@@ -1,0 +1,28 @@
+name: Deploy to Beget
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BEGET_HOST }}
+          username: ${{ secrets.BEGET_USER }}
+          password: ${{ secrets.BEGET_PASSWORD }}
+          port: 22
+          script: |
+            cd /home/borodachdev/apps/borodach-franchise-bot/
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt
+            mkdir -p logs
+            chmod +x scripts/*.sh
+            bash scripts/run.sh
+
