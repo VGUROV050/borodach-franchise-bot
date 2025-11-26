@@ -25,7 +25,7 @@ from .keyboards import (
     BTN_DONE_FILES,
     DEPT_BUTTON_TO_KEY,
 )
-from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError
+from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError, upload_file_to_task
 
 logger = logging.getLogger(__name__)
 
@@ -404,6 +404,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
     processing_msg = await message.answer("⏳ Создаю задачу...")
     
     try:
+        # 1. Создаём задачу
         task_id = await create_task(
             group_id=group_id,
             responsible_id=responsible_id,
@@ -417,7 +418,39 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
             files=files,
         )
         
-        files_text = f"\n📎 Прикреплено файлов: {len(files)}" if files else ""
+        # 2. Загружаем файлы в Bitrix (если есть)
+        uploaded_count = 0
+        if files:
+            await processing_msg.edit_text("⏳ Загружаю файлы...")
+            bot = message.bot
+            
+            for file_info in files:
+                try:
+                    file_id = file_info.get("file_id")
+                    file_type = file_info.get("type")
+                    
+                    # Определяем имя файла
+                    if file_type == "photo":
+                        file_name = f"photo_{telegram_user_id}_{uploaded_count + 1}.jpg"
+                    else:
+                        file_name = file_info.get("file_name", f"file_{uploaded_count + 1}")
+                    
+                    # Скачиваем файл из Telegram
+                    file = await bot.get_file(file_id)
+                    file_content = await bot.download_file(file.file_path)
+                    file_bytes = file_content.read()
+                    
+                    # Загружаем в Bitrix
+                    result = await upload_file_to_task(task_id, file_bytes, file_name)
+                    if result:
+                        uploaded_count += 1
+                        logger.info(f"Uploaded file {file_name} to task #{task_id}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to upload file: {e}")
+                    continue
+        
+        files_text = f"\n📎 Загружено файлов: {uploaded_count}" if uploaded_count > 0 else ""
         
         await processing_msg.edit_text(
             f"✅ <b>Задача успешно создана!</b>\n\n"
@@ -434,7 +467,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
             reply_markup=main_menu_keyboard(),
         )
         
-        logger.info(f"User {telegram_user_id} created task #{task_id} in {department_name}")
+        logger.info(f"User {telegram_user_id} created task #{task_id} in {department_name}, files: {uploaded_count}")
         
     except BitrixClientError as e:
         logger.error(f"Failed to create task for user {telegram_user_id}: {e}")
