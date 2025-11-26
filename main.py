@@ -5,6 +5,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.settings import TELEGRAM_BOT_TOKEN
 from bot import main_router
@@ -26,7 +27,8 @@ async def main():
         token=TELEGRAM_BOT_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML"),
     )
-    dp = Dispatcher()
+    # MemoryStorage для FSM (состояния сбросятся при перезапуске)
+    dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(main_router)
 
     logger.info("Starting bot polling...")
