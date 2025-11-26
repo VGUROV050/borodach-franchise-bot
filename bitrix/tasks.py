@@ -22,7 +22,6 @@ async def get_project_stages(group_id: str) -> dict[str, str]:
     Returns:
         Словарь {stage_id: stage_name}
     """
-    # Проверяем кэш
     if group_id in _stages_cache:
         return _stages_cache[group_id]
     
@@ -32,13 +31,11 @@ async def get_project_stages(group_id: str) -> dict[str, str]:
         
         stages_data = response.get("result", {})
         
-        # Преобразуем в словарь id -> title
         stages = {}
         for stage_id, stage_info in stages_data.items():
             if isinstance(stage_info, dict):
                 stages[str(stage_id)] = stage_info.get("TITLE", f"Этап {stage_id}")
         
-        # Сохраняем в кэш
         _stages_cache[group_id] = stages
         logger.info(f"Loaded {len(stages)} stages for group {group_id}")
         
@@ -54,10 +51,12 @@ async def create_task(
     responsible_id: str,
     department_name: str,
     branch: str,
+    title: str,
     description: str,
     telegram_user_id: int,
     telegram_username: str | None,
     telegram_name: str,
+    files: list[dict[str, Any]] | None = None,
 ) -> int:
     """
     Создать задачу в Bitrix24.
@@ -67,10 +66,12 @@ async def create_task(
         responsible_id: ID ответственного сотрудника в Bitrix
         department_name: Название отдела для отображения
         branch: Филиал (город/ТЦ/адрес)
+        title: Заголовок задачи от пользователя
         description: Описание задачи от пользователя
         telegram_user_id: ID пользователя в Telegram
         telegram_username: Username в Telegram (может быть None)
         telegram_name: Имя пользователя в Telegram
+        files: Список файлов (пока только информация, без загрузки в Bitrix)
         
     Returns:
         ID созданной задачи в Bitrix
@@ -78,8 +79,13 @@ async def create_task(
     Raises:
         BitrixClientError: При ошибке создания задачи
     """
-    # Формируем username для отображения
     username_display = f"@{telegram_username}" if telegram_username else "нет username"
+    
+    # Информация о файлах
+    files_info = ""
+    if files:
+        files_info = f"\n\n📎 Прикреплено файлов: {len(files)}"
+        # TODO: В будущем можно реализовать загрузку файлов в Bitrix через disk.folder.uploadfile
     
     # Формируем описание задачи
     full_description = f"""🏢 Отдел: {department_name}
@@ -87,22 +93,25 @@ async def create_task(
 
 📝 Описание задачи:
 {description}
-
+{files_info}
 ━━━━━━━━━━━━━━━━━━━━━━
 👤 Отправитель: {telegram_name} ({username_display})
 TG_USER_ID: {telegram_user_id}"""
 
+    # Формируем название: [Филиал] Заголовок от пользователя
+    task_title = f"[{branch}] {title}"
+
     params = {
         "fields": {
-            "TITLE": f"[{branch}] Задача от франчайзи",
+            "TITLE": task_title,
             "DESCRIPTION": full_description,
             "GROUP_ID": group_id,
             "RESPONSIBLE_ID": responsible_id,
-            "PRIORITY": "1",  # Средний приоритет
+            "PRIORITY": "1",
         }
     }
     
-    logger.info(f"Creating task for user {telegram_user_id}, dept: {department_name}, branch: {branch}")
+    logger.info(f"Creating task for user {telegram_user_id}, title: {title}, branch: {branch}")
     
     response = await call_method("tasks.task.add", params)
     
@@ -126,7 +135,6 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
     Returns:
         Список задач пользователя с названием этапа Kanban
     """
-    # Собираем все group_id из настроек
     group_ids = [
         dept["group_id"] 
         for dept in DEPARTMENTS.values() 
@@ -140,7 +148,6 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
     all_user_tasks = []
     
     for group_id in group_ids:
-        # Получаем этапы для этого проекта
         stages = await get_project_stages(group_id)
         
         params = {
@@ -156,11 +163,9 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
             response = await call_method("tasks.task.list", params)
             tasks = response.get("result", {}).get("tasks", [])
             
-            # Фильтруем по TG_USER_ID в описании
             search_pattern = f"TG_USER_ID: {telegram_user_id}"
             for task in tasks:
                 if search_pattern in task.get("description", ""):
-                    # Добавляем название этапа
                     stage_id = str(task.get("stageId", ""))
                     task["stage_name"] = stages.get(stage_id, "")
                     all_user_tasks.append(task)
@@ -169,7 +174,6 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
             logger.warning(f"Failed to fetch tasks from group {group_id}: {e}")
             continue
     
-    # Сортируем по дате создания (новые первые)
     all_user_tasks.sort(key=lambda t: t.get("createdDate", ""), reverse=True)
     
     logger.info(f"Found {len(all_user_tasks)} tasks for user {telegram_user_id}")

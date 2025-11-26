@@ -12,6 +12,15 @@ BTN_DEPT_DEVELOPMENT = "🚀 Отдел Развития"
 BTN_DEPT_MARKETING = "📢 Отдел Маркетинга"
 BTN_DEPT_DESIGN = "🎨 Дизайн"
 
+# Кнопки подтверждения описания
+BTN_ADD_COMMENT = "💬 Добавить комментарий"
+BTN_CONTINUE = "✅ Продолжить"
+
+# Кнопки прикрепления файлов
+BTN_ATTACH_FILES = "📎 Прикрепить файлы"
+BTN_SKIP_FILES = "⏭ Пропустить"
+BTN_DONE_FILES = "✅ Готово"
+
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
     BTN_DEPT_DEVELOPMENT: "development",
@@ -55,5 +64,44 @@ def cancel_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Введите ответ или вернитесь в меню",
+    )
+    return keyboard
+
+
+def confirm_description_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура подтверждения описания задачи."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_ADD_COMMENT), KeyboardButton(text=BTN_CONTINUE)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Добавить комментарий или продолжить?",
+    )
+    return keyboard
+
+
+def attach_files_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для прикрепления файлов."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_ATTACH_FILES), KeyboardButton(text=BTN_SKIP_FILES)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Прикрепить файлы?",
+    )
+    return keyboard
+
+
+def done_files_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура после загрузки файлов."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_DONE_FILES)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Отправьте файлы или нажмите Готово",
     )
     return keyboard

@@ -12,9 +12,17 @@ from .keyboards import (
     main_menu_keyboard, 
     cancel_keyboard,
     department_keyboard,
+    confirm_description_keyboard,
+    attach_files_keyboard,
+    done_files_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
+    BTN_ADD_COMMENT,
+    BTN_CONTINUE,
+    BTN_ATTACH_FILES,
+    BTN_SKIP_FILES,
+    BTN_DONE_FILES,
     DEPT_BUTTON_TO_KEY,
 )
 from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError
@@ -31,7 +39,12 @@ router = Router()
 class NewTaskStates(StatesGroup):
     waiting_for_department = State()
     waiting_for_branch = State()
+    waiting_for_title = State()
     waiting_for_description = State()
+    waiting_for_confirm = State()
+    waiting_for_comment = State()
+    waiting_for_files_choice = State()
+    waiting_for_files = State()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -60,7 +73,6 @@ async def cancel_handler(message: types.Message, state: FSMContext) -> None:
 @router.message(CommandStart())
 async def cmd_start(message: types.Message, state: FSMContext) -> None:
     """Обработчик команды /start."""
-    # Сбрасываем состояние, если пользователь был в процессе создания задачи
     await state.clear()
     
     await message.answer(
@@ -74,12 +86,12 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Новая задача
+# Новая задача — Шаг 1: Выбор отдела
 # ═══════════════════════════════════════════════════════════════════
 
 @router.message(F.text == BTN_NEW_TASK)
 async def new_task_start(message: types.Message, state: FSMContext) -> None:
-    """Начало создания новой задачи — спрашиваем отдел."""
+    """Начало создания задачи — выбор отдела."""
     await state.set_state(NewTaskStates.waiting_for_department)
     
     await message.answer(
@@ -91,11 +103,10 @@ async def new_task_start(message: types.Message, state: FSMContext) -> None:
 
 @router.message(NewTaskStates.waiting_for_department, F.text.in_(DEPT_BUTTON_TO_KEY.keys()))
 async def new_task_department(message: types.Message, state: FSMContext) -> None:
-    """Получили отдел — спрашиваем филиал."""
+    """Шаг 1: Получили отдел → спрашиваем филиал."""
     dept_key = DEPT_BUTTON_TO_KEY[message.text]
     dept_info = DEPARTMENTS[dept_key]
     
-    # Проверяем что group_id и responsible_id настроены
     if not dept_info["group_id"] or not dept_info["responsible_id"]:
         await message.answer(
             f"❌ Отдел «{dept_info['name']}» пока не настроен.\n"
@@ -104,12 +115,12 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
         )
         return
     
-    # Сохраняем выбранный отдел в FSM
     await state.update_data(
         department_key=dept_key,
         department_name=dept_info["name"],
         group_id=dept_info["group_id"],
         responsible_id=dept_info["responsible_id"],
+        files=[],  # Список для файлов
     )
     await state.set_state(NewTaskStates.waiting_for_branch)
     
@@ -130,9 +141,13 @@ async def new_task_department_invalid(message: types.Message, state: FSMContext)
     )
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Новая задача — Шаг 2: Филиал
+# ═══════════════════════════════════════════════════════════════════
+
 @router.message(NewTaskStates.waiting_for_branch)
 async def new_task_branch(message: types.Message, state: FSMContext) -> None:
-    """Получили филиал — спрашиваем описание задачи."""
+    """Шаг 2: Получили филиал → спрашиваем заголовок."""
     branch = message.text.strip()
     
     if not branch:
@@ -142,19 +157,49 @@ async def new_task_branch(message: types.Message, state: FSMContext) -> None:
         )
         return
     
-    # Сохраняем филиал в FSM
     await state.update_data(branch=branch)
-    await state.set_state(NewTaskStates.waiting_for_description)
+    await state.set_state(NewTaskStates.waiting_for_title)
     
     await message.answer(
-        "📝 <b>Опишите, пожалуйста, задачу для УК как можно конкретнее:</b>",
+        "✏️ <b>Введите краткий заголовок задачи:</b>\n\n"
+        "Например: «Ремонт кондиционера» или «Заказ расходников»",
         reply_markup=cancel_keyboard(),
     )
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Новая задача — Шаг 3: Заголовок
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(NewTaskStates.waiting_for_title)
+async def new_task_title(message: types.Message, state: FSMContext) -> None:
+    """Шаг 3: Получили заголовок → спрашиваем описание."""
+    title = message.text.strip()
+    
+    if not title:
+        await message.answer(
+            "Пожалуйста, введите заголовок задачи:",
+            reply_markup=cancel_keyboard(),
+        )
+        return
+    
+    await state.update_data(title=title)
+    await state.set_state(NewTaskStates.waiting_for_description)
+    
+    await message.answer(
+        "📝 <b>Опишите задачу подробнее:</b>\n\n"
+        "Укажите все детали, которые помогут выполнить задачу.",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Новая задача — Шаг 4: Описание
+# ═══════════════════════════════════════════════════════════════════
+
 @router.message(NewTaskStates.waiting_for_description)
 async def new_task_description(message: types.Message, state: FSMContext) -> None:
-    """Получили описание — создаём задачу в Bitrix."""
+    """Шаг 4: Получили описание → показываем подтверждение."""
     description = message.text.strip()
     
     if not description:
@@ -164,20 +209,198 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
         )
         return
     
-    # Получаем сохранённые данные
+    await state.update_data(description=description)
+    await state.set_state(NewTaskStates.waiting_for_confirm)
+    
+    # Показываем превью задачи
     data = await state.get_data()
+    
+    await message.answer(
+        f"📋 <b>Проверьте вашу задачу:</b>\n\n"
+        f"🏢 Отдел: {data['department_name']}\n"
+        f"📍 Филиал: {data['branch']}\n"
+        f"✏️ Заголовок: {data['title']}\n\n"
+        f"📝 Описание:\n{description}\n\n"
+        "Хотите добавить комментарий или продолжить?",
+        reply_markup=confirm_description_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Новая задача — Шаг 5: Подтверждение / Добавить комментарий
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(NewTaskStates.waiting_for_confirm, F.text == BTN_ADD_COMMENT)
+async def new_task_add_comment(message: types.Message, state: FSMContext) -> None:
+    """Пользователь хочет добавить комментарий."""
+    await state.set_state(NewTaskStates.waiting_for_comment)
+    
+    await message.answer(
+        "💬 <b>Введите дополнительный комментарий:</b>",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_comment)
+async def new_task_comment(message: types.Message, state: FSMContext) -> None:
+    """Получили комментарий → добавляем к описанию."""
+    comment = message.text.strip()
+    
+    if not comment:
+        await message.answer(
+            "Пожалуйста, введите комментарий:",
+            reply_markup=cancel_keyboard(),
+        )
+        return
+    
+    # Добавляем комментарий к описанию
+    data = await state.get_data()
+    updated_description = data["description"] + f"\n\n💬 Дополнение: {comment}"
+    await state.update_data(description=updated_description)
+    
+    await state.set_state(NewTaskStates.waiting_for_confirm)
+    
+    # Показываем обновлённое превью
+    await message.answer(
+        f"📋 <b>Обновлённое описание:</b>\n\n"
+        f"🏢 Отдел: {data['department_name']}\n"
+        f"📍 Филиал: {data['branch']}\n"
+        f"✏️ Заголовок: {data['title']}\n\n"
+        f"📝 Описание:\n{updated_description}\n\n"
+        "Хотите добавить ещё комментарий или продолжить?",
+        reply_markup=confirm_description_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_confirm, F.text == BTN_CONTINUE)
+async def new_task_continue(message: types.Message, state: FSMContext) -> None:
+    """Пользователь подтвердил описание → спрашиваем про файлы."""
+    await state.set_state(NewTaskStates.waiting_for_files_choice)
+    
+    await message.answer(
+        "📎 <b>Хотите прикрепить файлы к задаче?</b>\n\n"
+        "Вы можете отправить фото, документы или другие файлы.",
+        reply_markup=attach_files_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_confirm)
+async def new_task_confirm_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неверный выбор на этапе подтверждения."""
+    await message.answer(
+        "⚠️ Пожалуйста, выберите действие из кнопок ниже:",
+        reply_markup=confirm_description_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Новая задача — Шаг 6: Файлы
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(NewTaskStates.waiting_for_files_choice, F.text == BTN_SKIP_FILES)
+async def new_task_skip_files(message: types.Message, state: FSMContext) -> None:
+    """Пропустить прикрепление файлов → создаём задачу."""
+    await _create_task_final(message, state)
+
+
+@router.message(NewTaskStates.waiting_for_files_choice, F.text == BTN_ATTACH_FILES)
+async def new_task_attach_files(message: types.Message, state: FSMContext) -> None:
+    """Пользователь хочет прикрепить файлы."""
+    await state.set_state(NewTaskStates.waiting_for_files)
+    
+    await message.answer(
+        "📎 <b>Отправьте файлы</b>\n\n"
+        "Вы можете отправить несколько фото или документов.\n"
+        "Когда закончите — нажмите «✅ Готово».",
+        reply_markup=done_files_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_files_choice)
+async def new_task_files_choice_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неверный выбор на этапе файлов."""
+    await message.answer(
+        "⚠️ Пожалуйста, выберите действие из кнопок ниже:",
+        reply_markup=attach_files_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_files, F.text == BTN_DONE_FILES)
+async def new_task_files_done(message: types.Message, state: FSMContext) -> None:
+    """Пользователь закончил загружать файлы → создаём задачу."""
+    await _create_task_final(message, state)
+
+
+@router.message(NewTaskStates.waiting_for_files, F.photo)
+async def new_task_receive_photo(message: types.Message, state: FSMContext) -> None:
+    """Получили фото — сохраняем file_id."""
+    data = await state.get_data()
+    files = data.get("files", [])
+    
+    # Берём фото максимального размера
+    photo = message.photo[-1]
+    files.append({"type": "photo", "file_id": photo.file_id})
+    
+    await state.update_data(files=files)
+    
+    await message.answer(
+        f"✅ Фото добавлено (всего файлов: {len(files)})\n\n"
+        "Отправьте ещё файлы или нажмите «✅ Готово».",
+        reply_markup=done_files_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_files, F.document)
+async def new_task_receive_document(message: types.Message, state: FSMContext) -> None:
+    """Получили документ — сохраняем file_id."""
+    data = await state.get_data()
+    files = data.get("files", [])
+    
+    files.append({
+        "type": "document",
+        "file_id": message.document.file_id,
+        "file_name": message.document.file_name,
+    })
+    
+    await state.update_data(files=files)
+    
+    await message.answer(
+        f"✅ Документ «{message.document.file_name}» добавлен (всего файлов: {len(files)})\n\n"
+        "Отправьте ещё файлы или нажмите «✅ Готово».",
+        reply_markup=done_files_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_files)
+async def new_task_files_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неподдерживаемый тип файла или текст."""
+    await message.answer(
+        "📎 Отправьте фото или документ, либо нажмите «✅ Готово».",
+        reply_markup=done_files_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Финальное создание задачи
+# ═══════════════════════════════════════════════════════════════════
+
+async def _create_task_final(message: types.Message, state: FSMContext) -> None:
+    """Создание задачи в Bitrix с учётом всех данных."""
+    data = await state.get_data()
+    
     group_id = data.get("group_id")
     responsible_id = data.get("responsible_id")
     department_name = data.get("department_name", "Не указан")
     branch = data.get("branch", "Не указан")
+    title = data.get("title", "Задача от франчайзи")
+    description = data.get("description", "")
+    files = data.get("files", [])
     
-    # Данные пользователя
     user = message.from_user
     telegram_user_id = user.id
     telegram_username = user.username
     telegram_name = user.full_name
     
-    # Отправляем сообщение о процессе
     processing_msg = await message.answer("⏳ Создаю задачу...")
     
     try:
@@ -186,21 +409,26 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
             responsible_id=responsible_id,
             department_name=department_name,
             branch=branch,
+            title=title,
             description=description,
             telegram_user_id=telegram_user_id,
             telegram_username=telegram_username,
             telegram_name=telegram_name,
+            files=files,
         )
+        
+        files_text = f"\n📎 Прикреплено файлов: {len(files)}" if files else ""
         
         await processing_msg.edit_text(
             f"✅ <b>Задача успешно создана!</b>\n\n"
             f"📌 Номер задачи: <b>#{task_id}</b>\n"
             f"🏢 Отдел: {department_name}\n"
-            f"📍 Филиал: {branch}\n\n"
+            f"📍 Филиал: {branch}\n"
+            f"✏️ Заголовок: {title}"
+            f"{files_text}\n\n"
             f"Мы уведомим вас об обновлениях.",
         )
         
-        # Возвращаем главное меню
         await message.answer(
             "Выберите следующее действие:",
             reply_markup=main_menu_keyboard(),
@@ -219,7 +447,6 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
             reply_markup=main_menu_keyboard(),
         )
     
-    # Сбрасываем состояние
     await state.clear()
 
 
@@ -230,7 +457,6 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
 @router.message(F.text == BTN_MY_TASKS)
 async def my_tasks(message: types.Message, state: FSMContext) -> None:
     """Показать список задач пользователя."""
-    # Сбрасываем состояние, если был в процессе создания задачи
     await state.clear()
     
     telegram_user_id = message.from_user.id
@@ -247,7 +473,6 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
             )
             return
         
-        # Формируем список задач
         lines = ["📋 <b>Ваши задачи:</b>\n"]
         
         for task in tasks:
@@ -255,7 +480,6 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
             title = task.get("title", "Без названия")
             stage = format_task_stage(task.get("stage_name", ""))
             
-            # Обрезаем длинные названия
             if len(title) > 40:
                 title = title[:37] + "..."
             
