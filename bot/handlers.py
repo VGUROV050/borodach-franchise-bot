@@ -566,19 +566,19 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
         
         if not tasks:
             await processing_msg.edit_text(
-                "📭 <b>У вас нет активных задач</b>\n\n"
+                "📭 <b>У вас нет задач в работе</b>\n\n"
                 "Все задачи завершены или вы ещё не создавали задач.",
                 reply_markup=show_all_tasks_keyboard(),
             )
             return
         
-        text = _format_tasks_list(tasks, f"Ваши активные задачи ({len(tasks)})")
+        text = _format_tasks_list(tasks, f"Ваши задачи в работе ({len(tasks)})")
         
         await processing_msg.edit_text(text)
         
         # Спрашиваем, показать ли все задачи
         await message.answer(
-            "Показаны только <b>незавершённые</b> задачи.\n"
+            "Показаны только <b>задачи в работе</b>.\n"
             "Хотите посмотреть все задачи, включая завершённые?",
             reply_markup=show_all_tasks_keyboard(),
         )
