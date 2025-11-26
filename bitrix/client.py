@@ -1,5 +1,6 @@
 # Bitrix API client
 
+import base64
 import logging
 from typing import Any
 
@@ -56,48 +57,78 @@ async def call_method(method: str, params: dict[str, Any] | None = None) -> dict
 
 async def upload_file_to_task(task_id: int, file_content: bytes, file_name: str) -> int | None:
     """
-    Загрузить файл и прикрепить к задаче через комментарий.
-    Использует multipart/form-data.
+    Загрузить файл в Bitrix Disk и прикрепить к задаче.
+    
+    Шаг 1: Загружаем файл в общее хранилище
+    Шаг 2: Прикрепляем к задаче через UF_TASK_WEBDAV_FILES
     """
     if not BITRIX_WEBHOOK_URL:
         return None
     
-    url = f"{BITRIX_WEBHOOK_URL.rstrip('/')}/task.commentitem.add"
-    
     logger.info(f"Uploading file {file_name} ({len(file_content)} bytes) to task #{task_id}")
     
     try:
-        # Multipart upload с правильными именами полей для Bitrix
-        # Файлы передаются как UF_FORUM_MESSAGE_DOC[n]
-        files = [
-            ("UF_FORUM_MESSAGE_DOC[0]", (file_name, file_content, "application/octet-stream")),
-        ]
+        # Шаг 1: Получаем ID общего хранилища
+        storage_response = await call_method("disk.storage.getlist", {
+            "filter": {"ENTITY_TYPE": "common"}
+        })
         
-        data = {
-            "TASKID": str(task_id),
-            "FIELDS[POST_MESSAGE]": "📎 Файл от франчайзи:",
+        storages = storage_response.get("result", [])
+        if not storages:
+            logger.error("No common storage found")
+            return None
+        
+        storage_id = storages[0].get("ID")
+        root_folder_id = storages[0].get("ROOT_OBJECT_ID")
+        
+        logger.info(f"Using storage {storage_id}, root folder {root_folder_id}")
+        
+        # Шаг 2: Загружаем файл в корневую папку хранилища
+        file_base64 = base64.b64encode(file_content).decode('utf-8')
+        
+        upload_url = f"{BITRIX_WEBHOOK_URL.rstrip('/')}/disk.folder.uploadfile"
+        
+        upload_params = {
+            "id": root_folder_id,
+            "data": {"NAME": file_name},
+            "fileContent": [file_name, file_base64]
         }
         
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
-            response = await client.post(url, data=data, files=files)
-            
-            logger.info(f"Upload response: {response.status_code}")
+            response = await client.post(upload_url, json=upload_params)
             
             if response.status_code != 200:
-                logger.error(f"File upload HTTP error: {response.status_code} - {response.text[:500]}")
+                logger.error(f"File upload HTTP error: {response.status_code}")
                 return None
             
             result = response.json()
-            logger.info(f"Upload result: {result}")
+            logger.info(f"Disk upload result: {result}")
             
             if "error" in result:
-                error_msg = result.get('error_description', result.get('error', 'Unknown error'))
-                logger.error(f"File upload API error: {error_msg}")
+                logger.error(f"Disk upload error: {result.get('error_description', result['error'])}")
                 return None
             
-            comment_id = result.get("result")
-            logger.info(f"File uploaded successfully, comment ID: {comment_id}")
-            return comment_id
+            file_id = result.get("result", {}).get("ID")
+            if not file_id:
+                logger.error("No file ID in upload response")
+                return None
+            
+            logger.info(f"File uploaded to disk with ID: {file_id}")
+        
+        # Шаг 3: Прикрепляем файл к задаче
+        attach_params = {
+            "taskId": task_id,
+            "fileId": file_id
+        }
+        
+        attach_response = await call_method("tasks.task.files.attach", attach_params)
+        
+        if attach_response.get("result"):
+            logger.info(f"File {file_id} attached to task #{task_id}")
+            return file_id
+        else:
+            logger.warning(f"File attachment result: {attach_response}")
+            return file_id  # Файл загружен, но не прикреплён
             
     except Exception as e:
         logger.error(f"File upload error: {e}")
