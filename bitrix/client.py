@@ -1,6 +1,5 @@
 # Bitrix API client
 
-import base64
 import logging
 from typing import Any
 
@@ -58,33 +57,29 @@ async def call_method(method: str, params: dict[str, Any] | None = None) -> dict
 async def upload_file_to_task(task_id: int, file_content: bytes, file_name: str) -> int | None:
     """
     Загрузить файл и прикрепить к задаче через комментарий.
-    Использует JSON формат с base64 содержимым файла.
+    Использует multipart/form-data.
     """
     if not BITRIX_WEBHOOK_URL:
         return None
     
     url = f"{BITRIX_WEBHOOK_URL.rstrip('/')}/task.commentitem.add"
     
-    # Кодируем файл в base64
-    file_base64 = base64.b64encode(file_content).decode('utf-8')
-    
     logger.info(f"Uploading file {file_name} ({len(file_content)} bytes) to task #{task_id}")
     
     try:
-        # Формат Bitrix для файлов в комментариях: 
-        # UF_FORUM_MESSAGE_DOC: [["filename", "base64content"]]
-        params = {
-            "TASKID": task_id,
-            "FIELDS": {
-                "POST_MESSAGE": "📎 Файл от франчайзи:",
-                "UF_FORUM_MESSAGE_DOC": [
-                    [file_name, file_base64]
-                ]
-            }
+        # Multipart upload с правильными именами полей для Bitrix
+        # Файлы передаются как UF_FORUM_MESSAGE_DOC[n]
+        files = [
+            ("UF_FORUM_MESSAGE_DOC[0]", (file_name, file_content, "application/octet-stream")),
+        ]
+        
+        data = {
+            "TASKID": str(task_id),
+            "FIELDS[POST_MESSAGE]": "📎 Файл от франчайзи:",
         }
         
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
-            response = await client.post(url, json=params)
+            response = await client.post(url, data=data, files=files)
             
             logger.info(f"Upload response: {response.status_code}")
             
@@ -93,12 +88,11 @@ async def upload_file_to_task(task_id: int, file_content: bytes, file_name: str)
                 return None
             
             result = response.json()
+            logger.info(f"Upload result: {result}")
             
             if "error" in result:
                 error_msg = result.get('error_description', result.get('error', 'Unknown error'))
                 logger.error(f"File upload API error: {error_msg}")
-                # Логируем полный ответ для отладки
-                logger.error(f"Full response: {result}")
                 return None
             
             comment_id = result.get("result")
