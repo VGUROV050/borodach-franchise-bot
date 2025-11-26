@@ -1,7 +1,14 @@
 # Bitrix module
 
 from .client import BitrixClientError, upload_file_to_task
-from .tasks import create_task, get_user_tasks, format_task_stage
+from .tasks import (
+    create_task, 
+    get_user_tasks, 
+    format_task_stage,
+    get_task_by_id,
+    cancel_task,
+    verify_task_ownership,
+)
 
 __all__ = [
     "BitrixClientError",
@@ -9,4 +16,7 @@ __all__ = [
     "create_task",
     "get_user_tasks", 
     "format_task_stage",
+    "get_task_by_id",
+    "cancel_task",
+    "verify_task_ownership",
 ]

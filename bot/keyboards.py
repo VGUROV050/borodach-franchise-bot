@@ -23,6 +23,9 @@ BTN_DONE_FILES = "✅ Готово"
 
 # Кнопки просмотра задач
 BTN_SHOW_ALL_TASKS = "📋 Показать все задачи"
+BTN_CANCEL_TASK = "❌ Отменить задачу"
+BTN_CONFIRM_CANCEL = "✅ Да, отменить"
+BTN_REJECT_CANCEL = "❌ Нет"
 
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
@@ -119,5 +122,30 @@ def show_all_tasks_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Показать все или в меню?",
+    )
+    return keyboard
+
+
+def all_tasks_actions_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура после показа всех задач (с возможностью отмены)."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_CANCEL_TASK)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Отменить задачу или в меню?",
+    )
+    return keyboard
+
+
+def confirm_cancel_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура подтверждения отмены задачи."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_CONFIRM_CANCEL), KeyboardButton(text=BTN_REJECT_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Подтвердите отмену",
     )
     return keyboard

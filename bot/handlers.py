@@ -18,6 +18,8 @@ from .keyboards import (
     attach_files_keyboard,
     done_files_keyboard,
     show_all_tasks_keyboard,
+    all_tasks_actions_keyboard,
+    confirm_cancel_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -27,9 +29,21 @@ from .keyboards import (
     BTN_SKIP_FILES,
     BTN_DONE_FILES,
     BTN_SHOW_ALL_TASKS,
+    BTN_CANCEL_TASK,
+    BTN_CONFIRM_CANCEL,
+    BTN_REJECT_CANCEL,
     DEPT_BUTTON_TO_KEY,
 )
-from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError, upload_file_to_task
+from bitrix import (
+    create_task, 
+    get_user_tasks, 
+    format_task_stage, 
+    BitrixClientError, 
+    upload_file_to_task,
+    get_task_by_id,
+    cancel_task,
+    verify_task_ownership,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +63,11 @@ class NewTaskStates(StatesGroup):
     waiting_for_comment = State()
     waiting_for_files_choice = State()
     waiting_for_files = State()
+
+
+class CancelTaskStates(StatesGroup):
+    waiting_for_task_id = State()
+    waiting_for_confirm = State()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -596,6 +615,7 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
 @router.message(F.text == BTN_SHOW_ALL_TASKS)
 async def show_all_tasks(message: types.Message, state: FSMContext) -> None:
     """Показать все задачи пользователя, включая завершённые."""
+    await state.clear()
     telegram_user_id = message.from_user.id
     
     processing_msg = await message.answer("⏳ Загружаю все задачи...")
@@ -620,8 +640,8 @@ async def show_all_tasks(message: types.Message, state: FSMContext) -> None:
         await processing_msg.edit_text(text)
         
         await message.answer(
-            "Выберите действие:",
-            reply_markup=main_menu_keyboard(),
+            "Вы можете отменить задачу или вернуться в меню:",
+            reply_markup=all_tasks_actions_keyboard(),
         )
         
         logger.info(f"User {telegram_user_id} viewed all {len(tasks)} tasks")
@@ -636,3 +656,130 @@ async def show_all_tasks(message: types.Message, state: FSMContext) -> None:
             "Выберите действие:",
             reply_markup=main_menu_keyboard(),
         )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Отмена задачи
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_CANCEL_TASK)
+async def cancel_task_start(message: types.Message, state: FSMContext) -> None:
+    """Начало процесса отмены задачи."""
+    await state.set_state(CancelTaskStates.waiting_for_task_id)
+    
+    await message.answer(
+        "🔢 <b>Введите номер задачи для отмены</b>\n\n"
+        "Укажите только цифры, например: <code>39802</code>",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+@router.message(CancelTaskStates.waiting_for_task_id)
+async def cancel_task_receive_id(message: types.Message, state: FSMContext) -> None:
+    """Получили ID задачи для отмены."""
+    # Проверка на кнопку "Главное меню"
+    if message.text == BTN_CANCEL:
+        await state.clear()
+        await message.answer(
+            "🏠 Вы вернулись в главное меню.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+    
+    # Валидация: должно быть число
+    task_id_text = message.text.strip()
+    if not task_id_text.isdigit():
+        await message.answer(
+            "❌ Введите только цифры (номер задачи).\n"
+            "Например: <code>39802</code>",
+            reply_markup=cancel_keyboard(),
+        )
+        return
+    
+    task_id = int(task_id_text)
+    telegram_user_id = message.from_user.id
+    
+    # Получаем задачу из Bitrix
+    processing_msg = await message.answer("⏳ Проверяю задачу...")
+    
+    task = await get_task_by_id(task_id)
+    
+    if not task:
+        await processing_msg.edit_text(
+            f"❌ Задача <b>#{task_id}</b> не найдена.\n\n"
+            "Проверьте номер и попробуйте снова.",
+        )
+        return
+    
+    # Проверяем, что задача принадлежит пользователю
+    if not verify_task_ownership(task, telegram_user_id):
+        await processing_msg.edit_text(
+            f"❌ Задача <b>#{task_id}</b> не принадлежит вам.\n\n"
+            "Вы можете отменять только свои задачи.",
+        )
+        return
+    
+    # Сохраняем данные для подтверждения
+    await state.update_data(
+        cancel_task_id=task_id,
+        cancel_task_title=task.get("title", "Без названия"),
+        cancel_task_group_id=task.get("groupId", ""),
+    )
+    
+    await state.set_state(CancelTaskStates.waiting_for_confirm)
+    
+    await processing_msg.edit_text(
+        f"⚠️ <b>Подтвердите отмену задачи</b>\n\n"
+        f"<b>#{task_id}</b> — {task.get('title', 'Без названия')}\n\n"
+        f"Вы уверены, что хотите отменить эту задачу?",
+    )
+    
+    await message.answer(
+        "Выберите действие:",
+        reply_markup=confirm_cancel_keyboard(),
+    )
+
+
+@router.message(CancelTaskStates.waiting_for_confirm, F.text == BTN_CONFIRM_CANCEL)
+async def cancel_task_confirm(message: types.Message, state: FSMContext) -> None:
+    """Подтверждение отмены задачи."""
+    data = await state.get_data()
+    
+    task_id = data.get("cancel_task_id")
+    task_title = data.get("cancel_task_title", "Без названия")
+    group_id = data.get("cancel_task_group_id", "")
+    
+    processing_msg = await message.answer("⏳ Отменяю задачу...")
+    
+    success = await cancel_task(task_id, group_id)
+    
+    if success:
+        await processing_msg.edit_text(
+            f"✅ <b>Задача отменена</b>\n\n"
+            f"<b>#{task_id}</b> — {task_title}\n\n"
+            f"Задача переведена на этап «Отменена».",
+        )
+        logger.info(f"User {message.from_user.id} cancelled task #{task_id}")
+    else:
+        await processing_msg.edit_text(
+            f"❌ <b>Не удалось отменить задачу</b>\n\n"
+            f"Возможно, в проекте нет этапа «Отменена».\n"
+            f"Попробуйте позже или обратитесь в поддержку.",
+        )
+    
+    await state.clear()
+    await message.answer(
+        "Выберите действие:",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+@router.message(CancelTaskStates.waiting_for_confirm, F.text == BTN_REJECT_CANCEL)
+async def cancel_task_reject(message: types.Message, state: FSMContext) -> None:
+    """Отказ от отмены задачи."""
+    await state.clear()
+    await message.answer(
+        "👌 Отмена задачи отменена.\n\n"
+        "Выберите действие:",
+        reply_markup=main_menu_keyboard(),
+    )

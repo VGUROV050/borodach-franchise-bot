@@ -197,3 +197,97 @@ def format_task_stage(stage_name: str) -> str:
     if not stage_name:
         return "📋 Без этапа"
     return f"📋 {stage_name}"
+
+
+async def get_task_by_id(task_id: int) -> dict[str, Any] | None:
+    """
+    Получить задачу по ID.
+    
+    Args:
+        task_id: ID задачи в Bitrix
+        
+    Returns:
+        Данные задачи или None, если не найдена
+    """
+    params = {
+        "taskId": task_id,
+        "select": ["ID", "TITLE", "STATUS", "STAGE_ID", "DESCRIPTION", "GROUP_ID"],
+    }
+    
+    try:
+        response = await call_method("tasks.task.get", params)
+        task = response.get("result", {}).get("task", {})
+        return task if task else None
+    except BitrixClientError as e:
+        logger.warning(f"Failed to get task {task_id}: {e}")
+        return None
+
+
+async def get_cancelled_stage_id(group_id: str) -> str | None:
+    """
+    Найти ID этапа "Отменена" в проекте.
+    
+    Args:
+        group_id: ID проекта/группы в Bitrix
+        
+    Returns:
+        ID этапа "Отменена" или None, если не найден
+    """
+    stages = await get_project_stages(group_id)
+    
+    # Ищем этап с названием "Отменена" (или похожим)
+    for stage_id, stage_name in stages.items():
+        if "отменен" in stage_name.lower():
+            return stage_id
+    
+    logger.warning(f"Cancelled stage not found in group {group_id}")
+    return None
+
+
+async def cancel_task(task_id: int, group_id: str) -> bool:
+    """
+    Отменить задачу — перевести на этап "Отменена".
+    
+    Args:
+        task_id: ID задачи
+        group_id: ID проекта/группы задачи
+        
+    Returns:
+        True, если успешно, False иначе
+    """
+    cancelled_stage_id = await get_cancelled_stage_id(group_id)
+    
+    if not cancelled_stage_id:
+        logger.error(f"Cannot cancel task {task_id}: no 'Отменена' stage in group {group_id}")
+        return False
+    
+    params = {
+        "taskId": task_id,
+        "fields": {
+            "STAGE_ID": cancelled_stage_id,
+        }
+    }
+    
+    try:
+        await call_method("tasks.task.update", params)
+        logger.info(f"Task {task_id} moved to cancelled stage {cancelled_stage_id}")
+        return True
+    except BitrixClientError as e:
+        logger.error(f"Failed to cancel task {task_id}: {e}")
+        return False
+
+
+def verify_task_ownership(task: dict[str, Any], telegram_user_id: int) -> bool:
+    """
+    Проверить, что задача принадлежит пользователю.
+    
+    Args:
+        task: Данные задачи из Bitrix
+        telegram_user_id: ID пользователя в Telegram
+        
+    Returns:
+        True, если задача принадлежит пользователю
+    """
+    description = task.get("description", "")
+    search_pattern = f"TG_USER_ID: {telegram_user_id}"
+    return search_pattern in description
