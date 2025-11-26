@@ -3,16 +3,19 @@
 import logging
 
 from aiogram import Router, types, F
-from aiogram.filters import CommandStart, StateFilter
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
+from config.settings import DEPARTMENTS
 from .keyboards import (
     main_menu_keyboard, 
     cancel_keyboard,
+    department_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
+    DEPT_BUTTON_TO_KEY,
 )
 from bitrix import create_task, get_user_tasks, format_task_status, BitrixClientError
 
@@ -26,6 +29,7 @@ router = Router()
 # ═══════════════════════════════════════════════════════════════════
 
 class NewTaskStates(StatesGroup):
+    waiting_for_department = State()
     waiting_for_branch = State()
     waiting_for_description = State()
 
@@ -75,13 +79,53 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 
 @router.message(F.text == BTN_NEW_TASK)
 async def new_task_start(message: types.Message, state: FSMContext) -> None:
-    """Начало создания новой задачи — спрашиваем филиал."""
+    """Начало создания новой задачи — спрашиваем отдел."""
+    await state.set_state(NewTaskStates.waiting_for_department)
+    
+    await message.answer(
+        "🏢 <b>В какой отдел вы хотите поставить задачу?</b>\n\n"
+        "Выберите отдел:",
+        reply_markup=department_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_department, F.text.in_(DEPT_BUTTON_TO_KEY.keys()))
+async def new_task_department(message: types.Message, state: FSMContext) -> None:
+    """Получили отдел — спрашиваем филиал."""
+    dept_key = DEPT_BUTTON_TO_KEY[message.text]
+    dept_info = DEPARTMENTS[dept_key]
+    
+    # Проверяем что group_id настроен
+    if not dept_info["group_id"]:
+        await message.answer(
+            f"❌ Отдел «{dept_info['name']}» пока не настроен.\n"
+            "Обратитесь к администратору.",
+            reply_markup=department_keyboard(),
+        )
+        return
+    
+    # Сохраняем выбранный отдел в FSM
+    await state.update_data(
+        department_key=dept_key,
+        department_name=dept_info["name"],
+        group_id=dept_info["group_id"],
+    )
     await state.set_state(NewTaskStates.waiting_for_branch)
     
     await message.answer(
+        f"✅ Отдел: <b>{dept_info['name']}</b>\n\n"
         "📍 <b>По какому филиалу вы хотите поставить задачу?</b>\n\n"
         "Укажите город, ТЦ или адрес:",
         reply_markup=cancel_keyboard(),
+    )
+
+
+@router.message(NewTaskStates.waiting_for_department)
+async def new_task_department_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неверный выбор отдела."""
+    await message.answer(
+        "⚠️ Пожалуйста, выберите отдел из списка ниже:",
+        reply_markup=department_keyboard(),
     )
 
 
@@ -119,8 +163,10 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
         )
         return
     
-    # Получаем сохранённый филиал
+    # Получаем сохранённые данные
     data = await state.get_data()
+    group_id = data.get("group_id")
+    department_name = data.get("department_name", "Не указан")
     branch = data.get("branch", "Не указан")
     
     # Данные пользователя
@@ -134,6 +180,8 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
     
     try:
         task_id = await create_task(
+            group_id=group_id,
+            department_name=department_name,
             branch=branch,
             description=description,
             telegram_user_id=telegram_user_id,
@@ -144,6 +192,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
         await processing_msg.edit_text(
             f"✅ <b>Задача успешно создана!</b>\n\n"
             f"📌 Номер задачи: <b>#{task_id}</b>\n"
+            f"🏢 Отдел: {department_name}\n"
             f"📍 Филиал: {branch}\n\n"
             f"Мы уведомим вас об обновлениях.",
         )
@@ -154,7 +203,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
             reply_markup=main_menu_keyboard(),
         )
         
-        logger.info(f"User {telegram_user_id} created task #{task_id}")
+        logger.info(f"User {telegram_user_id} created task #{task_id} in {department_name}")
         
     except BitrixClientError as e:
         logger.error(f"Failed to create task for user {telegram_user_id}: {e}")

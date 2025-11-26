@@ -7,6 +7,18 @@ BTN_NEW_TASK = "🆕 Новая задача"
 BTN_MY_TASKS = "📋 Мои задачи"
 BTN_CANCEL = "🏠 Главное меню"
 
+# Кнопки отделов
+BTN_DEPT_DEVELOPMENT = "🚀 Отдел Развития"
+BTN_DEPT_MARKETING = "📢 Отдел Маркетинга"
+BTN_DEPT_DESIGN = "🎨 Дизайн"
+
+# Маппинг кнопок на ключи отделов (для handlers)
+DEPT_BUTTON_TO_KEY = {
+    BTN_DEPT_DEVELOPMENT: "development",
+    BTN_DEPT_MARKETING: "marketing",
+    BTN_DEPT_DESIGN: "design",
+}
+
 
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
@@ -16,6 +28,21 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def department_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура выбора отдела."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_DEPT_DEVELOPMENT)],
+            [KeyboardButton(text=BTN_DEPT_MARKETING)],
+            [KeyboardButton(text=BTN_DEPT_DESIGN)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите отдел",
     )
     return keyboard
 
