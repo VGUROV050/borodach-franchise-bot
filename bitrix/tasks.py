@@ -172,12 +172,19 @@ async def get_user_tasks(
             search_pattern = f"TG_USER_ID: {telegram_user_id}"
             for task in tasks:
                 if search_pattern in task.get("description", ""):
-                    # Фильтруем завершённые если нужно (статус 5 = завершена)
-                    if only_active and str(task.get("status", "")) == "5":
-                        continue
-                    
                     stage_id = str(task.get("stageId", ""))
-                    task["stage_name"] = stages.get(stage_id, "")
+                    stage_name = stages.get(stage_id, "")
+                    
+                    # Фильтруем завершённые и отменённые если нужны только активные
+                    if only_active:
+                        # Статус 5 = завершена
+                        if str(task.get("status", "")) == "5":
+                            continue
+                        # Этап "Отменена"
+                        if "отменен" in stage_name.lower():
+                            continue
+                    
+                    task["stage_name"] = stage_name
                     task["department_name"] = dept_name
                     all_user_tasks.append(task)
             
@@ -291,3 +298,30 @@ def verify_task_ownership(task: dict[str, Any], telegram_user_id: int) -> bool:
     description = task.get("description", "")
     search_pattern = f"TG_USER_ID: {telegram_user_id}"
     return search_pattern in description
+
+
+async def check_task_can_be_cancelled(task: dict[str, Any]) -> tuple[bool, str]:
+    """
+    Проверить, можно ли отменить задачу.
+    
+    Args:
+        task: Данные задачи из Bitrix
+        
+    Returns:
+        (can_cancel, reason) - можно ли отменить и причина если нет
+    """
+    # Проверяем статус (5 = завершена)
+    if str(task.get("status", "")) == "5":
+        return False, "completed"
+    
+    # Проверяем этап Kanban
+    group_id = str(task.get("groupId", ""))
+    if group_id:
+        stages = await get_project_stages(group_id)
+        stage_id = str(task.get("stageId", ""))
+        stage_name = stages.get(stage_id, "")
+        
+        if "отменен" in stage_name.lower():
+            return False, "cancelled"
+    
+    return True, ""

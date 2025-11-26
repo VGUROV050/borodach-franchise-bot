@@ -8,6 +8,7 @@ from .tasks import (
     get_task_by_id,
     cancel_task,
     verify_task_ownership,
+    check_task_can_be_cancelled,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "get_task_by_id",
     "cancel_task",
     "verify_task_ownership",
+    "check_task_can_be_cancelled",
 ]

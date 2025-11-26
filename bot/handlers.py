@@ -17,7 +17,7 @@ from .keyboards import (
     confirm_description_keyboard,
     attach_files_keyboard,
     done_files_keyboard,
-    show_all_tasks_keyboard,
+    active_tasks_keyboard,
     all_tasks_actions_keyboard,
     confirm_cancel_keyboard,
     BTN_NEW_TASK, 
@@ -43,6 +43,7 @@ from bitrix import (
     get_task_by_id,
     cancel_task,
     verify_task_ownership,
+    check_task_can_be_cancelled,
 )
 
 logger = logging.getLogger(__name__)
@@ -528,6 +529,44 @@ def _format_task_date(created_date: str) -> str:
         return ""
 
 
+# Порядок сортировки этапов и их эмодзи
+STAGE_ORDER = [
+    "новая",
+    "выполня",  # выполняется, выполняются
+    "проверк",  # на проверке
+    "заверш",   # завершена, завершено
+    "выполнен", # выполнена
+    "отменен",  # отменена
+]
+
+STAGE_EMOJI = {
+    "новая": "🆕",
+    "выполня": "⏳",
+    "проверк": "👀",
+    "заверш": "✅",
+    "выполнен": "✅",
+    "отменен": "🚫",
+}
+
+
+def _get_stage_sort_key(stage_name: str) -> int:
+    """Получить ключ сортировки для этапа."""
+    stage_lower = stage_name.lower()
+    for i, pattern in enumerate(STAGE_ORDER):
+        if pattern in stage_lower:
+            return i
+    return 100  # Неизвестные этапы в конец
+
+
+def _get_stage_emoji(stage_name: str) -> str:
+    """Получить эмодзи для этапа."""
+    stage_lower = stage_name.lower()
+    for pattern, emoji in STAGE_EMOJI.items():
+        if pattern in stage_lower:
+            return emoji
+    return "📋"
+
+
 def _format_tasks_list(tasks: list, title: str) -> str:
     """Форматировать список задач, сгруппированных по отделам и этапам."""
     if not tasks:
@@ -553,8 +592,13 @@ def _format_tasks_list(tasks: list, title: str) -> str:
         # Заголовок отдела
         lines.append(f"\n<b>{dept_name}</b>")
         
-        for stage_name, stage_tasks in stages.items():
-            lines.append(f"  <i>📋 {stage_name}:</i>")
+        # Сортируем этапы в нужном порядке
+        sorted_stages = sorted(stages.keys(), key=_get_stage_sort_key)
+        
+        for stage_name in sorted_stages:
+            stage_tasks = stages[stage_name]
+            emoji = _get_stage_emoji(stage_name)
+            lines.append(f"  <i>{emoji} {stage_name}:</i>")
             
             for task in stage_tasks:
                 task_id = task.get("id", "?")
@@ -572,7 +616,7 @@ def _format_tasks_list(tasks: list, title: str) -> str:
 
 @router.message(F.text == BTN_MY_TASKS)
 async def my_tasks(message: types.Message, state: FSMContext) -> None:
-    """Показать активные задачи пользователя, сгруппированные по отделам."""
+    """Показать задачи в работе, сгруппированные по отделам."""
     await state.clear()
     
     telegram_user_id = message.from_user.id
@@ -580,14 +624,17 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
     processing_msg = await message.answer("⏳ Загружаю задачи...")
     
     try:
-        # Получаем только активные (незавершённые) задачи
+        # Получаем только задачи в работе (не завершённые, не отменённые)
         tasks = await get_user_tasks(telegram_user_id, limit=30, only_active=True)
         
         if not tasks:
             await processing_msg.edit_text(
                 "📭 <b>У вас нет задач в работе</b>\n\n"
                 "Все задачи завершены или вы ещё не создавали задач.",
-                reply_markup=show_all_tasks_keyboard(),
+            )
+            await message.answer(
+                "Хотите посмотреть все задачи, включая завершённые?",
+                reply_markup=active_tasks_keyboard(),
             )
             return
         
@@ -595,11 +642,9 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
         
         await processing_msg.edit_text(text)
         
-        # Спрашиваем, показать ли все задачи
         await message.answer(
-            "Показаны только <b>задачи в работе</b>.\n"
-            "Хотите посмотреть все задачи, включая завершённые?",
-            reply_markup=show_all_tasks_keyboard(),
+            "Показаны только <b>задачи в работе</b>.",
+            reply_markup=active_tasks_keyboard(),
         )
         
         logger.info(f"User {telegram_user_id} viewed {len(tasks)} active tasks")
@@ -716,6 +761,30 @@ async def cancel_task_receive_id(message: types.Message, state: FSMContext) -> N
         await processing_msg.edit_text(
             f"❌ Задача <b>#{task_id}</b> не принадлежит вам.\n\n"
             "Вы можете отменять только свои задачи.",
+        )
+        return
+    
+    # Проверяем, можно ли отменить задачу
+    can_cancel, reason = await check_task_can_be_cancelled(task)
+    if not can_cancel:
+        if reason == "completed":
+            await processing_msg.edit_text(
+                f"❌ <b>Нельзя отменить завершённую задачу</b>\n\n"
+                f"Задача <b>#{task_id}</b> уже выполнена.",
+            )
+        elif reason == "cancelled":
+            await processing_msg.edit_text(
+                f"❌ <b>Задача уже отменена</b>\n\n"
+                f"Задача <b>#{task_id}</b> уже находится в статусе «Отменена».",
+            )
+        else:
+            await processing_msg.edit_text(
+                f"❌ <b>Невозможно отменить задачу</b>\n\n"
+                f"Задача <b>#{task_id}</b> не может быть отменена.",
+            )
+        await message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu_keyboard(),
         )
         return
     

@@ -113,15 +113,15 @@ def done_files_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def show_all_tasks_keyboard() -> ReplyKeyboardMarkup:
-    """Клавиатура после показа активных задач."""
+def active_tasks_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура после показа задач в работе."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_SHOW_ALL_TASKS)],
+            [KeyboardButton(text=BTN_CANCEL_TASK), KeyboardButton(text=BTN_SHOW_ALL_TASKS)],
             [KeyboardButton(text=BTN_CANCEL)],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Показать все или в меню?",
+        input_field_placeholder="Выберите действие",
     )
     return keyboard
 
