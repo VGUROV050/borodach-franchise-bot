@@ -542,8 +542,8 @@ def _format_tasks_list(tasks: list, title: str) -> str:
                 title_text = task.get("title", "Без названия")
                 date_str = _format_task_date(task.get("createdDate", ""))
                 
-                if len(title_text) > 30:
-                    title_text = title_text[:27] + "..."
+                if len(title_text) > 55:
+                    title_text = title_text[:52] + "..."
                 
                 date_display = f" • {date_str}" if date_str else ""
                 lines.append(f"    • <b>#{task_id}</b> — {title_text}{date_display}")
