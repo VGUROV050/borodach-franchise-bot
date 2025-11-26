@@ -161,8 +161,8 @@ async def new_task_branch(message: types.Message, state: FSMContext) -> None:
     await state.set_state(NewTaskStates.waiting_for_title)
     
     await message.answer(
-        "✏️ <b>Введите краткий заголовок задачи:</b>\n\n"
-        "Например: «Ремонт кондиционера» или «Заказ расходников»",
+        "✏️ <b>Введите краткое название задачи:</b>\n\n"
+        "Например: «Обновить цены в филиале» или «Добавить сотрудника в Yclients»",
         reply_markup=cancel_keyboard(),
     )
 
@@ -178,7 +178,7 @@ async def new_task_title(message: types.Message, state: FSMContext) -> None:
     
     if not title:
         await message.answer(
-            "Пожалуйста, введите заголовок задачи:",
+            "Пожалуйста, введите название задачи:",
             reply_markup=cancel_keyboard(),
         )
         return
@@ -219,7 +219,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
         f"📋 <b>Проверьте вашу задачу:</b>\n\n"
         f"🏢 Отдел: {data['department_name']}\n"
         f"📍 Филиал: {data['branch']}\n"
-        f"✏️ Заголовок: {data['title']}\n\n"
+        f"✏️ Задача: {data['title']}\n\n"
         f"📝 Описание:\n{description}\n\n"
         "Хотите добавить комментарий или продолжить?",
         reply_markup=confirm_description_keyboard(),
@@ -265,7 +265,7 @@ async def new_task_comment(message: types.Message, state: FSMContext) -> None:
         f"📋 <b>Обновлённое описание:</b>\n\n"
         f"🏢 Отдел: {data['department_name']}\n"
         f"📍 Филиал: {data['branch']}\n"
-        f"✏️ Заголовок: {data['title']}\n\n"
+        f"✏️ Задача: {data['title']}\n\n"
         f"📝 Описание:\n{updated_description}\n\n"
         "Хотите добавить ещё комментарий или продолжить?",
         reply_markup=confirm_description_keyboard(),
@@ -457,7 +457,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
             f"📌 Номер задачи: <b>#{task_id}</b>\n"
             f"🏢 Отдел: {department_name}\n"
             f"📍 Филиал: {branch}\n"
-            f"✏️ Заголовок: {title}"
+            f"✏️ Задача: {title}"
             f"{files_text}\n\n"
             f"Мы уведомим вас об обновлениях.",
         )
