@@ -95,8 +95,8 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
     dept_key = DEPT_BUTTON_TO_KEY[message.text]
     dept_info = DEPARTMENTS[dept_key]
     
-    # Проверяем что group_id настроен
-    if not dept_info["group_id"]:
+    # Проверяем что group_id и responsible_id настроены
+    if not dept_info["group_id"] or not dept_info["responsible_id"]:
         await message.answer(
             f"❌ Отдел «{dept_info['name']}» пока не настроен.\n"
             "Обратитесь к администратору.",
@@ -109,6 +109,7 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
         department_key=dept_key,
         department_name=dept_info["name"],
         group_id=dept_info["group_id"],
+        responsible_id=dept_info["responsible_id"],
     )
     await state.set_state(NewTaskStates.waiting_for_branch)
     
@@ -166,6 +167,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
     # Получаем сохранённые данные
     data = await state.get_data()
     group_id = data.get("group_id")
+    responsible_id = data.get("responsible_id")
     department_name = data.get("department_name", "Не указан")
     branch = data.get("branch", "Не указан")
     
@@ -181,6 +183,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
     try:
         task_id = await create_task(
             group_id=group_id,
+            responsible_id=responsible_id,
             department_name=department_name,
             branch=branch,
             description=description,

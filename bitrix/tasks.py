@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 async def create_task(
     group_id: str,
+    responsible_id: str,
     department_name: str,
     branch: str,
     description: str,
@@ -23,6 +24,7 @@ async def create_task(
     
     Args:
         group_id: ID проекта/группы в Bitrix
+        responsible_id: ID ответственного сотрудника в Bitrix
         department_name: Название отдела для отображения
         branch: Филиал (город/ТЦ/адрес)
         description: Описание задачи от пользователя
@@ -55,6 +57,7 @@ TG_USER_ID: {telegram_user_id}"""
             "TITLE": f"[{branch}] Задача от франчайзи",
             "DESCRIPTION": full_description,
             "GROUP_ID": group_id,
+            "RESPONSIBLE_ID": responsible_id,
             "PRIORITY": "1",  # Средний приоритет
         }
     }

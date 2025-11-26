@@ -17,18 +17,26 @@ BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # О
 BITRIX_GROUP_ID_MARKETING = os.getenv("BITRIX_GROUP_ID_MARKETING", "")      # Отдел Маркетинга
 BITRIX_GROUP_ID_DESIGN = os.getenv("BITRIX_GROUP_ID_DESIGN", "")            # Дизайн
 
-# Маппинг отделов на их Bitrix Group ID
+# ID ответственных сотрудников в Bitrix24 для каждого отдела
+BITRIX_RESPONSIBLE_DEVELOPMENT = os.getenv("BITRIX_RESPONSIBLE_DEVELOPMENT", "")
+BITRIX_RESPONSIBLE_MARKETING = os.getenv("BITRIX_RESPONSIBLE_MARKETING", "")
+BITRIX_RESPONSIBLE_DESIGN = os.getenv("BITRIX_RESPONSIBLE_DESIGN", "")
+
+# Маппинг отделов на их Bitrix Group ID и ответственного
 DEPARTMENTS = {
     "development": {
         "name": "🚀 Отдел Развития",
         "group_id": BITRIX_GROUP_ID_DEVELOPMENT,
+        "responsible_id": BITRIX_RESPONSIBLE_DEVELOPMENT,
     },
     "marketing": {
         "name": "📢 Отдел Маркетинга",
         "group_id": BITRIX_GROUP_ID_MARKETING,
+        "responsible_id": BITRIX_RESPONSIBLE_MARKETING,
     },
     "design": {
         "name": "🎨 Дизайн",
         "group_id": BITRIX_GROUP_ID_DESIGN,
+        "responsible_id": BITRIX_RESPONSIBLE_DESIGN,
     },
 }
