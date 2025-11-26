@@ -124,30 +124,36 @@ TG_USER_ID: {telegram_user_id}"""
     return int(task_id)
 
 
-async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[str, Any]]:
+async def get_user_tasks(
+    telegram_user_id: int, 
+    limit: int = 30,
+    only_active: bool = False,
+) -> list[dict[str, Any]]:
     """
     Получить задачи пользователя по его Telegram ID из всех отделов.
     
     Args:
         telegram_user_id: ID пользователя в Telegram
         limit: Максимальное количество задач
+        only_active: Если True — только незавершённые (статус != 5)
         
     Returns:
-        Список задач пользователя с названием этапа Kanban
+        Список задач пользователя с названием этапа Kanban и отдела
     """
-    group_ids = [
-        dept["group_id"] 
-        for dept in DEPARTMENTS.values() 
+    # Создаём маппинг group_id -> department_name
+    group_to_dept = {
+        dept["group_id"]: dept["name"]
+        for dept in DEPARTMENTS.values()
         if dept["group_id"]
-    ]
+    }
     
-    if not group_ids:
+    if not group_to_dept:
         logger.warning("No department group IDs configured")
         return []
     
     all_user_tasks = []
     
-    for group_id in group_ids:
+    for group_id, dept_name in group_to_dept.items():
         stages = await get_project_stages(group_id)
         
         params = {
@@ -166,8 +172,13 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
             search_pattern = f"TG_USER_ID: {telegram_user_id}"
             for task in tasks:
                 if search_pattern in task.get("description", ""):
+                    # Фильтруем завершённые если нужно (статус 5 = завершена)
+                    if only_active and str(task.get("status", "")) == "5":
+                        continue
+                    
                     stage_id = str(task.get("stageId", ""))
                     task["stage_name"] = stages.get(stage_id, "")
+                    task["department_name"] = dept_name
                     all_user_tasks.append(task)
             
         except BitrixClientError as e:
@@ -176,7 +187,7 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
     
     all_user_tasks.sort(key=lambda t: t.get("createdDate", ""), reverse=True)
     
-    logger.info(f"Found {len(all_user_tasks)} tasks for user {telegram_user_id}")
+    logger.info(f"Found {len(all_user_tasks)} tasks for user {telegram_user_id} (only_active={only_active})")
     
     return all_user_tasks[:limit]
 

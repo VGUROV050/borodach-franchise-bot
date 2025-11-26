@@ -17,6 +17,7 @@ from .keyboards import (
     confirm_description_keyboard,
     attach_files_keyboard,
     done_files_keyboard,
+    show_all_tasks_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -25,6 +26,7 @@ from .keyboards import (
     BTN_ATTACH_FILES,
     BTN_SKIP_FILES,
     BTN_DONE_FILES,
+    BTN_SHOW_ALL_TASKS,
     DEPT_BUTTON_TO_KEY,
 )
 from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError, upload_file_to_task
@@ -494,9 +496,64 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
 # Мои задачи
 # ═══════════════════════════════════════════════════════════════════
 
+def _format_task_date(created_date: str) -> str:
+    """Форматировать дату создания задачи."""
+    if not created_date:
+        return ""
+    try:
+        dt = datetime.fromisoformat(created_date.replace("Z", "+00:00"))
+        moscow_tz = ZoneInfo("Europe/Moscow")
+        dt_moscow = dt.astimezone(moscow_tz)
+        return dt_moscow.strftime("%d.%m.%Y %H:%M")
+    except (ValueError, TypeError):
+        return ""
+
+
+def _format_tasks_list(tasks: list, title: str) -> str:
+    """Форматировать список задач, сгруппированных по отделам и этапам."""
+    if not tasks:
+        return "📭 <b>Задач не найдено</b>"
+    
+    # Группируем по отделам, затем по этапам
+    depts_dict: dict[str, dict[str, list]] = {}
+    
+    for task in tasks:
+        dept_name = task.get("department_name", "Без отдела")
+        stage_name = task.get("stage_name", "") or "Без этапа"
+        
+        if dept_name not in depts_dict:
+            depts_dict[dept_name] = {}
+        if stage_name not in depts_dict[dept_name]:
+            depts_dict[dept_name][stage_name] = []
+        
+        depts_dict[dept_name][stage_name].append(task)
+    
+    lines = [f"📋 <b>{title}</b>\n"]
+    
+    for dept_name, stages in depts_dict.items():
+        # Заголовок отдела
+        lines.append(f"\n<b>{dept_name}</b>")
+        
+        for stage_name, stage_tasks in stages.items():
+            lines.append(f"  <i>📋 {stage_name}:</i>")
+            
+            for task in stage_tasks:
+                task_id = task.get("id", "?")
+                title_text = task.get("title", "Без названия")
+                date_str = _format_task_date(task.get("createdDate", ""))
+                
+                if len(title_text) > 30:
+                    title_text = title_text[:27] + "..."
+                
+                date_display = f" • {date_str}" if date_str else ""
+                lines.append(f"    • <b>#{task_id}</b> — {title_text}{date_display}")
+    
+    return "\n".join(lines)
+
+
 @router.message(F.text == BTN_MY_TASKS)
 async def my_tasks(message: types.Message, state: FSMContext) -> None:
-    """Показать список задач пользователя, сгруппированных по этапам."""
+    """Показать активные задачи пользователя, сгруппированные по отделам."""
     await state.clear()
     
     telegram_user_id = message.from_user.id
@@ -504,60 +561,78 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
     processing_msg = await message.answer("⏳ Загружаю задачи...")
     
     try:
-        tasks = await get_user_tasks(telegram_user_id, limit=20)
+        # Получаем только активные (незавершённые) задачи
+        tasks = await get_user_tasks(telegram_user_id, limit=30, only_active=True)
         
         if not tasks:
             await processing_msg.edit_text(
-                "📭 <b>У вас пока нет задач</b>\n\n"
-                "Нажмите «🆕 Новая задача», чтобы создать первую.",
+                "📭 <b>У вас нет активных задач</b>\n\n"
+                "Все задачи завершены или вы ещё не создавали задач.",
+                reply_markup=show_all_tasks_keyboard(),
             )
             return
         
-        # Группируем задачи по этапам
-        stages_dict: dict[str, list] = {}
-        for task in tasks:
-            stage_name = task.get("stage_name", "") or "Без этапа"
-            if stage_name not in stages_dict:
-                stages_dict[stage_name] = []
-            stages_dict[stage_name].append(task)
+        text = _format_tasks_list(tasks, f"Ваши активные задачи ({len(tasks)})")
         
-        lines = ["📋 <b>Ваши задачи:</b>\n"]
+        await processing_msg.edit_text(text)
         
-        for stage_name, stage_tasks in stages_dict.items():
-            # Заголовок этапа
-            lines.append(f"\n<b>📋 {stage_name}</b>")
-            
-            for task in stage_tasks:
-                task_id = task.get("id", "?")
-                title = task.get("title", "Без названия")
-                
-                # Форматируем дату создания
-                created_date = task.get("createdDate", "")
-                date_str = ""
-                if created_date:
-                    try:
-                        # Bitrix возвращает дату в формате ISO
-                        dt = datetime.fromisoformat(created_date.replace("Z", "+00:00"))
-                        moscow_tz = ZoneInfo("Europe/Moscow")
-                        dt_moscow = dt.astimezone(moscow_tz)
-                        date_str = dt_moscow.strftime("%d.%m.%Y %H:%M")
-                    except (ValueError, TypeError):
-                        date_str = ""
-                
-                # Обрезаем длинные названия
-                if len(title) > 35:
-                    title = title[:32] + "..."
-                
-                date_display = f" • {date_str}" if date_str else ""
-                lines.append(f"  • <b>#{task_id}</b> — {title}{date_display}")
+        # Спрашиваем, показать ли все задачи
+        await message.answer(
+            "Показаны только <b>незавершённые</b> задачи.\n"
+            "Хотите посмотреть все задачи, включая завершённые?",
+            reply_markup=show_all_tasks_keyboard(),
+        )
         
-        await processing_msg.edit_text("\n".join(lines))
-        
-        logger.info(f"User {telegram_user_id} viewed {len(tasks)} tasks in {len(stages_dict)} stages")
+        logger.info(f"User {telegram_user_id} viewed {len(tasks)} active tasks")
         
     except BitrixClientError as e:
         logger.error(f"Failed to fetch tasks for user {telegram_user_id}: {e}")
         await processing_msg.edit_text(
             "❌ <b>Не удалось загрузить задачи</b>\n\n"
             "Попробуйте позже.",
+        )
+
+
+@router.message(F.text == BTN_SHOW_ALL_TASKS)
+async def show_all_tasks(message: types.Message, state: FSMContext) -> None:
+    """Показать все задачи пользователя, включая завершённые."""
+    telegram_user_id = message.from_user.id
+    
+    processing_msg = await message.answer("⏳ Загружаю все задачи...")
+    
+    try:
+        # Получаем все задачи
+        tasks = await get_user_tasks(telegram_user_id, limit=50, only_active=False)
+        
+        if not tasks:
+            await processing_msg.edit_text(
+                "📭 <b>У вас пока нет задач</b>\n\n"
+                "Нажмите «🆕 Новая задача», чтобы создать первую.",
+            )
+            await message.answer(
+                "Выберите действие:",
+                reply_markup=main_menu_keyboard(),
+            )
+            return
+        
+        text = _format_tasks_list(tasks, f"Все ваши задачи ({len(tasks)})")
+        
+        await processing_msg.edit_text(text)
+        
+        await message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu_keyboard(),
+        )
+        
+        logger.info(f"User {telegram_user_id} viewed all {len(tasks)} tasks")
+        
+    except BitrixClientError as e:
+        logger.error(f"Failed to fetch all tasks for user {telegram_user_id}: {e}")
+        await processing_msg.edit_text(
+            "❌ <b>Не удалось загрузить задачи</b>\n\n"
+            "Попробуйте позже.",
+        )
+        await message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu_keyboard(),
         )

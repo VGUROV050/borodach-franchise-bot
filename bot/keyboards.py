@@ -21,6 +21,9 @@ BTN_ATTACH_FILES = "📎 Прикрепить файлы"
 BTN_SKIP_FILES = "⏭ Пропустить"
 BTN_DONE_FILES = "✅ Готово"
 
+# Кнопки просмотра задач
+BTN_SHOW_ALL_TASKS = "📋 Показать все задачи"
+
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
     BTN_DEPT_DEVELOPMENT: "development",
@@ -103,5 +106,18 @@ def done_files_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Отправьте файлы или нажмите Готово",
+    )
+    return keyboard
+
+
+def show_all_tasks_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура после показа активных задач."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_SHOW_ALL_TASKS)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Показать все или в меню?",
     )
     return keyboard
