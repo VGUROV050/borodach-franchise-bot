@@ -1,6 +1,8 @@
 # Bot handlers
 
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from aiogram import Router, types, F
 from aiogram.filters import CommandStart
@@ -452,12 +454,17 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
         
         files_text = f"\n📎 Загружено файлов: {uploaded_count}" if uploaded_count > 0 else ""
         
+        # Текущее время в Москве
+        moscow_tz = ZoneInfo("Europe/Moscow")
+        created_at = datetime.now(moscow_tz).strftime("%d.%m.%Y %H:%M")
+        
         await processing_msg.edit_text(
             f"✅ <b>Задача успешно создана!</b>\n\n"
             f"📌 Номер задачи: <b>#{task_id}</b>\n"
             f"🏢 Отдел: {department_name}\n"
             f"📍 Филиал: {branch}\n"
-            f"✏️ Задача: {title}"
+            f"✏️ Задача: {title}\n"
+            f"🕐 Создана: {created_at}"
             f"{files_text}\n\n"
             f"Мы уведомим вас об обновлениях.",
         )
@@ -489,7 +496,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
 
 @router.message(F.text == BTN_MY_TASKS)
 async def my_tasks(message: types.Message, state: FSMContext) -> None:
-    """Показать список задач пользователя."""
+    """Показать список задач пользователя, сгруппированных по этапам."""
     await state.clear()
     
     telegram_user_id = message.from_user.id
@@ -497,7 +504,7 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
     processing_msg = await message.answer("⏳ Загружаю задачи...")
     
     try:
-        tasks = await get_user_tasks(telegram_user_id, limit=10)
+        tasks = await get_user_tasks(telegram_user_id, limit=20)
         
         if not tasks:
             await processing_msg.edit_text(
@@ -506,21 +513,47 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
             )
             return
         
+        # Группируем задачи по этапам
+        stages_dict: dict[str, list] = {}
+        for task in tasks:
+            stage_name = task.get("stage_name", "") or "Без этапа"
+            if stage_name not in stages_dict:
+                stages_dict[stage_name] = []
+            stages_dict[stage_name].append(task)
+        
         lines = ["📋 <b>Ваши задачи:</b>\n"]
         
-        for task in tasks:
-            task_id = task.get("id", "?")
-            title = task.get("title", "Без названия")
-            stage = format_task_stage(task.get("stage_name", ""))
+        for stage_name, stage_tasks in stages_dict.items():
+            # Заголовок этапа
+            lines.append(f"\n<b>📋 {stage_name}</b>")
             
-            if len(title) > 40:
-                title = title[:37] + "..."
-            
-            lines.append(f"• <b>#{task_id}</b> — {title}\n  {stage}")
+            for task in stage_tasks:
+                task_id = task.get("id", "?")
+                title = task.get("title", "Без названия")
+                
+                # Форматируем дату создания
+                created_date = task.get("createdDate", "")
+                date_str = ""
+                if created_date:
+                    try:
+                        # Bitrix возвращает дату в формате ISO
+                        dt = datetime.fromisoformat(created_date.replace("Z", "+00:00"))
+                        moscow_tz = ZoneInfo("Europe/Moscow")
+                        dt_moscow = dt.astimezone(moscow_tz)
+                        date_str = dt_moscow.strftime("%d.%m.%Y %H:%M")
+                    except (ValueError, TypeError):
+                        date_str = ""
+                
+                # Обрезаем длинные названия
+                if len(title) > 35:
+                    title = title[:32] + "..."
+                
+                date_display = f" • {date_str}" if date_str else ""
+                lines.append(f"  • <b>#{task_id}</b> — {title}{date_display}")
         
         await processing_msg.edit_text("\n".join(lines))
         
-        logger.info(f"User {telegram_user_id} viewed {len(tasks)} tasks")
+        logger.info(f"User {telegram_user_id} viewed {len(tasks)} tasks in {len(stages_dict)} stages")
         
     except BitrixClientError as e:
         logger.error(f"Failed to fetch tasks for user {telegram_user_id}: {e}")
