@@ -17,7 +17,7 @@ from .keyboards import (
     BTN_CANCEL,
     DEPT_BUTTON_TO_KEY,
 )
-from bitrix import create_task, get_user_tasks, format_task_status, BitrixClientError
+from bitrix import create_task, get_user_tasks, format_task_stage, BitrixClientError
 
 logger = logging.getLogger(__name__)
 
@@ -253,13 +253,13 @@ async def my_tasks(message: types.Message, state: FSMContext) -> None:
         for task in tasks:
             task_id = task.get("id", "?")
             title = task.get("title", "Без названия")
-            status = format_task_status(task.get("status", ""))
+            stage = format_task_stage(task.get("stage_name", ""))
             
             # Обрезаем длинные названия
             if len(title) > 40:
                 title = title[:37] + "..."
             
-            lines.append(f"• <b>#{task_id}</b> — {title}\n  {status}")
+            lines.append(f"• <b>#{task_id}</b> — {title}\n  {stage}")
         
         await processing_msg.edit_text("\n".join(lines))
         

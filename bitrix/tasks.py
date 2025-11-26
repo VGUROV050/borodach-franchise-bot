@@ -8,6 +8,46 @@ from .client import call_method, BitrixClientError
 
 logger = logging.getLogger(__name__)
 
+# Кэш этапов Kanban для проектов (group_id -> {stage_id -> stage_name})
+_stages_cache: dict[str, dict[str, str]] = {}
+
+
+async def get_project_stages(group_id: str) -> dict[str, str]:
+    """
+    Получить этапы Kanban для проекта.
+    
+    Args:
+        group_id: ID проекта/группы в Bitrix
+        
+    Returns:
+        Словарь {stage_id: stage_name}
+    """
+    # Проверяем кэш
+    if group_id in _stages_cache:
+        return _stages_cache[group_id]
+    
+    try:
+        params = {"entityId": group_id}
+        response = await call_method("task.stages.get", params)
+        
+        stages_data = response.get("result", {})
+        
+        # Преобразуем в словарь id -> title
+        stages = {}
+        for stage_id, stage_info in stages_data.items():
+            if isinstance(stage_info, dict):
+                stages[str(stage_id)] = stage_info.get("TITLE", f"Этап {stage_id}")
+        
+        # Сохраняем в кэш
+        _stages_cache[group_id] = stages
+        logger.info(f"Loaded {len(stages)} stages for group {group_id}")
+        
+        return stages
+        
+    except BitrixClientError as e:
+        logger.warning(f"Failed to get stages for group {group_id}: {e}")
+        return {}
+
 
 async def create_task(
     group_id: str,
@@ -84,7 +124,7 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
         limit: Максимальное количество задач
         
     Returns:
-        Список задач пользователя
+        Список задач пользователя с названием этапа Kanban
     """
     # Собираем все group_id из настроек
     group_ids = [
@@ -100,11 +140,14 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
     all_user_tasks = []
     
     for group_id in group_ids:
+        # Получаем этапы для этого проекта
+        stages = await get_project_stages(group_id)
+        
         params = {
             "filter": {
                 "GROUP_ID": group_id,
             },
-            "select": ["ID", "TITLE", "STATUS", "CREATED_DATE", "DESCRIPTION", "GROUP_ID"],
+            "select": ["ID", "TITLE", "STATUS", "STAGE_ID", "CREATED_DATE", "DESCRIPTION", "GROUP_ID"],
             "order": {"CREATED_DATE": "desc"},
             "start": 0,
         }
@@ -115,11 +158,12 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
             
             # Фильтруем по TG_USER_ID в описании
             search_pattern = f"TG_USER_ID: {telegram_user_id}"
-            user_tasks = [
-                task for task in tasks 
-                if search_pattern in task.get("description", "")
-            ]
-            all_user_tasks.extend(user_tasks)
+            for task in tasks:
+                if search_pattern in task.get("description", ""):
+                    # Добавляем название этапа
+                    stage_id = str(task.get("stageId", ""))
+                    task["stage_name"] = stages.get(stage_id, "")
+                    all_user_tasks.append(task)
             
         except BitrixClientError as e:
             logger.warning(f"Failed to fetch tasks from group {group_id}: {e}")
@@ -133,14 +177,8 @@ async def get_user_tasks(telegram_user_id: int, limit: int = 10) -> list[dict[st
     return all_user_tasks[:limit]
 
 
-def format_task_status(status: str) -> str:
-    """Преобразовать статус задачи в читаемый вид."""
-    statuses = {
-        "1": "🆕 Новая",
-        "2": "⏳ Ждёт выполнения", 
-        "3": "🔄 В работе",
-        "4": "⏸ Ожидает контроля",
-        "5": "✅ Завершена",
-        "6": "⏰ Отложена",
-    }
-    return statuses.get(str(status), f"Статус {status}")
+def format_task_stage(stage_name: str) -> str:
+    """Отформатировать название этапа для отображения."""
+    if not stage_name:
+        return "📋 Без этапа"
+    return f"📋 {stage_name}"
