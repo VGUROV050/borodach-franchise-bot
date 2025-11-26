@@ -330,6 +330,9 @@ async def new_task_files_choice_invalid(message: types.Message, state: FSMContex
 @router.message(NewTaskStates.waiting_for_files, F.text == BTN_DONE_FILES)
 async def new_task_files_done(message: types.Message, state: FSMContext) -> None:
     """Пользователь закончил загружать файлы → создаём задачу."""
+    data = await state.get_data()
+    files = data.get("files", [])
+    logger.info(f"Files done pressed, files in state: {len(files)}")
     await _create_task_final(message, state)
 
 
@@ -344,6 +347,8 @@ async def new_task_receive_photo(message: types.Message, state: FSMContext) -> N
     files.append({"type": "photo", "file_id": photo.file_id})
     
     await state.update_data(files=files)
+    
+    logger.info(f"Photo added, total files in state: {len(files)}, file_id: {photo.file_id[:20]}...")
     
     await message.answer(
         f"✅ Фото добавлено (всего файлов: {len(files)})\n\n"
@@ -390,6 +395,8 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
     """Создание задачи в Bitrix с учётом всех данных."""
     data = await state.get_data()
     
+    logger.info(f"_create_task_final called, state data keys: {list(data.keys())}")
+    
     group_id = data.get("group_id")
     responsible_id = data.get("responsible_id")
     department_name = data.get("department_name", "Не указан")
@@ -397,6 +404,8 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
     title = data.get("title", "Задача от франчайзи")
     description = data.get("description", "")
     files = data.get("files", [])
+    
+    logger.info(f"Files from state: {len(files)} files")
     
     user = message.from_user
     telegram_user_id = user.id
