@@ -3,11 +3,17 @@
 import logging
 
 from aiogram import Router, types, F
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from .keyboards import main_menu_keyboard, BTN_NEW_TASK, BTN_MY_TASKS
+from .keyboards import (
+    main_menu_keyboard, 
+    cancel_keyboard,
+    BTN_NEW_TASK, 
+    BTN_MY_TASKS,
+    BTN_CANCEL,
+)
 from bitrix import create_task, get_user_tasks, format_task_status, BitrixClientError
 
 logger = logging.getLogger(__name__)
@@ -22,6 +28,25 @@ router = Router()
 class NewTaskStates(StatesGroup):
     waiting_for_branch = State()
     waiting_for_description = State()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Отмена / Возврат в главное меню (из любого состояния)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_CANCEL)
+async def cancel_handler(message: types.Message, state: FSMContext) -> None:
+    """Возврат в главное меню из любого состояния."""
+    current_state = await state.get_state()
+    
+    if current_state is not None:
+        logger.info(f"User {message.from_user.id} cancelled from state {current_state}")
+        await state.clear()
+    
+    await message.answer(
+        "🏠 <b>Главное меню</b>\n\nВыберите действие:",
+        reply_markup=main_menu_keyboard(),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -56,6 +81,7 @@ async def new_task_start(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         "📍 <b>По какому филиалу вы хотите поставить задачу?</b>\n\n"
         "Укажите город, ТЦ или адрес:",
+        reply_markup=cancel_keyboard(),
     )
 
 
@@ -65,7 +91,10 @@ async def new_task_branch(message: types.Message, state: FSMContext) -> None:
     branch = message.text.strip()
     
     if not branch:
-        await message.answer("Пожалуйста, укажите филиал:")
+        await message.answer(
+            "Пожалуйста, укажите филиал:",
+            reply_markup=cancel_keyboard(),
+        )
         return
     
     # Сохраняем филиал в FSM
@@ -74,6 +103,7 @@ async def new_task_branch(message: types.Message, state: FSMContext) -> None:
     
     await message.answer(
         "📝 <b>Опишите, пожалуйста, задачу для УК как можно конкретнее:</b>",
+        reply_markup=cancel_keyboard(),
     )
 
 
@@ -83,7 +113,10 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
     description = message.text.strip()
     
     if not description:
-        await message.answer("Пожалуйста, опишите задачу:")
+        await message.answer(
+            "Пожалуйста, опишите задачу:",
+            reply_markup=cancel_keyboard(),
+        )
         return
     
     # Получаем сохранённый филиал
@@ -115,6 +148,12 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
             f"Мы уведомим вас об обновлениях.",
         )
         
+        # Возвращаем главное меню
+        await message.answer(
+            "Выберите следующее действие:",
+            reply_markup=main_menu_keyboard(),
+        )
+        
         logger.info(f"User {telegram_user_id} created task #{task_id}")
         
     except BitrixClientError as e:
@@ -122,6 +161,10 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
         await processing_msg.edit_text(
             "❌ <b>Не удалось создать задачу</b>\n\n"
             "Попробуйте позже или обратитесь в поддержку.",
+        )
+        await message.answer(
+            "Выберите действие:",
+            reply_markup=main_menu_keyboard(),
         )
     
     # Сбрасываем состояние
