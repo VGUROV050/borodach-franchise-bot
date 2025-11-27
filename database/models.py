@@ -59,6 +59,9 @@ class Partner(Base):
     # Причина отклонения (если rejected)
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
+    # Флаг: есть ли запрос на добавление филиала
+    has_pending_branch: Mapped[bool] = mapped_column(Boolean, default=False)
+    
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

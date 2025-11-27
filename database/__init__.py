@@ -14,6 +14,11 @@ from .crud import (
     get_or_create_branch,
     link_partner_to_branch,
     get_partner_branches,
+    update_partner_for_branch_request,
+    get_partner_by_id,
+    delete_partner,
+    clear_partner_pending_branch,
+    get_partners_with_pending_branches,
 )
 
 __all__ = [
@@ -40,5 +45,10 @@ __all__ = [
     "get_or_create_branch",
     "link_partner_to_branch",
     "get_partner_branches",
+    "update_partner_for_branch_request",
+    "get_partner_by_id",
+    "delete_partner",
+    "clear_partner_pending_branch",
+    "get_partners_with_pending_branches",
 ]
 

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить филиал — {{ partner.full_name }}{% endblock %}
+
+{% block content %}
+<a href="/" class="btn btn-secondary mb-2">&larr; Назад</a>
+
+<h1 class="mb-2">🏢 Добавление филиала</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">👤 {{ partner.full_name }}</h2>
+    </div>
+    
+    <div class="partner-info mb-2">
+        📱 {{ partner.phone or '—' }}<br>
+        💬 @{{ partner.telegram_username or '—' }} (ID: {{ partner.telegram_id }})
+    </div>
+    
+    {% if partner.branches_text %}
+    <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>📝 Запрос от партнёра:</strong>
+        <pre style="margin: 0.5rem 0 0 0; white-space: pre-wrap; font-family: inherit;">{{ partner.branches_text }}</pre>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="/partners/{{ partner.id }}/add-branch">
+        <h3 style="margin-bottom: 1rem;">Выберите филиал(ы) для привязки:</h3>
+        
+        {% if branches %}
+        <div class="branches-list">
+            {% for branch in branches %}
+            <div class="branch-item" style="display: flex; align-items: center; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 0.5rem;">
+                <input type="checkbox" 
+                       name="branch_ids" 
+                       value="{{ branch.id }}" 
+                       id="branch_{{ branch.id }}"
+                       style="width: 20px; height: 20px; margin-right: 1rem;">
+                <label for="branch_{{ branch.id }}" style="flex: 1; cursor: pointer;">
+                    <strong>{{ branch.display_name or branch.city }}</strong>
+                    {% if branch.address %}
+                    <br><span class="text-muted">{{ branch.city }}, {{ branch.address }}</span>
+                    {% endif %}
+                    {% if branch.yclients_id %}
+                    <br><span class="text-muted" style="font-size: 0.8rem;">YClients ID: {{ branch.yclients_id }}</span>
+                    {% endif %}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="flex mt-2" style="gap: 1rem;">
+            <button type="submit" class="btn btn-success">✅ Привязать выбранные филиалы</button>
+            <a href="/" class="btn btn-secondary">Отмена</a>
+        </div>
+        {% else %}
+        <p class="text-muted">Нет доступных филиалов. <a href="/branches">Добавить филиал →</a></p>
+        {% endif %}
+    </form>
+</div>
+{% endblock %}
+

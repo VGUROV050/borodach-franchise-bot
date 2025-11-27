@@ -236,12 +236,112 @@ async def link_partner_to_branch(
 async def get_partner_branches(
     db: AsyncSession,
     partner_id: int,
-) -> list[Branch]:
-    """Получить филиалы партнёра."""
+) -> list[PartnerBranch]:
+    """Получить филиалы партнёра (с данными филиала)."""
     result = await db.execute(
-        select(Branch)
-        .join(PartnerBranch)
+        select(PartnerBranch)
+        .options(selectinload(PartnerBranch.branch))
         .where(PartnerBranch.partner_id == partner_id)
+    )
+    return list(result.scalars().all())
+
+
+async def update_partner_for_branch_request(
+    db: AsyncSession,
+    partner_id: int,
+    branch_text: str,
+) -> Optional[Partner]:
+    """Обновить партнёра: добавить заявку на новый филиал."""
+    result = await db.execute(
+        select(Partner).where(Partner.id == partner_id)
+    )
+    partner = result.scalar_one_or_none()
+    
+    if not partner:
+        return None
+    
+    # Добавляем текст филиала к существующим (если есть)
+    if partner.branches_text:
+        partner.branches_text = f"{partner.branches_text}\n---\n{branch_text}"
+    else:
+        partner.branches_text = branch_text
+    
+    # Если партнёр уже верифицирован, помечаем что есть запрос на новый филиал
+    partner.has_pending_branch = True
+    
+    await db.commit()
+    await db.refresh(partner)
+    
+    logger.info(f"Partner {partner_id} requested new branch: {branch_text}")
+    return partner
+
+
+async def get_partner_by_id(
+    db: AsyncSession,
+    partner_id: int,
+) -> Optional[Partner]:
+    """Получить партнёра по ID."""
+    result = await db.execute(
+        select(Partner)
+        .options(selectinload(Partner.branches).selectinload(PartnerBranch.branch))
+        .where(Partner.id == partner_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_partner(
+    db: AsyncSession,
+    partner_id: int,
+) -> bool:
+    """Удалить партнёра."""
+    result = await db.execute(
+        select(Partner).where(Partner.id == partner_id)
+    )
+    partner = result.scalar_one_or_none()
+    
+    if not partner:
+        return False
+    
+    await db.delete(partner)
+    await db.commit()
+    
+    logger.info(f"Deleted partner {partner_id}")
+    return True
+
+
+async def clear_partner_pending_branch(
+    db: AsyncSession,
+    partner_id: int,
+) -> Optional[Partner]:
+    """Очистить флаг ожидающего филиала."""
+    result = await db.execute(
+        select(Partner).where(Partner.id == partner_id)
+    )
+    partner = result.scalar_one_or_none()
+    
+    if not partner:
+        return None
+    
+    partner.has_pending_branch = False
+    
+    await db.commit()
+    await db.refresh(partner)
+    
+    return partner
+
+
+async def get_partners_with_pending_branches(
+    db: AsyncSession,
+) -> list[Partner]:
+    """Получить верифицированных партнёров с запросами на добавление филиала."""
+    result = await db.execute(
+        select(Partner)
+        .options(selectinload(Partner.branches).selectinload(PartnerBranch.branch))
+        .where(
+            Partner.status == PartnerStatus.VERIFIED,
+            Partner.has_pending_branch == True,
+        )
+        .order_by(Partner.created_at.desc())
     )
     return list(result.scalars().all())
 

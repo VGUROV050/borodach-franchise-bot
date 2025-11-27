@@ -12,7 +12,9 @@ from aiogram.fsm.state import State, StatesGroup
 from config.settings import DEPARTMENTS
 from database import AsyncSessionLocal, get_partner_by_telegram_id, PartnerStatus
 from .keyboards import (
-    main_menu_keyboard, 
+    main_menu_keyboard,
+    tasks_menu_keyboard,
+    branches_menu_keyboard,
     cancel_keyboard,
     department_keyboard,
     confirm_description_keyboard,
@@ -23,6 +25,10 @@ from .keyboards import (
     confirm_cancel_keyboard,
     registration_start_keyboard,
     pending_verification_keyboard,
+    BTN_TASKS,
+    BTN_MY_BRANCHES,
+    BTN_MAIN_MENU,
+    BTN_ADD_BRANCH,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -74,23 +80,172 @@ class CancelTaskStates(StatesGroup):
     waiting_for_confirm = State()
 
 
+class AddBranchStates(StatesGroup):
+    waiting_for_branch_text = State()
+
+
 # ═══════════════════════════════════════════════════════════════════
-# Отмена / Возврат в главное меню (из любого состояния)
+# Helper: проверка верификации (вынесено вверх для использования)
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(F.text == BTN_CANCEL)
-async def cancel_handler(message: types.Message, state: FSMContext) -> None:
+async def _check_verified(message: types.Message) -> bool:
+    """Проверить, что пользователь верифицирован. Возвращает True если ок."""
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+    
+    if partner is None:
+        await message.answer(
+            "❌ Вы не зарегистрированы.\n"
+            "Нажмите /start для регистрации.",
+            reply_markup=registration_start_keyboard(),
+        )
+        return False
+    
+    if partner.status != PartnerStatus.VERIFIED:
+        await message.answer(
+            "⏳ Ваша заявка ещё не подтверждена.\n"
+            "Дождитесь верификации администратором.",
+            reply_markup=pending_verification_keyboard(),
+        )
+        return False
+    
+    return True
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Главное меню и навигация
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_MAIN_MENU)
+async def main_menu_handler(message: types.Message, state: FSMContext) -> None:
     """Возврат в главное меню из любого состояния."""
     current_state = await state.get_state()
     
     if current_state is not None:
-        logger.info(f"User {message.from_user.id} cancelled from state {current_state}")
+        logger.info(f"User {message.from_user.id} returned to main menu from state {current_state}")
         await state.clear()
     
+    # Проверяем верификацию
+    if not await _check_verified(message):
+        return
+    
     await message.answer(
-        "🏠 <b>Главное меню</b>\n\nВыберите действие:",
+        "🏠 <b>Главное меню</b>\n\nВыберите раздел:",
         reply_markup=main_menu_keyboard(),
     )
+
+
+@router.message(F.text == BTN_TASKS)
+async def tasks_menu_handler(message: types.Message, state: FSMContext) -> None:
+    """Меню задач."""
+    if not await _check_verified(message):
+        return
+    
+    await state.clear()
+    await message.answer(
+        "📋 <b>Задачи</b>\n\nВыберите действие:",
+        reply_markup=tasks_menu_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Мои филиалы
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_MY_BRANCHES)
+async def my_branches_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать филиалы пользователя."""
+    if not await _check_verified(message):
+        return
+    
+    await state.clear()
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        
+        if partner:
+            from database import get_partner_branches
+            branches = await get_partner_branches(db, partner.id)
+        else:
+            branches = []
+    
+    if branches:
+        branches_text = "\n".join([
+            f"• {pb.branch.display_name or pb.branch.name}" 
+            for pb in branches
+        ])
+        text = (
+            f"🏢 <b>Ваши филиалы</b>\n\n"
+            f"{branches_text}\n\n"
+            "Вы можете добавить ещё филиал, нажав кнопку ниже."
+        )
+    else:
+        text = (
+            "🏢 <b>Ваши филиалы</b>\n\n"
+            "У вас пока нет привязанных филиалов.\n\n"
+            "Нажмите кнопку ниже, чтобы добавить филиал."
+        )
+    
+    await message.answer(text, reply_markup=branches_menu_keyboard())
+
+
+@router.message(F.text == BTN_ADD_BRANCH)
+async def add_branch_start(message: types.Message, state: FSMContext) -> None:
+    """Начало добавления филиала."""
+    if not await _check_verified(message):
+        return
+    
+    await state.set_state(AddBranchStates.waiting_for_branch_text)
+    
+    await message.answer(
+        "🏢 <b>Добавление филиала</b>\n\n"
+        "Укажите информацию о вашем филиале:\n"
+        "• Город\n"
+        "• Адрес\n"
+        "• Название (если есть)\n\n"
+        "Например: <i>Москва, ул. Примерная, д.1, БЦ Пример</i>",
+        reply_markup=cancel_keyboard(),
+    )
+
+
+@router.message(AddBranchStates.waiting_for_branch_text)
+async def add_branch_process(message: types.Message, state: FSMContext) -> None:
+    """Обработка текста филиала."""
+    if message.text == BTN_MAIN_MENU:
+        await state.clear()
+        await message.answer(
+            "🏠 <b>Главное меню</b>\n\nВыберите раздел:",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+    
+    branch_text = message.text.strip()
+    
+    if len(branch_text) < 5:
+        await message.answer(
+            "❌ Слишком короткое описание. Пожалуйста, укажите город и адрес.",
+            reply_markup=cancel_keyboard(),
+        )
+        return
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        
+        if partner:
+            from database import update_partner_for_branch_request
+            await update_partner_for_branch_request(db, partner.id, branch_text)
+    
+    await state.clear()
+    
+    await message.answer(
+        "✅ <b>Заявка на добавление филиала отправлена!</b>\n\n"
+        f"📍 {branch_text}\n\n"
+        "Администратор рассмотрит вашу заявку и привяжет филиал.\n"
+        "Вы получите уведомление, когда филиал будет добавлен.",
+        reply_markup=main_menu_keyboard(),
+    )
+    
+    logger.info(f"Partner {message.from_user.id} requested new branch: {branch_text}")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -145,9 +300,9 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         f"👋 Привет, <b>{partner.full_name}</b>!\n\n"
         "Это бот для франчайзи <b>BORODACH</b>.\n\n"
         "Здесь вы можете:\n"
-        "• 🆕 Создать задачу в управляющую компанию\n"
-        "• 📋 Посмотреть свои задачи\n\n"
-        "Выберите действие в меню ниже 👇",
+        "• 📋 Работать с задачами\n"
+        "• 🏢 Управлять своими филиалами\n\n"
+        "Выберите раздел в меню ниже 👇",
         reply_markup=main_menu_keyboard(),
     )
 
@@ -185,34 +340,6 @@ async def check_status(message: types.Message, state: FSMContext) -> None:
             "❌ <b>Статус: Отклонён</b>\n\n"
             f"Причина: {partner.rejection_reason or 'Не указана'}",
         )
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Helper: проверка верификации
-# ═══════════════════════════════════════════════════════════════════
-
-async def _check_verified(message: types.Message) -> bool:
-    """Проверить, что пользователь верифицирован. Возвращает True если ок."""
-    async with AsyncSessionLocal() as db:
-        partner = await get_partner_by_telegram_id(db, message.from_user.id)
-    
-    if partner is None:
-        await message.answer(
-            "❌ Вы не зарегистрированы.\n"
-            "Нажмите /start для регистрации.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return False
-    
-    if partner.status != PartnerStatus.VERIFIED:
-        await message.answer(
-            "⏳ Ваша заявка ещё не подтверждена.\n"
-            "Дождитесь верификации администратором.",
-            reply_markup=pending_verification_keyboard(),
-        )
-        return False
-    
-    return True
 
 
 # ═══════════════════════════════════════════════════════════════════

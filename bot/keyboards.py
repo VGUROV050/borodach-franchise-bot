@@ -3,9 +3,20 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 # Константы для текста кнопок (используются и в handlers)
+BTN_TASKS = "📋 Задачи"
+BTN_MY_BRANCHES = "🏢 Мои филиалы"
+BTN_BACK = "⬅️ Назад"
+BTN_MAIN_MENU = "🏠 Главное меню"
+
+# Подменю задач
 BTN_NEW_TASK = "🆕 Новая задача"
 BTN_MY_TASKS = "📋 Мои задачи"
-BTN_CANCEL = "🏠 Главное меню"
+
+# Подменю филиалов
+BTN_ADD_BRANCH = "➕ Добавить филиал"
+
+# Для совместимости (старое название)
+BTN_CANCEL = BTN_MAIN_MENU
 
 # Кнопки отделов
 BTN_DEPT_DEVELOPMENT = "🚀 Отдел Развития"
@@ -45,10 +56,48 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_NEW_TASK), KeyboardButton(text=BTN_MY_TASKS)]
+            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BRANCHES)]
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def tasks_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Меню задач."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_NEW_TASK), KeyboardButton(text=BTN_MY_TASKS)],
+            [KeyboardButton(text=BTN_MAIN_MENU)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def branches_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Меню филиалов."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_ADD_BRANCH)],
+            [KeyboardButton(text=BTN_MAIN_MENU)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def back_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура с кнопкой назад."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_BACK)],
+            [KeyboardButton(text=BTN_MAIN_MENU)],
+        ],
+        resize_keyboard=True,
     )
     return keyboard
 

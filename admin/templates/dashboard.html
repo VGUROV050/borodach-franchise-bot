@@ -11,6 +11,10 @@
         <div class="stat-label">Ожидают верификации</div>
     </div>
     <div class="stat-card">
+        <div class="stat-value">{{ pending_branches_count|default(0) }}</div>
+        <div class="stat-label">Запросов на филиалы</div>
+    </div>
+    <div class="stat-card">
         <div class="stat-value">{{ verified_partners|length }}</div>
         <div class="stat-label">Верифицировано (последние)</div>
     </div>
@@ -60,6 +64,51 @@
 {% else %}
 <div class="card">
     <p class="text-muted">✅ Нет заявок на верификацию</p>
+</div>
+{% endif %}
+
+{% if pending_branches %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🏢 Запросы на добавление филиалов</h2>
+        <span class="badge badge-warning">{{ pending_branches_count }}</span>
+    </div>
+    
+    {% for partner in pending_branches %}
+    <div class="partner-card">
+        <div class="flex" style="justify-content: space-between; align-items: start;">
+            <div>
+                <div class="partner-name">{{ partner.full_name }}</div>
+                <div class="partner-info">
+                    📱 {{ partner.phone or '—' }}<br>
+                    💬 @{{ partner.telegram_username or '—' }}
+                </div>
+                
+                <div class="partner-branches">
+                    <strong>🏢 Текущие филиалы:</strong><br>
+                    {% if partner.branches %}
+                        {% for pb in partner.branches %}
+                            • {{ pb.branch.display_name or pb.branch.city }}<br>
+                        {% endfor %}
+                    {% else %}
+                        <em>Нет привязанных филиалов</em>
+                    {% endif %}
+                </div>
+                
+                {% if partner.branches_text %}
+                <div class="partner-branches" style="margin-top: 0.5rem; background: #fff3cd; padding: 0.5rem; border-radius: 4px;">
+                    <strong>📝 Запрос на новый филиал:</strong><br>
+                    <pre style="margin: 0; white-space: pre-wrap;">{{ partner.branches_text }}</pre>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="partner-actions">
+            <a href="/partners/{{ partner.id }}/add-branch" class="btn btn-success btn-sm">✅ Добавить филиал</a>
+        </div>
+    </div>
+    {% endfor %}
 </div>
 {% endif %}
 

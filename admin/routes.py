@@ -17,6 +17,8 @@ from database import (
     get_all_branches,
     PartnerStatus,
     Partner,
+    get_partners_with_pending_branches,
+    clear_partner_pending_branch,
 )
 from .auth import verify_session, create_session
 
@@ -46,10 +48,10 @@ async def send_telegram_notification(
     if show_main_menu:
         payload["reply_markup"] = {
             "keyboard": [
-                [{"text": "🆕 Новая задача"}, {"text": "📋 Мои задачи"}]
+                [{"text": "📋 Задачи"}, {"text": "🏢 Мои филиалы"}]
             ],
             "resize_keyboard": True,
-            "input_field_placeholder": "Выберите действие",
+            "input_field_placeholder": "Выберите раздел",
         }
     # Добавляем клавиатуру регистрации
     elif show_registration:
@@ -142,6 +144,7 @@ async def dashboard(request: Request):
         pending = await get_all_partners(db, status=PartnerStatus.PENDING)
         verified = await get_all_partners(db, status=PartnerStatus.VERIFIED, limit=10)
         rejected = await get_all_partners(db, status=PartnerStatus.REJECTED, limit=10)
+        pending_branches = await get_partners_with_pending_branches(db)
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -149,6 +152,8 @@ async def dashboard(request: Request):
         "verified_partners": verified,
         "rejected_partners": rejected,
         "pending_count": len(pending),
+        "pending_branches": pending_branches,
+        "pending_branches_count": len(pending_branches),
     })
 
 
@@ -289,6 +294,84 @@ async def reject_partner(
         raise HTTPException(status_code=404, detail="Партнёр не найден")
     
     logger.info(f"Partner {partner_id} rejected: {reason}")
+    return RedirectResponse(url="/", status_code=302)
+
+
+@router.get("/partners/{partner_id}/add-branch", response_class=HTMLResponse)
+async def add_branch_to_partner_page(
+    request: Request,
+    partner_id: int,
+):
+    """Страница добавления филиала к партнёру."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from sqlalchemy import select
+    from database.models import Partner
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner = result.scalar_one_or_none()
+        branches = await get_all_branches(db, only_active=True)
+    
+    if not partner:
+        raise HTTPException(status_code=404, detail="Партнёр не найден")
+    
+    return templates.TemplateResponse("add_branch_to_partner.html", {
+        "request": request,
+        "partner": partner,
+        "branches": branches,
+    })
+
+
+@router.post("/partners/{partner_id}/add-branch")
+async def add_branch_to_partner(
+    request: Request,
+    partner_id: int,
+    branch_ids: list[int] = Form(default=[]),
+):
+    """Добавить филиал(ы) к партнёру."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database.crud import link_partner_to_branch
+    from sqlalchemy import select
+    from database.models import Partner
+    
+    async with AsyncSessionLocal() as db:
+        # Получаем партнёра
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner_data = result.scalar_one_or_none()
+        
+        if not partner_data:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        telegram_id = partner_data.telegram_id
+        partner_name = partner_data.full_name
+        
+        # Привязываем к филиалам
+        for branch_id in branch_ids:
+            await link_partner_to_branch(
+                db=db,
+                partner_id=partner_id,
+                branch_id=branch_id,
+                is_owner=True,
+            )
+        
+        # Очищаем флаг и branches_text
+        await clear_partner_pending_branch(db, partner_id)
+    
+    # Отправляем уведомление
+    if telegram_id and branch_ids:
+        await send_telegram_notification(
+            telegram_id,
+            f"✅ <b>Филиал добавлен!</b>\n\n"
+            f"Ваш запрос на добавление филиала одобрен.\n\n"
+            f"Перейдите в раздел «🏢 Мои филиалы» чтобы увидеть обновлённый список.",
+            show_main_menu=True,
+        )
+    
+    logger.info(f"Added branches {branch_ids} to partner {partner_id}")
     return RedirectResponse(url="/", status_code=302)
 
 
