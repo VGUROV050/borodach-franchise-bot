@@ -7,11 +7,11 @@ from aiogram.fsm.state import State, StatesGroup
 
 from database import AsyncSessionLocal, create_partner
 from .keyboards import (
-    cancel_keyboard,
+    cancel_registration_keyboard,
     registration_start_keyboard,
     share_contact_keyboard,
     add_more_branches_keyboard,
-    BTN_CANCEL,
+    BTN_CANCEL_REGISTRATION,
     BTN_START_REGISTRATION,
     BTN_ADD_MORE_BRANCH,
     BTN_FINISH_REGISTRATION,
@@ -75,11 +75,11 @@ async def registration_contact(message: types.Message, state: FSMContext) -> Non
     await message.answer(
         f"✅ Телефон: <b>{phone}</b>\n\n"
         "👤 Введите ваше <b>ФИО</b> (как в договоре франшизы):",
-        reply_markup=cancel_keyboard(),
+        reply_markup=cancel_registration_keyboard(),
     )
 
 
-@router.message(RegistrationStates.waiting_for_contact, F.text == BTN_CANCEL)
+@router.message(RegistrationStates.waiting_for_contact, F.text == BTN_CANCEL_REGISTRATION)
 async def registration_contact_cancel(message: types.Message, state: FSMContext) -> None:
     """Отмена на этапе контакта."""
     await state.clear()
@@ -104,7 +104,7 @@ async def registration_contact_invalid(message: types.Message, state: FSMContext
 # Шаг 2: ФИО
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(RegistrationStates.waiting_for_full_name, F.text == BTN_CANCEL)
+@router.message(RegistrationStates.waiting_for_full_name, F.text == BTN_CANCEL_REGISTRATION)
 async def registration_name_cancel(message: types.Message, state: FSMContext) -> None:
     """Отмена на этапе ФИО."""
     await state.clear()
@@ -122,7 +122,7 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
     if len(full_name) < 3:
         await message.answer(
             "⚠️ Пожалуйста, введите полное ФИО:",
-            reply_markup=cancel_keyboard(),
+            reply_markup=cancel_registration_keyboard(),
         )
         return
     
@@ -136,7 +136,7 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
         "• Москва, Мега Тёплый Стан\n"
         "• Казань, ТЦ Кольцо\n"
         "• СПб Невский проспект",
-        reply_markup=cancel_keyboard(),
+        reply_markup=cancel_registration_keyboard(),
     )
 
 
@@ -144,7 +144,7 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
 # Шаг 3: Филиал
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(RegistrationStates.waiting_for_branch, F.text == BTN_CANCEL)
+@router.message(RegistrationStates.waiting_for_branch, F.text == BTN_CANCEL_REGISTRATION)
 async def registration_branch_cancel(message: types.Message, state: FSMContext) -> None:
     """Отмена на этапе филиала."""
     await state.clear()
@@ -162,7 +162,7 @@ async def registration_branch(message: types.Message, state: FSMContext) -> None
     if len(branch_text) < 3:
         await message.answer(
             "⚠️ Пожалуйста, укажите филиал подробнее:",
-            reply_markup=cancel_keyboard(),
+            reply_markup=cancel_registration_keyboard(),
         )
         return
     
@@ -195,7 +195,7 @@ async def registration_add_more(message: types.Message, state: FSMContext) -> No
     
     await message.answer(
         "🏢 Укажите следующий филиал:",
-        reply_markup=cancel_keyboard(),
+        reply_markup=cancel_registration_keyboard(),
     )
 
 

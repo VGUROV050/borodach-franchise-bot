@@ -31,6 +31,7 @@ BTN_REJECT_CANCEL = "❌ Нет"
 BTN_START_REGISTRATION = "📝 Пройти регистрацию"
 BTN_ADD_MORE_BRANCH = "➕ Добавить ещё филиал"
 BTN_FINISH_REGISTRATION = "✅ Завершить регистрацию"
+BTN_CANCEL_REGISTRATION = "❌ Отменить"
 
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
@@ -177,10 +178,22 @@ def share_contact_keyboard() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📱 Поделиться контактом", request_contact=True)],
-            [KeyboardButton(text=BTN_CANCEL)],
+            [KeyboardButton(text=BTN_CANCEL_REGISTRATION)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Поделитесь контактом",
+    )
+    return keyboard
+
+
+def cancel_registration_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для отмены регистрации."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_CANCEL_REGISTRATION)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Введите данные или отмените",
     )
     return keyboard
 
