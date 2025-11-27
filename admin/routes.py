@@ -468,6 +468,69 @@ async def add_branch(
     return RedirectResponse(url="/branches", status_code=302)
 
 
+@router.get("/branches/{branch_id}/edit", response_class=HTMLResponse)
+async def edit_branch_page(
+    request: Request,
+    branch_id: int,
+):
+    """Страница редактирования филиала."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from sqlalchemy import select
+    from database.models import Branch
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Branch).where(Branch.id == branch_id))
+        branch = result.scalar_one_or_none()
+    
+    if not branch:
+        raise HTTPException(status_code=404, detail="Филиал не найден")
+    
+    return templates.TemplateResponse("edit_branch.html", {
+        "request": request,
+        "branch": branch,
+    })
+
+
+@router.post("/branches/{branch_id}/edit")
+async def edit_branch(
+    request: Request,
+    branch_id: int,
+    yclients_id: str = Form(...),
+    city: str = Form(...),
+    address: str = Form(...),
+    name: str = Form(""),
+    display_name: str = Form(""),
+    is_active: str = Form("1"),
+):
+    """Сохранить изменения филиала."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select
+    from database.models import Branch
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Branch).where(Branch.id == branch_id))
+        branch = result.scalar_one_or_none()
+        
+        if not branch:
+            raise HTTPException(status_code=404, detail="Филиал не найден")
+        
+        branch.yclients_id = yclients_id
+        branch.city = city
+        branch.address = address
+        branch.name = name or None
+        branch.display_name = display_name or None
+        branch.is_active = is_active == "1"
+        
+        await db.commit()
+    
+    logger.info(f"Branch {branch_id} updated")
+    return RedirectResponse(url="/branches", status_code=302)
+
+
 @router.post("/branches/{branch_id}/delete")
 async def delete_branch(
     request: Request,

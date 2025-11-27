@@ -79,10 +79,13 @@
                     {% endif %}
                 </td>
                 <td>
-                    <form method="post" action="/branches/{{ branch.id }}/delete" 
-                          onsubmit="return confirm('Удалить филиал {{ branch.display_name or branch.city }}?');">
-                        <button type="submit" class="btn btn-danger btn-sm">🗑</button>
-                    </form>
+                    <div class="flex gap-1">
+                        <a href="/branches/{{ branch.id }}/edit" class="btn btn-sm" title="Редактировать">✏️</a>
+                        <form method="post" action="/branches/{{ branch.id }}/delete" style="display: inline;"
+                              onsubmit="return confirm('Удалить филиал {{ branch.display_name or branch.city }}?');">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Удалить">🗑</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

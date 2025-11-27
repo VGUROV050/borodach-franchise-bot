@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование филиала — Borodach Admin{% endblock %}
+
+{% block content %}
+<a href="/branches" class="btn btn-secondary mb-2">&larr; Назад к филиалам</a>
+
+<h1 class="mb-2">✏️ Редактирование филиала</h1>
+
+<div class="card">
+    <form method="post" action="/branches/{{ branch.id }}/edit">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+            <div class="form-group">
+                <label class="form-label">YClients ID *</label>
+                <input type="text" name="yclients_id" class="form-input" 
+                       value="{{ branch.yclients_id or '' }}" placeholder="123456" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Город *</label>
+                <input type="text" name="city" class="form-input" 
+                       value="{{ branch.city }}" placeholder="Москва" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Адрес *</label>
+                <input type="text" name="address" class="form-input" 
+                       value="{{ branch.address }}" placeholder="ул. Примерная, 1" required>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Название (ТЦ и т.д.)</label>
+                <input type="text" name="name" class="form-input" 
+                       value="{{ branch.name or '' }}" placeholder="ТЦ Мега">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Краткое название (отображается партнёрам)</label>
+                <input type="text" name="display_name" class="form-input" 
+                       value="{{ branch.display_name or '' }}" placeholder="Мега Тёплый Стан">
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Статус</label>
+                <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="is_active" value="1" 
+                               {{ 'checked' if branch.is_active else '' }}
+                               style="width: 18px; height: 18px; accent-color: var(--success);">
+                        <span>Активен</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="is_active" value="0"
+                               {{ 'checked' if not branch.is_active else '' }}
+                               style="width: 18px; height: 18px; accent-color: var(--danger);">
+                        <span>Неактивен</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex gap-2 mt-2">
+            <button type="submit" class="btn btn-primary">💾 Сохранить изменения</button>
+            <a href="/branches" class="btn">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<div class="card mt-2" style="background: var(--bg-main);">
+    <h3 style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">📋 Информация</h3>
+    <p class="text-muted" style="font-size: 0.875rem; margin: 0;">
+        ID филиала: <code>{{ branch.id }}</code><br>
+        Создан: {{ branch.created_at.strftime('%d.%m.%Y %H:%M') if branch.created_at else '—' }}
+    </p>
+</div>
+{% endblock %}
+
