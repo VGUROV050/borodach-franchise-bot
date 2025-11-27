@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}Партнёры — Borodach Admin{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">👥 Партнёры</h1>
+
+<div class="card mb-2">
+    <div class="flex gap-2">
+        <a href="/partners" class="btn {% if not current_status %}btn-primary{% endif %}">Все</a>
+        <a href="/partners?status=pending" class="btn {% if current_status == 'pending' %}btn-primary{% endif %}">Ожидают</a>
+        <a href="/partners?status=verified" class="btn {% if current_status == 'verified' %}btn-primary{% endif %}">Верифицированы</a>
+        <a href="/partners?status=rejected" class="btn {% if current_status == 'rejected' %}btn-primary{% endif %}">Отклонены</a>
+    </div>
+</div>
+
+<div class="card">
+    {% if partners %}
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>ФИО</th>
+                <th>Телефон</th>
+                <th>Telegram</th>
+                <th>Статус</th>
+                <th>Филиалы</th>
+                <th>Дата</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for partner in partners %}
+            <tr>
+                <td>{{ partner.id }}</td>
+                <td>{{ partner.full_name }}</td>
+                <td>{{ partner.phone or '—' }}</td>
+                <td>@{{ partner.telegram_username or '—' }}</td>
+                <td>
+                    {% if partner.status.value == 'pending' %}
+                    <span class="badge badge-pending">Ожидает</span>
+                    {% elif partner.status.value == 'verified' %}
+                    <span class="badge badge-verified">Верифицирован</span>
+                    {% else %}
+                    <span class="badge badge-rejected">Отклонён</span>
+                    {% endif %}
+                </td>
+                <td style="max-width: 200px; font-size: 0.85rem;">
+                    {{ partner.branches_text[:50] + '...' if partner.branches_text and partner.branches_text|length > 50 else partner.branches_text or '—' }}
+                </td>
+                <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
+                <td>
+                    {% if partner.status.value == 'pending' %}
+                    <form method="post" action="/partners/{{ partner.id }}/verify" style="display: inline;">
+                        <button type="submit" class="btn btn-success btn-sm">✅</button>
+                    </form>
+                    <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
+                        <input type="hidden" name="reason" value="">
+                        <button type="submit" class="btn btn-danger btn-sm">❌</button>
+                    </form>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Партнёры не найдены</p>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Главная — Borodach Admin{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">👋 Добро пожаловать</h1>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ pending_count }}</div>
+        <div class="stat-label">Ожидают верификации</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ verified_partners|length }}</div>
+        <div class="stat-label">Верифицировано (последние)</div>
+    </div>
+</div>
+
+{% if pending_partners %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">⏳ Заявки на верификацию</h2>
+        <span class="badge badge-pending">{{ pending_count }}</span>
+    </div>
+    
+    {% for partner in pending_partners %}
+    <div class="partner-card">
+        <div class="flex" style="justify-content: space-between; align-items: start;">
+            <div>
+                <div class="partner-name">{{ partner.full_name }}</div>
+                <div class="partner-info">
+                    📱 {{ partner.phone or '—' }}<br>
+                    💬 @{{ partner.telegram_username or '—' }} (ID: {{ partner.telegram_id }})
+                </div>
+                
+                {% if partner.branches_text %}
+                <div class="partner-branches">
+                    <strong>🏢 Филиалы (текст):</strong><br>
+                    <pre>{{ partner.branches_text }}</pre>
+                </div>
+                {% endif %}
+            </div>
+            
+            <span class="text-muted" style="font-size: 0.8rem;">
+                {{ partner.created_at.strftime('%d.%m.%Y %H:%M') if partner.created_at else '' }}
+            </span>
+        </div>
+        
+        <div class="partner-actions">
+            <form method="post" action="/partners/{{ partner.id }}/verify" style="display: inline;">
+                <button type="submit" class="btn btn-success btn-sm">✅ Подтвердить</button>
+            </form>
+            
+            <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
+                <input type="hidden" name="reason" value="">
+                <button type="submit" class="btn btn-danger btn-sm">❌ Отклонить</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card">
+    <p class="text-muted">✅ Нет заявок на верификацию</p>
+</div>
+{% endif %}
+
+{% if verified_partners %}
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">✅ Последние верифицированные</h2>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Партнёр</th>
+                <th>Телефон</th>
+                <th>Telegram</th>
+                <th>Дата</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for partner in verified_partners %}
+            <tr>
+                <td>{{ partner.full_name }}</td>
+                <td>{{ partner.phone or '—' }}</td>
+                <td>@{{ partner.telegram_username or '—' }}</td>
+                <td class="text-muted">{{ partner.verified_at.strftime('%d.%m.%Y') if partner.verified_at else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
