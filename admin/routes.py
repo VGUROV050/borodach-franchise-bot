@@ -23,7 +23,11 @@ from .auth import verify_session, create_session
 logger = logging.getLogger(__name__)
 
 
-async def send_telegram_notification(chat_id: int, text: str) -> bool:
+async def send_telegram_notification(
+    chat_id: int, 
+    text: str, 
+    show_main_menu: bool = False,
+) -> bool:
     """Отправить уведомление пользователю через Telegram Bot API."""
     if not TELEGRAM_BOT_TOKEN:
         logger.warning("TELEGRAM_BOT_TOKEN not set, skipping notification")
@@ -31,13 +35,25 @@ async def send_telegram_notification(chat_id: int, text: str) -> bool:
     
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     
+    payload = {
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML",
+    }
+    
+    # Добавляем клавиатуру главного меню
+    if show_main_menu:
+        payload["reply_markup"] = {
+            "keyboard": [
+                [{"text": "🆕 Новая задача"}, {"text": "📋 Мои задачи"}]
+            ],
+            "resize_keyboard": True,
+            "input_field_placeholder": "Выберите действие",
+        }
+    
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, json={
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "HTML",
-            })
+            response = await client.post(url, json=payload)
             
             if response.status_code == 200:
                 logger.info(f"Notification sent to {chat_id}")
@@ -224,7 +240,7 @@ async def verify_partner(
                 is_owner=True,
             )
     
-    # Отправляем уведомление пользователю
+    # Отправляем уведомление пользователю с главным меню
     if telegram_id:
         await send_telegram_notification(
             telegram_id,
@@ -233,7 +249,8 @@ async def verify_partner(
             f"Теперь вы можете:\n"
             f"• 🆕 Создавать задачи\n"
             f"• 📋 Просматривать свои задачи\n\n"
-            f"Нажмите /start чтобы начать работу.",
+            f"Выберите действие в меню ниже 👇",
+            show_main_menu=True,
         )
     
     logger.info(f"Partner {partner_id} verified with branches: {branch_ids}")
