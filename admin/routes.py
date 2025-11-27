@@ -27,6 +27,7 @@ async def send_telegram_notification(
     chat_id: int, 
     text: str, 
     show_main_menu: bool = False,
+    show_registration: bool = False,
 ) -> bool:
     """Отправить уведомление пользователю через Telegram Bot API."""
     if not TELEGRAM_BOT_TOKEN:
@@ -49,6 +50,15 @@ async def send_telegram_notification(
             ],
             "resize_keyboard": True,
             "input_field_placeholder": "Выберите действие",
+        }
+    # Добавляем клавиатуру регистрации
+    elif show_registration:
+        payload["reply_markup"] = {
+            "keyboard": [
+                [{"text": "📝 Пройти регистрацию"}]
+            ],
+            "resize_keyboard": True,
+            "input_field_placeholder": "Нажмите для регистрации",
         }
     
     try:
@@ -291,22 +301,38 @@ async def delete_partner(
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from sqlalchemy import delete
+    from sqlalchemy import select, delete
     from database.models import Partner, PartnerBranch
     
     async with AsyncSessionLocal() as db:
-        # Сначала удаляем связи с филиалами
+        # Получаем данные партнёра для уведомления
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner = result.scalar_one_or_none()
+        telegram_id = partner.telegram_id if partner else None
+        partner_name = partner.full_name if partner else ""
+        
+        # Удаляем связи с филиалами
         await db.execute(
             delete(PartnerBranch).where(PartnerBranch.partner_id == partner_id)
         )
         
-        # Затем удаляем партнёра
+        # Удаляем партнёра
         await db.execute(
             delete(Partner).where(Partner.id == partner_id)
         )
         await db.commit()
     
-    logger.info(f"Partner {partner_id} deleted")
+    # Отправляем уведомление с кнопкой регистрации
+    if telegram_id:
+        await send_telegram_notification(
+            telegram_id,
+            f"❌ <b>Ваш аккаунт удалён из системы</b>\n\n"
+            f"Если это произошло по ошибке — свяжитесь с вашим менеджером.\n\n"
+            f"Для повторной регистрации нажмите кнопку ниже.",
+            show_registration=True,
+        )
+    
+    logger.info(f"Partner {partner_id} ({partner_name}) deleted")
     return RedirectResponse(url="/partners", status_code=302)
 
 
