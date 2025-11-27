@@ -217,6 +217,34 @@ async def reject_partner(
     return RedirectResponse(url="/", status_code=302)
 
 
+@router.post("/partners/{partner_id}/delete")
+async def delete_partner(
+    request: Request,
+    partner_id: int,
+):
+    """Удалить партнёра."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import delete
+    from database.models import Partner, PartnerBranch
+    
+    async with AsyncSessionLocal() as db:
+        # Сначала удаляем связи с филиалами
+        await db.execute(
+            delete(PartnerBranch).where(PartnerBranch.partner_id == partner_id)
+        )
+        
+        # Затем удаляем партнёра
+        await db.execute(
+            delete(Partner).where(Partner.id == partner_id)
+        )
+        await db.commit()
+    
+    logger.info(f"Partner {partner_id} deleted")
+    return RedirectResponse(url="/partners", status_code=302)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Филиалы
 # ═══════════════════════════════════════════════════════════════════

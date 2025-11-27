@@ -49,16 +49,18 @@
                     {{ partner.branches_text[:50] + '...' if partner.branches_text and partner.branches_text|length > 50 else partner.branches_text or '—' }}
                 </td>
                 <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
-                <td>
+                <td class="flex gap-1">
                     {% if partner.status.value == 'pending' %}
                     <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm">✅</a>
                     <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
                         <input type="hidden" name="reason" value="">
                         <button type="submit" class="btn btn-danger btn-sm">❌</button>
                     </form>
-                    {% else %}
-                    —
                     {% endif %}
+                    <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline;"
+                          onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
+                        <button type="submit" class="btn btn-sm" style="background: #6c757d; color: white;">🗑</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
