@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.settings import TELEGRAM_BOT_TOKEN
 from bot import main_router
+from database import init_db, close_db
 
 
 logging.basicConfig(
@@ -23,6 +24,10 @@ async def main():
     if not TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN не задан в .env")
 
+    # Инициализация БД
+    logger.info("Connecting to database...")
+    await init_db()
+
     bot = Bot(
         token=TELEGRAM_BOT_TOKEN,
         default=DefaultBotProperties(parse_mode="HTML"),
@@ -31,8 +36,12 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(main_router)
 
-    logger.info("Starting bot polling...")
-    await dp.start_polling(bot)
+    try:
+        logger.info("Starting bot polling...")
+        await dp.start_polling(bot)
+    finally:
+        # Закрываем соединение с БД при остановке
+        await close_db()
 
 
 if __name__ == "__main__":

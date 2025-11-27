@@ -10,6 +10,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config.settings import DEPARTMENTS
+from database import AsyncSessionLocal, get_partner_by_telegram_id, PartnerStatus
 from .keyboards import (
     main_menu_keyboard, 
     cancel_keyboard,
@@ -20,6 +21,8 @@ from .keyboards import (
     active_tasks_keyboard,
     all_tasks_actions_keyboard,
     confirm_cancel_keyboard,
+    registration_start_keyboard,
+    pending_verification_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -91,22 +94,125 @@ async def cancel_handler(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# /start
+# /start — с проверкой верификации
 # ═══════════════════════════════════════════════════════════════════
 
 @router.message(CommandStart())
 async def cmd_start(message: types.Message, state: FSMContext) -> None:
-    """Обработчик команды /start."""
+    """Обработчик команды /start с проверкой верификации."""
     await state.clear()
     
+    telegram_id = message.from_user.id
+    
+    # Проверяем партнёра в БД
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, telegram_id)
+    
+    if partner is None:
+        # Новый пользователь — нужна регистрация
+        await message.answer(
+            "👋 Добро пожаловать в бот для франчайзи <b>BORODACH</b>!\n\n"
+            "Для доступа к функциям бота необходимо пройти регистрацию.\n\n"
+            "Нажмите кнопку ниже, чтобы начать:",
+            reply_markup=registration_start_keyboard(),
+        )
+        return
+    
+    if partner.status == PartnerStatus.PENDING:
+        # Ожидает верификации
+        await message.answer(
+            "⏳ <b>Ваша заявка на рассмотрении</b>\n\n"
+            f"👤 {partner.full_name}\n"
+            f"📱 {partner.phone}\n\n"
+            "Пожалуйста, дождитесь подтверждения администратором.\n"
+            "Мы уведомим вас, когда заявка будет рассмотрена.",
+            reply_markup=pending_verification_keyboard(),
+        )
+        return
+    
+    if partner.status == PartnerStatus.REJECTED:
+        # Заявка отклонена
+        rejection_reason = partner.rejection_reason or "Причина не указана"
+        await message.answer(
+            "❌ <b>Ваша заявка отклонена</b>\n\n"
+            f"Причина: {rejection_reason}\n\n"
+            "Если вы считаете, что это ошибка, обратитесь в поддержку.",
+        )
+        return
+    
+    # Верифицированный партнёр — показываем главное меню
     await message.answer(
-        "👋 Привет! Это бот для франчайзи <b>BORODACH</b>.\n\n"
+        f"👋 Привет, <b>{partner.full_name}</b>!\n\n"
+        "Это бот для франчайзи <b>BORODACH</b>.\n\n"
         "Здесь вы можете:\n"
         "• 🆕 Создать задачу в управляющую компанию\n"
         "• 📋 Посмотреть свои задачи\n\n"
         "Выберите действие в меню ниже 👇",
         reply_markup=main_menu_keyboard(),
     )
+
+
+@router.message(F.text == "🔄 Проверить статус")
+async def check_status(message: types.Message, state: FSMContext) -> None:
+    """Проверка статуса верификации."""
+    telegram_id = message.from_user.id
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, telegram_id)
+    
+    if partner is None:
+        await message.answer(
+            "❌ Вы не зарегистрированы.\n"
+            "Нажмите /start для регистрации.",
+        )
+        return
+    
+    if partner.status == PartnerStatus.PENDING:
+        await message.answer(
+            "⏳ <b>Статус: Ожидает рассмотрения</b>\n\n"
+            "Ваша заявка ещё не рассмотрена.\n"
+            "Пожалуйста, подождите.",
+            reply_markup=pending_verification_keyboard(),
+        )
+    elif partner.status == PartnerStatus.VERIFIED:
+        await message.answer(
+            "✅ <b>Статус: Верифицирован</b>\n\n"
+            "Добро пожаловать!",
+            reply_markup=main_menu_keyboard(),
+        )
+    elif partner.status == PartnerStatus.REJECTED:
+        await message.answer(
+            "❌ <b>Статус: Отклонён</b>\n\n"
+            f"Причина: {partner.rejection_reason or 'Не указана'}",
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Helper: проверка верификации
+# ═══════════════════════════════════════════════════════════════════
+
+async def _check_verified(message: types.Message) -> bool:
+    """Проверить, что пользователь верифицирован. Возвращает True если ок."""
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+    
+    if partner is None:
+        await message.answer(
+            "❌ Вы не зарегистрированы.\n"
+            "Нажмите /start для регистрации.",
+            reply_markup=registration_start_keyboard(),
+        )
+        return False
+    
+    if partner.status != PartnerStatus.VERIFIED:
+        await message.answer(
+            "⏳ Ваша заявка ещё не подтверждена.\n"
+            "Дождитесь верификации администратором.",
+            reply_markup=pending_verification_keyboard(),
+        )
+        return False
+    
+    return True
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -116,6 +222,10 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
 @router.message(F.text == BTN_NEW_TASK)
 async def new_task_start(message: types.Message, state: FSMContext) -> None:
     """Начало создания задачи — выбор отдела."""
+    # Проверка верификации
+    if not await _check_verified(message):
+        return
+    
     await state.set_state(NewTaskStates.waiting_for_department)
     
     await message.answer(
@@ -617,6 +727,10 @@ def _format_tasks_list(tasks: list, title: str) -> str:
 @router.message(F.text == BTN_MY_TASKS)
 async def my_tasks(message: types.Message, state: FSMContext) -> None:
     """Показать задачи в работе, сгруппированные по отделам."""
+    # Проверка верификации
+    if not await _check_verified(message):
+        return
+    
     await state.clear()
     
     telegram_user_id = message.from_user.id

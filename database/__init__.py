@@ -11,6 +11,7 @@ from .crud import (
     get_pending_partners,
     get_all_branches,
     create_branch,
+    get_or_create_branch,
     link_partner_to_branch,
     get_partner_branches,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "get_pending_partners",
     "get_all_branches",
     "create_branch",
+    "get_or_create_branch",
     "link_partner_to_branch",
     "get_partner_branches",
 ]

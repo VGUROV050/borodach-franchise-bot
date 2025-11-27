@@ -27,6 +27,11 @@ BTN_CANCEL_TASK = "❌ Отменить задачу"
 BTN_CONFIRM_CANCEL = "✅ Да, отменить"
 BTN_REJECT_CANCEL = "❌ Нет"
 
+# Кнопки регистрации
+BTN_START_REGISTRATION = "📝 Пройти регистрацию"
+BTN_ADD_MORE_BRANCH = "➕ Добавить ещё филиал"
+BTN_FINISH_REGISTRATION = "✅ Завершить регистрацию"
+
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
     BTN_DEPT_DEVELOPMENT: "development",
@@ -147,5 +152,46 @@ def confirm_cancel_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Подтвердите отмену",
+    )
+    return keyboard
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Клавиатуры регистрации
+# ═══════════════════════════════════════════════════════════════════
+
+def registration_start_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для начала регистрации."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_START_REGISTRATION)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Нажмите для регистрации",
+    )
+    return keyboard
+
+
+def add_more_branches_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура добавления филиалов."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_ADD_MORE_BRANCH)],
+            [KeyboardButton(text=BTN_FINISH_REGISTRATION)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Добавить филиал или завершить?",
+    )
+    return keyboard
+
+
+def pending_verification_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для ожидающих верификации."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🔄 Проверить статус")],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Ожидайте верификации",
     )
     return keyboard
