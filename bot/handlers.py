@@ -27,6 +27,7 @@ from .keyboards import (
     pending_verification_keyboard,
     BTN_TASKS,
     BTN_MY_BRANCHES,
+    BTN_STATISTICS,
     BTN_MAIN_MENU,
     BTN_ADD_BRANCH,
     BTN_NEW_TASK, 
@@ -246,6 +247,85 @@ async def add_branch_process(message: types.Message, state: FSMContext) -> None:
     )
     
     logger.info(f"Partner {message.from_user.id} requested new branch: {branch_text}")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Статистика по филиалам (YClients)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_STATISTICS)
+async def statistics_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать статистику по филиалам из YClients."""
+    if not await _check_verified(message):
+        return
+    
+    await state.clear()
+    
+    # Показываем сообщение о загрузке
+    loading_msg = await message.answer("⏳ Загружаю статистику из YClients...")
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        
+        if not partner:
+            await loading_msg.edit_text("❌ Партнёр не найден")
+            return
+        
+        from database import get_partner_branches
+        partner_branches = await get_partner_branches(db, partner.id)
+    
+    if not partner_branches:
+        await loading_msg.edit_text(
+            "🏢 <b>Статистика по филиалам</b>\n\n"
+            "У вас пока нет привязанных филиалов.\n"
+            "Обратитесь к администратору для привязки.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+    
+    # Получаем статистику по каждому филиалу
+    from yclients import get_monthly_revenue
+    
+    stats_text = "📊 <b>Статистика по филиалам</b>\n\n"
+    total_revenue = 0
+    total_records = 0
+    period = ""
+    
+    for pb in partner_branches:
+        branch = pb.branch
+        branch_name = branch.display_name or f"{branch.city}, {branch.address}"
+        
+        if not branch.yclients_id:
+            stats_text += f"🏢 <b>{branch_name}</b>\n"
+            stats_text += "   ⚠️ YClients ID не указан\n\n"
+            continue
+        
+        # Получаем выручку
+        result = await get_monthly_revenue(branch.yclients_id)
+        
+        if result.get("success"):
+            revenue = result.get("revenue", 0)
+            records = result.get("records_count", 0)
+            period = result.get("period", "")
+            
+            total_revenue += revenue
+            total_records += records
+            
+            stats_text += f"🏢 <b>{branch_name}</b>\n"
+            stats_text += f"   💰 Выручка: {revenue:,.0f} ₽\n"
+            stats_text += f"   👥 Визитов: {records}\n\n"
+        else:
+            stats_text += f"🏢 <b>{branch_name}</b>\n"
+            stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n\n"
+    
+    # Итого
+    if total_revenue > 0 or total_records > 0:
+        stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
+        stats_text += f"📈 <b>Итого за {period}:</b>\n"
+        stats_text += f"   💰 Выручка: {total_revenue:,.0f} ₽\n"
+        stats_text += f"   👥 Визитов: {total_records}"
+    
+    await loading_msg.edit_text(stats_text, reply_markup=main_menu_keyboard())
 
 
 # ═══════════════════════════════════════════════════════════════════

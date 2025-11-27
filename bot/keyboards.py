@@ -5,6 +5,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 # Константы для текста кнопок (используются и в handlers)
 BTN_TASKS = "📋 Задачи"
 BTN_MY_BRANCHES = "🏢 Мои филиалы"
+BTN_STATISTICS = "📊 Статистика"
 BTN_BACK = "⬅️ Назад"
 BTN_MAIN_MENU = "🏠 Главное меню"
 
@@ -56,7 +57,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BRANCHES)]
+            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BRANCHES)],
+            [KeyboardButton(text=BTN_STATISTICS)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
