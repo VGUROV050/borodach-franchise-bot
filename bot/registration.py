@@ -5,17 +5,11 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from database import (
-    AsyncSessionLocal,
-    get_partner_by_telegram_id,
-    create_partner,
-    get_or_create_branch,
-    link_partner_to_branch,
-    PartnerStatus,
-)
+from database import AsyncSessionLocal, create_partner
 from .keyboards import (
     cancel_keyboard,
     registration_start_keyboard,
+    share_contact_keyboard,
     add_more_branches_keyboard,
     BTN_CANCEL,
     BTN_START_REGISTRATION,
@@ -29,11 +23,9 @@ router = Router()
 
 
 class RegistrationStates(StatesGroup):
+    waiting_for_contact = State()
     waiting_for_full_name = State()
-    waiting_for_phone = State()
-    waiting_for_city = State()
-    waiting_for_address = State()
-    waiting_for_branch_name = State()
+    waiting_for_branch = State()
     waiting_for_more_branches = State()
 
 
@@ -44,28 +36,87 @@ class RegistrationStates(StatesGroup):
 @router.message(F.text == BTN_START_REGISTRATION)
 async def registration_start(message: types.Message, state: FSMContext) -> None:
     """Начало регистрации нового партнёра."""
-    await state.set_state(RegistrationStates.waiting_for_full_name)
+    await state.set_state(RegistrationStates.waiting_for_contact)
     await state.update_data(branches=[])
     
     await message.answer(
         "📝 <b>Регистрация нового партнёра</b>\n\n"
-        "Введите ваше <b>ФИО</b> (как в договоре):",
+        "Для начала поделитесь вашим контактом.\n"
+        "Нажмите кнопку ниже 👇",
+        reply_markup=share_contact_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 1: Получение контакта
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(RegistrationStates.waiting_for_contact, F.contact)
+async def registration_contact(message: types.Message, state: FSMContext) -> None:
+    """Получили контакт → запрашиваем ФИО."""
+    contact = message.contact
+    
+    # Проверяем, что это контакт самого пользователя
+    if contact.user_id != message.from_user.id:
+        await message.answer(
+            "⚠️ Пожалуйста, поделитесь <b>своим</b> контактом, а не чужим.",
+            reply_markup=share_contact_keyboard(),
+        )
+        return
+    
+    # Сохраняем телефон
+    phone = contact.phone_number
+    if not phone.startswith("+"):
+        phone = "+" + phone
+    
+    await state.update_data(phone=phone)
+    await state.set_state(RegistrationStates.waiting_for_full_name)
+    
+    await message.answer(
+        f"✅ Телефон: <b>{phone}</b>\n\n"
+        "👤 Введите ваше <b>ФИО</b> (как в договоре франшизы):",
         reply_markup=cancel_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_contact, F.text == BTN_CANCEL)
+async def registration_contact_cancel(message: types.Message, state: FSMContext) -> None:
+    """Отмена на этапе контакта."""
+    await state.clear()
+    await message.answer(
+        "❌ Регистрация отменена.\n\n"
+        "Для доступа к боту необходимо пройти регистрацию.",
+        reply_markup=registration_start_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_contact)
+async def registration_contact_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неверный ввод — ждём контакт."""
+    await message.answer(
+        "⚠️ Пожалуйста, нажмите кнопку «📱 Поделиться контактом» ниже.\n\n"
+        "Это необходимо для верификации.",
+        reply_markup=share_contact_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 2: ФИО
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(RegistrationStates.waiting_for_full_name, F.text == BTN_CANCEL)
+async def registration_name_cancel(message: types.Message, state: FSMContext) -> None:
+    """Отмена на этапе ФИО."""
+    await state.clear()
+    await message.answer(
+        "❌ Регистрация отменена.",
+        reply_markup=registration_start_keyboard(),
     )
 
 
 @router.message(RegistrationStates.waiting_for_full_name)
 async def registration_full_name(message: types.Message, state: FSMContext) -> None:
-    """Получили ФИО → запрашиваем телефон."""
-    if message.text == BTN_CANCEL:
-        await state.clear()
-        await message.answer(
-            "❌ Регистрация отменена.\n\n"
-            "Для доступа к боту необходимо пройти регистрацию.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return
-    
+    """Получили ФИО → запрашиваем филиал."""
     full_name = message.text.strip()
     
     if len(full_name) < 3:
@@ -76,163 +127,74 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
         return
     
     await state.update_data(full_name=full_name)
-    await state.set_state(RegistrationStates.waiting_for_phone)
+    await state.set_state(RegistrationStates.waiting_for_branch)
     
     await message.answer(
         f"✅ ФИО: <b>{full_name}</b>\n\n"
-        "📱 Введите ваш <b>номер телефона</b>:\n"
-        "Например: +7 999 123-45-67",
+        "🏢 <b>Укажите ваш филиал</b>\n\n"
+        "Напишите как вам удобно, например:\n"
+        "• Москва, Мега Тёплый Стан\n"
+        "• Казань, ТЦ Кольцо\n"
+        "• СПб Невский проспект",
         reply_markup=cancel_keyboard(),
     )
 
 
-@router.message(RegistrationStates.waiting_for_phone)
-async def registration_phone(message: types.Message, state: FSMContext) -> None:
-    """Получили телефон → запрашиваем город филиала."""
-    if message.text == BTN_CANCEL:
-        await state.clear()
-        await message.answer(
-            "❌ Регистрация отменена.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 3: Филиал
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(RegistrationStates.waiting_for_branch, F.text == BTN_CANCEL)
+async def registration_branch_cancel(message: types.Message, state: FSMContext) -> None:
+    """Отмена на этапе филиала."""
+    await state.clear()
+    await message.answer(
+        "❌ Регистрация отменена.",
+        reply_markup=registration_start_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_branch)
+async def registration_branch(message: types.Message, state: FSMContext) -> None:
+    """Получили филиал → спрашиваем про ещё филиалы."""
+    branch_text = message.text.strip()
     
-    phone = message.text.strip()
-    
-    # Простая валидация телефона
-    phone_digits = "".join(filter(str.isdigit, phone))
-    if len(phone_digits) < 10:
+    if len(branch_text) < 3:
         await message.answer(
-            "⚠️ Некорректный номер телефона. Введите номер с кодом страны:\n"
-            "Например: +7 999 123-45-67",
+            "⚠️ Пожалуйста, укажите филиал подробнее:",
             reply_markup=cancel_keyboard(),
         )
         return
-    
-    await state.update_data(phone=phone)
-    await state.set_state(RegistrationStates.waiting_for_city)
-    
-    await message.answer(
-        f"✅ Телефон: <b>{phone}</b>\n\n"
-        "🏙 Теперь укажите <b>город</b> вашего филиала:",
-        reply_markup=cancel_keyboard(),
-    )
-
-
-@router.message(RegistrationStates.waiting_for_city)
-async def registration_city(message: types.Message, state: FSMContext) -> None:
-    """Получили город → запрашиваем адрес."""
-    if message.text == BTN_CANCEL:
-        await state.clear()
-        await message.answer(
-            "❌ Регистрация отменена.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return
-    
-    city = message.text.strip()
-    
-    if len(city) < 2:
-        await message.answer(
-            "⚠️ Пожалуйста, введите название города:",
-            reply_markup=cancel_keyboard(),
-        )
-        return
-    
-    await state.update_data(current_city=city)
-    await state.set_state(RegistrationStates.waiting_for_address)
-    
-    await message.answer(
-        f"✅ Город: <b>{city}</b>\n\n"
-        "📍 Введите <b>адрес</b> филиала:\n"
-        "Например: ул. Ленина, 15",
-        reply_markup=cancel_keyboard(),
-    )
-
-
-@router.message(RegistrationStates.waiting_for_address)
-async def registration_address(message: types.Message, state: FSMContext) -> None:
-    """Получили адрес → запрашиваем название (ТЦ и т.д.)."""
-    if message.text == BTN_CANCEL:
-        await state.clear()
-        await message.answer(
-            "❌ Регистрация отменена.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return
-    
-    address = message.text.strip()
-    
-    if len(address) < 3:
-        await message.answer(
-            "⚠️ Пожалуйста, введите полный адрес:",
-            reply_markup=cancel_keyboard(),
-        )
-        return
-    
-    await state.update_data(current_address=address)
-    await state.set_state(RegistrationStates.waiting_for_branch_name)
-    
-    await message.answer(
-        f"✅ Адрес: <b>{address}</b>\n\n"
-        "🏢 Укажите <b>название</b> (ТЦ, БЦ или другое):\n"
-        "Например: ТЦ Мега, БЦ Сити\n\n"
-        "Или отправьте <code>-</code> если нет названия.",
-        reply_markup=cancel_keyboard(),
-    )
-
-
-@router.message(RegistrationStates.waiting_for_branch_name)
-async def registration_branch_name(message: types.Message, state: FSMContext) -> None:
-    """Получили название → спрашиваем про ещё филиалы."""
-    if message.text == BTN_CANCEL:
-        await state.clear()
-        await message.answer(
-            "❌ Регистрация отменена.",
-            reply_markup=registration_start_keyboard(),
-        )
-        return
-    
-    branch_name = message.text.strip()
-    if branch_name == "-":
-        branch_name = None
     
     data = await state.get_data()
     branches = data.get("branches", [])
-    
-    # Добавляем филиал в список
-    branches.append({
-        "city": data["current_city"],
-        "address": data["current_address"],
-        "name": branch_name,
-    })
+    branches.append(branch_text)
     
     await state.update_data(branches=branches)
     await state.set_state(RegistrationStates.waiting_for_more_branches)
     
     # Формируем список филиалов для отображения
-    branches_text = "\n".join([
-        f"  • {b['city']}, {b['address']}" + (f" ({b['name']})" if b['name'] else "")
-        for b in branches
-    ])
+    branches_list = "\n".join([f"  • {b}" for b in branches])
     
     await message.answer(
-        f"✅ <b>Добавлен филиал:</b>\n"
-        f"📍 {data['current_city']}, {data['current_address']}"
-        + (f" ({branch_name})" if branch_name else "") +
-        f"\n\n<b>Ваши филиалы ({len(branches)}):</b>\n{branches_text}\n\n"
+        f"✅ <b>Филиал добавлен:</b> {branch_text}\n\n"
+        f"<b>Ваши филиалы ({len(branches)}):</b>\n{branches_list}\n\n"
         "Хотите добавить ещё филиал?",
         reply_markup=add_more_branches_keyboard(),
     )
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 4: Ещё филиалы или завершение
+# ═══════════════════════════════════════════════════════════════════
+
 @router.message(RegistrationStates.waiting_for_more_branches, F.text == BTN_ADD_MORE_BRANCH)
 async def registration_add_more(message: types.Message, state: FSMContext) -> None:
     """Пользователь хочет добавить ещё филиал."""
-    await state.set_state(RegistrationStates.waiting_for_city)
+    await state.set_state(RegistrationStates.waiting_for_branch)
     
     await message.answer(
-        "🏙 Введите <b>город</b> следующего филиала:",
+        "🏢 Укажите следующий филиал:",
         reply_markup=cancel_keyboard(),
     )
 
@@ -247,45 +209,36 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
     phone = data.get("phone")
     branches = data.get("branches", [])
     
+    # Формируем текст филиалов для сохранения
+    branches_text = "\n".join(branches) if branches else None
+    
     processing_msg = await message.answer("⏳ Сохраняю данные...")
     
     try:
         async with AsyncSessionLocal() as db:
-            # Создаём партнёра
             partner = await create_partner(
                 db=db,
                 telegram_id=user.id,
                 telegram_username=user.username,
+                telegram_first_name=user.first_name,
+                telegram_last_name=user.last_name,
                 full_name=full_name,
                 phone=phone,
+                branches_text=branches_text,
             )
-            
-            # Создаём филиалы и связываем с партнёром
-            for branch_data in branches:
-                from database.crud import get_or_create_branch
-                branch = await get_or_create_branch(
-                    db=db,
-                    city=branch_data["city"],
-                    address=branch_data["address"],
-                    name=branch_data.get("name"),
-                )
-                await link_partner_to_branch(
-                    db=db,
-                    partner_id=partner.id,
-                    branch_id=branch.id,
-                    is_owner=True,
-                )
+        
+        branches_list = "\n".join([f"  • {b}" for b in branches])
         
         await processing_msg.edit_text(
             "✅ <b>Заявка на регистрацию отправлена!</b>\n\n"
             f"👤 ФИО: {full_name}\n"
             f"📱 Телефон: {phone}\n"
-            f"🏢 Филиалов: {len(branches)}\n\n"
+            f"🏢 Филиалы:\n{branches_list}\n\n"
             "⏳ Ваша заявка будет рассмотрена администратором.\n"
             "Мы уведомим вас о результате.",
         )
         
-        logger.info(f"New partner registration: {user.id} ({full_name}), {len(branches)} branches")
+        logger.info(f"New partner registration: {user.id} ({full_name}), branches: {branches}")
         
     except Exception as e:
         logger.error(f"Failed to create partner: {e}")
@@ -304,4 +257,3 @@ async def registration_more_invalid(message: types.Message, state: FSMContext) -
         "⚠️ Выберите действие из кнопок ниже:",
         reply_markup=add_more_branches_keyboard(),
     )
-

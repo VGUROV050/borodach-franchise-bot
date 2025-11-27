@@ -39,10 +39,15 @@ class Partner(Base):
     # Telegram данные
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     telegram_username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    telegram_first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    telegram_last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
     # Персональные данные
     full_name: Mapped[str] = mapped_column(String(255))
     phone: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
+    
+    # Филиалы — текст от пользователя (для сопоставления админом)
+    branches_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Статус верификации
     status: Mapped[PartnerStatus] = mapped_column(
@@ -65,7 +70,7 @@ class Partner(Base):
     )
     verified_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
-    # Связь с филиалами
+    # Связь с филиалами (заполняется админом при верификации)
     branches: Mapped[list["PartnerBranch"]] = relationship(
         back_populates="partner",
         cascade="all, delete-orphan",
@@ -82,10 +87,16 @@ class Branch(Base):
     
     id: Mapped[int] = mapped_column(primary_key=True)
     
+    # YClients ID — уникальный системный идентификатор
+    yclients_id: Mapped[Optional[str]] = mapped_column(String(50), unique=True, nullable=True, index=True)
+    
     # Информация о филиале
     city: Mapped[str] = mapped_column(String(100), index=True)
     address: Mapped[str] = mapped_column(String(255))
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Название ТЦ и т.д.
+    
+    # Краткое название для отображения (например "Мега Тёплый Стан")
+    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Активность
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -103,7 +114,7 @@ class Branch(Base):
     )
     
     def __repr__(self) -> str:
-        return f"<Branch {self.id}: {self.city}, {self.address}>"
+        return f"<Branch {self.id}: {self.display_name or self.city}>"
 
 
 class PartnerBranch(Base):

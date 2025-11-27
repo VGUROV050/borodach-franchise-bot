@@ -51,13 +51,19 @@ async def create_partner(
     telegram_username: Optional[str],
     full_name: str,
     phone: Optional[str] = None,
+    telegram_first_name: Optional[str] = None,
+    telegram_last_name: Optional[str] = None,
+    branches_text: Optional[str] = None,
 ) -> Partner:
     """Создать нового партнёра."""
     partner = Partner(
         telegram_id=telegram_id,
         telegram_username=telegram_username,
+        telegram_first_name=telegram_first_name,
+        telegram_last_name=telegram_last_name,
         full_name=full_name,
         phone=phone,
+        branches_text=branches_text,
         status=PartnerStatus.PENDING,
     )
     

@@ -172,6 +172,19 @@ def registration_start_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
+def share_contact_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для запроса контакта."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📱 Поделиться контактом", request_contact=True)],
+            [KeyboardButton(text=BTN_CANCEL)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Поделитесь контактом",
+    )
+    return keyboard
+
+
 def add_more_branches_keyboard() -> ReplyKeyboardMarkup:
     """Клавиатура добавления филиалов."""
     keyboard = ReplyKeyboardMarkup(
