@@ -117,14 +117,14 @@ class YClientsAPI:
 
 async def get_monthly_revenue(company_id: str) -> dict:
     """
-    Получить выручку за текущий месяц для филиала.
+    Получить выручку за текущий месяц для филиала через аналитику.
     
     Returns:
         {
             "success": True/False,
             "revenue": float,
             "records_count": int,
-            "period": "Ноябрь 2025",
+            "period": str,
             "error": str (если ошибка)
         }
     """
@@ -134,57 +134,58 @@ async def get_monthly_revenue(company_id: str) -> dict:
     today = datetime.now()
     start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
-    # Пробуем получить через записи (records) — они содержат стоимость услуг
-    records = await api.get_records(company_id, start_of_month, today)
+    # Форматируем даты
+    date_from = start_of_month.strftime("%Y-%m-%d")
+    date_to = today.strftime("%Y-%m-%d")
     
-    if records is None:
+    # Получаем аналитику через API
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BASE_URL}/company/{company_id}/analytics/overall/",
+                headers=api.headers,
+                params={
+                    "start_date": date_from,
+                    "end_date": date_to,
+                },
+                timeout=30.0,
+            )
+            
+            logger.info(f"YClients analytics response for {company_id}: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                analytics = data.get("data", {})
+                
+                # Суммарный доход из аналитики
+                total_revenue = float(analytics.get("total_income", 0) or 0)
+                # Количество записей
+                records_count = int(analytics.get("records_count", 0) or 0)
+                # Завершённые записи
+                completed_count = int(analytics.get("records_completed", 0) or analytics.get("visits_count", 0) or 0)
+                
+                logger.info(f"YClients analytics for {company_id}: revenue={total_revenue}, records={records_count}, completed={completed_count}")
+                
+                # Форматируем даты для отображения
+                period = f"{start_of_month.strftime('%d.%m.%Y')} — {today.strftime('%d.%m.%Y')}"
+                
+                return {
+                    "success": True,
+                    "revenue": total_revenue,
+                    "records_count": completed_count,
+                    "total_records": records_count,
+                    "period": period,
+                }
+            else:
+                logger.error(f"YClients analytics API error: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "error": f"Ошибка API: {response.status_code}",
+                }
+    except Exception as e:
+        logger.error(f"YClients analytics exception: {e}")
         return {
             "success": False,
-            "error": "Не удалось получить данные из YClients",
+            "error": "Ошибка подключения к YClients",
         }
-    
-    # Считаем выручку из записей
-    total_revenue = 0
-    completed_records = 0
-    total_records = len(records)
-    
-    for record in records:
-        # attendance: 2 = подтверждён, 1 = пришёл (завершён), 0 = не пришёл, -1 = ожидает
-        attendance = record.get("attendance", 0)
-        
-        # Считаем только завершённые записи (attendance = 1 или 2)
-        if attendance >= 1:
-            completed_records += 1
-            
-            # Способ 1: Сумма из услуг
-            services = record.get("services", [])
-            for service in services:
-                # cost — итоговая стоимость, cost_per_unit * amount
-                cost = service.get("cost", 0) or service.get("cost_per_unit", 0)
-                total_revenue += float(cost)
-            
-            # Способ 2: Если услуг нет, берём из самой записи
-            if not services:
-                # Пробуем взять стоимость из записи
-                record_cost = record.get("cost", 0) or record.get("price_min", 0)
-                total_revenue += float(record_cost)
-    
-    logger.info(f"YClients stats for {company_id}: total={total_records}, completed={completed_records}, revenue={total_revenue}")
-    
-    # Форматируем даты для отображения
-    date_from = start_of_month.strftime("%d.%m.%Y")
-    date_to = today.strftime("%d.%m.%Y")
-    period = f"{date_from} — {date_to}"
-    
-    logger.info(f"YClients period: {date_from} to {date_to}")
-    
-    return {
-        "success": True,
-        "revenue": total_revenue,
-        "records_count": completed_records,
-        "total_records": total_records,
-        "period": period,
-        "date_from": date_from,
-        "date_to": date_to,
-    }
 
