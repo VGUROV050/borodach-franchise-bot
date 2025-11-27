@@ -12,6 +12,17 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 BITRIX_WEBHOOK_URL = os.getenv("BITRIX_WEBHOOK_URL", "")
 
+# Database
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://borodach_bot:password@localhost:5432/borodach_franchise"
+)
+
+# Admin panel
+ADMIN_SECRET_KEY = os.getenv("ADMIN_SECRET_KEY", "change-me-in-production")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
+
 # ID проектов/групп в Bitrix24 для каждого отдела
 BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # Отдел Развития
 BITRIX_GROUP_ID_MARKETING = os.getenv("BITRIX_GROUP_ID_MARKETING", "")      # Отдел Маркетинга
