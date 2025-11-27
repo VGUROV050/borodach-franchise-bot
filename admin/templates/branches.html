@@ -59,6 +59,7 @@
                 <th>Адрес</th>
                 <th>Название</th>
                 <th>Статус</th>
+                <th>Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -76,6 +77,12 @@
                     {% else %}
                     <span class="text-danger">Неактивен</span>
                     {% endif %}
+                </td>
+                <td>
+                    <form method="post" action="/branches/{{ branch.id }}/delete" 
+                          onsubmit="return confirm('Удалить филиал {{ branch.display_name or branch.city }}?');">
+                        <button type="submit" class="btn btn-danger btn-sm">🗑</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}

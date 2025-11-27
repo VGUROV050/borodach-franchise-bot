@@ -51,9 +51,7 @@
                 <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
                 <td>
                     {% if partner.status.value == 'pending' %}
-                    <form method="post" action="/partners/{{ partner.id }}/verify" style="display: inline;">
-                        <button type="submit" class="btn btn-success btn-sm">✅</button>
-                    </form>
+                    <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm">✅</a>
                     <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
                         <input type="hidden" name="reason" value="">
                         <button type="submit" class="btn btn-danger btn-sm">❌</button>

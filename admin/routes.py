@@ -128,27 +128,67 @@ async def partners_list(
     })
 
 
+@router.get("/partners/{partner_id}/verify", response_class=HTMLResponse)
+async def verify_partner_page(
+    request: Request,
+    partner_id: int,
+):
+    """Страница верификации партнёра с выбором филиалов."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from sqlalchemy import select
+    from database.models import Partner
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner = result.scalar_one_or_none()
+        branches = await get_all_branches(db, only_active=True)
+    
+    if not partner:
+        raise HTTPException(status_code=404, detail="Партнёр не найден")
+    
+    return templates.TemplateResponse("verify_partner.html", {
+        "request": request,
+        "partner": partner,
+        "branches": branches,
+    })
+
+
 @router.post("/partners/{partner_id}/verify")
 async def verify_partner(
     request: Request,
     partner_id: int,
+    branch_ids: list[int] = Form(default=[]),
 ):
-    """Верифицировать партнёра."""
+    """Верифицировать партнёра с привязкой к филиалам."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
+    from database.crud import link_partner_to_branch
+    
     async with AsyncSessionLocal() as db:
+        # Обновляем статус
         partner = await update_partner_status(
             db=db,
             partner_id=partner_id,
             status=PartnerStatus.VERIFIED,
             verified_by="admin",
         )
+        
+        if not partner:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        # Привязываем к филиалам
+        for branch_id in branch_ids:
+            await link_partner_to_branch(
+                db=db,
+                partner_id=partner_id,
+                branch_id=branch_id,
+                is_owner=True,
+            )
     
-    if not partner:
-        raise HTTPException(status_code=404, detail="Партнёр не найден")
-    
-    logger.info(f"Partner {partner_id} verified")
+    logger.info(f"Partner {partner_id} verified with branches: {branch_ids}")
     return RedirectResponse(url="/", status_code=302)
 
 
@@ -209,7 +249,6 @@ async def add_branch(
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from database.crud import create_branch
     from database.models import Branch
     
     async with AsyncSessionLocal() as db:
@@ -224,5 +263,33 @@ async def add_branch(
         await db.commit()
     
     logger.info(f"Branch added: {city}, {address}")
+    return RedirectResponse(url="/branches", status_code=302)
+
+
+@router.post("/branches/{branch_id}/delete")
+async def delete_branch(
+    request: Request,
+    branch_id: int,
+):
+    """Удалить филиал."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select, delete
+    from database.models import Branch, PartnerBranch
+    
+    async with AsyncSessionLocal() as db:
+        # Сначала удаляем связи с партнёрами
+        await db.execute(
+            delete(PartnerBranch).where(PartnerBranch.branch_id == branch_id)
+        )
+        
+        # Затем удаляем сам филиал
+        await db.execute(
+            delete(Branch).where(Branch.id == branch_id)
+        )
+        await db.commit()
+    
+    logger.info(f"Branch {branch_id} deleted")
     return RedirectResponse(url="/branches", status_code=302)
 

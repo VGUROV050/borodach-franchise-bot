@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Верификация — {{ partner.full_name }}{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">✅ Верификация партнёра</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">{{ partner.full_name }}</h2>
+        <span class="badge badge-pending">Ожидает</span>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+        <div>
+            <h3 class="mb-1" style="font-size: 1rem; color: var(--text-muted);">📋 Данные партнёра</h3>
+            
+            <table style="width: 100%;">
+                <tr>
+                    <td class="text-muted" style="width: 140px;">Telegram ID:</td>
+                    <td><code>{{ partner.telegram_id }}</code></td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Username:</td>
+                    <td>@{{ partner.telegram_username or '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Телефон:</td>
+                    <td><strong>{{ partner.phone or '—' }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Дата заявки:</td>
+                    <td>{{ partner.created_at.strftime('%d.%m.%Y %H:%M') if partner.created_at else '—' }}</td>
+                </tr>
+            </table>
+            
+            {% if partner.branches_text %}
+            <div class="partner-branches mt-2">
+                <strong>🏢 Филиалы (текст от партнёра):</strong>
+                <pre style="margin-top: 0.5rem;">{{ partner.branches_text }}</pre>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div>
+            <h3 class="mb-1" style="font-size: 1rem; color: var(--text-muted);">🔗 Привязка к филиалам</h3>
+            
+            <form method="post" action="/partners/{{ partner.id }}/verify">
+                {% if branches %}
+                <p class="text-muted mb-1" style="font-size: 0.9rem;">
+                    Выберите филиалы, к которым относится партнёр:
+                </p>
+                
+                <div style="max-height: 300px; overflow-y: auto; background: var(--bg-dark); border-radius: 8px; padding: 1rem;">
+                    {% for branch in branches %}
+                    <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; cursor: pointer;">
+                        <input type="checkbox" name="branch_ids" value="{{ branch.id }}" 
+                               style="width: 18px; height: 18px; accent-color: var(--accent);">
+                        <span>
+                            <strong>{{ branch.display_name or branch.city }}</strong>
+                            <span class="text-muted" style="font-size: 0.85rem;">
+                                — {{ branch.city }}, {{ branch.address }}
+                                {% if branch.name %}({{ branch.name }}){% endif %}
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted">
+                    ⚠️ Филиалы ещё не добавлены. 
+                    <a href="/branches" style="color: var(--accent);">Добавить филиал</a>
+                </p>
+                {% endif %}
+                
+                <div class="mt-2 flex gap-1">
+                    <button type="submit" class="btn btn-success">✅ Подтвердить верификацию</button>
+                    <a href="/" class="btn">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-2">
+    <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">❌ Отклонить заявку</h3>
+    
+    <form method="post" action="/partners/{{ partner.id }}/reject">
+        <div class="form-group">
+            <label class="form-label">Причина отклонения (необязательно):</label>
+            <input type="text" name="reason" class="form-input" placeholder="Например: Некорректные данные">
+        </div>
+        <button type="submit" class="btn btn-danger">❌ Отклонить заявку</button>
+    </form>
+</div>
+{% endblock %}
+
