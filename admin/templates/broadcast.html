@@ -19,20 +19,28 @@
 
 {% if request.query_params.get('error') == 'empty' %}
 <div class="card" style="background: var(--danger-light); border-color: #fecaca;">
-    <p style="color: #dc2626; font-weight: 500;">
-        ❌ Сообщение не может быть пустым
-    </p>
+    <p style="color: #dc2626; font-weight: 500;">❌ Сообщение не может быть пустым</p>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') == 'no_recipients' %}
+<div class="card" style="background: var(--danger-light); border-color: #fecaca;">
+    <p style="color: #dc2626; font-weight: 500;">❌ Не выбраны получатели</p>
 </div>
 {% endif %}
 
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-value">{{ verified_count }}</div>
-        <div class="stat-label">Верифицированных партнёров</div>
+        <div class="stat-label">Верифицированных</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ all_count }}</div>
         <div class="stat-label">Всего партнёров</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ history|length }}</div>
+        <div class="stat-label">Рассылок в истории</div>
     </div>
 </div>
 
@@ -41,21 +49,66 @@
         <h2 class="card-title">✉️ Новая рассылка</h2>
     </div>
     
-    <form method="post" action="/broadcast/send">
+    <form method="post" action="/broadcast/send" id="broadcastForm">
         <div class="form-group">
             <label class="form-label">Получатели</label>
             <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="radio" name="recipient_type" value="verified" checked
+                    <input type="radio" name="recipient_type" value="all_verified" checked
+                           onchange="togglePartnersList(false)"
                            style="width: 18px; height: 18px; accent-color: var(--accent);">
-                    <span>Только верифицированные ({{ verified_count }})</span>
+                    <span>Все верифицированные ({{ verified_count }})</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="radio" name="recipient_type" value="all"
+                    <input type="radio" name="recipient_type" value="selected"
+                           onchange="togglePartnersList(true)"
                            style="width: 18px; height: 18px; accent-color: var(--accent);">
-                    <span>Все партнёры ({{ all_count }})</span>
+                    <span>Выбрать партнёров</span>
                 </label>
             </div>
+        </div>
+        
+        <div id="partnersList" style="display: none; margin-bottom: 1.5rem;">
+            <label class="form-label">Выберите партнёров:</label>
+            <div style="max-height: 300px; overflow-y: auto; background: var(--bg-main); border-radius: 10px; padding: 1rem; border: 1px solid var(--border);">
+                <div style="margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 500;">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()"
+                               style="width: 18px; height: 18px; accent-color: var(--accent);">
+                        <span>Выбрать всех</span>
+                    </label>
+                </div>
+                {% for partner in verified_partners %}
+                <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; cursor: pointer; border-bottom: 1px solid var(--border);">
+                    <input type="checkbox" name="partner_ids" value="{{ partner.id }}" class="partner-checkbox"
+                           style="width: 18px; height: 18px; accent-color: var(--accent);">
+                    <span style="flex: 1;">
+                        <strong>{{ partner.full_name }}</strong>
+                        <span class="text-muted" style="font-size: 0.8rem;">
+                            — {{ partner.phone or 'нет телефона' }}
+                        </span>
+                    </span>
+                    <span class="badge badge-verified" style="font-size: 0.7rem;">Верифицирован</span>
+                </label>
+                {% endfor %}
+                
+                {% for partner in all_partners if partner.status.value != 'verified' %}
+                <label style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; cursor: pointer; border-bottom: 1px solid var(--border); opacity: 0.7;">
+                    <input type="checkbox" name="partner_ids" value="{{ partner.id }}" class="partner-checkbox"
+                           style="width: 18px; height: 18px; accent-color: var(--accent);">
+                    <span style="flex: 1;">
+                        <strong>{{ partner.full_name }}</strong>
+                        <span class="text-muted" style="font-size: 0.8rem;">
+                            — {{ partner.phone or 'нет телефона' }}
+                        </span>
+                    </span>
+                    <span class="badge badge-pending" style="font-size: 0.7rem;">{{ partner.status.value }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.5rem;">
+                Выбрано: <span id="selectedCount">0</span> партнёров
+            </p>
         </div>
         
         <div class="form-group">
@@ -70,7 +123,7 @@
         
         <div class="form-group" style="background: var(--bg-main); padding: 1rem; border-radius: 10px;">
             <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
-                💡 <strong>Подсказка:</strong> Вы можете использовать HTML-теги для форматирования:
+                💡 <strong>HTML-теги:</strong>
             </p>
             <code style="font-size: 0.8rem;">
                 &lt;b&gt;жирный&lt;/b&gt; • &lt;i&gt;курсив&lt;/i&gt; • &lt;u&gt;подчёркнутый&lt;/u&gt; • &lt;code&gt;код&lt;/code&gt;
@@ -87,28 +140,72 @@
     </form>
 </div>
 
+{% if history %}
 <div class="card">
-    <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">📝 Примеры сообщений</h3>
-    
-    <div style="display: grid; gap: 1rem;">
-        <div style="background: var(--bg-main); padding: 1rem; border-radius: 10px;">
-            <strong>Новость:</strong>
-            <pre style="margin-top: 0.5rem; font-size: 0.8rem;">📢 <b>Важная новость!</b>
-
-Уважаемые партнёры, сообщаем вам о запуске новой акции...
-
-Подробности у вашего менеджера.</pre>
-        </div>
-        
-        <div style="background: var(--bg-main); padding: 1rem; border-radius: 10px;">
-            <strong>Напоминание:</strong>
-            <pre style="margin-top: 0.5rem; font-size: 0.8rem;">⏰ <b>Напоминание</b>
-
-Не забудьте отправить отчёт за текущий месяц до 25 числа.
-
-С уважением, команда BORODACH</pre>
-        </div>
+    <div class="card-header">
+        <h2 class="card-title">📋 История рассылок</h2>
     </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Дата и время</th>
+                <th>Сообщение</th>
+                <th>Получатели</th>
+                <th>Результат</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in history %}
+            <tr>
+                <td style="white-space: nowrap;">
+                    {{ item.sent_at.strftime('%d.%m.%Y') }}<br>
+                    <span class="text-muted">{{ item.sent_at.strftime('%H:%M') }}</span>
+                </td>
+                <td style="max-width: 300px;">
+                    <div style="max-height: 60px; overflow: hidden; font-size: 0.875rem;">
+                        {{ item.message[:100] }}{% if item.message|length > 100 %}...{% endif %}
+                    </div>
+                </td>
+                <td style="font-size: 0.875rem;">
+                    {{ item.recipients[:50] }}{% if item.recipients|length > 50 %}...{% endif %}
+                    <br><span class="text-muted">({{ item.recipients_count }} чел.)</span>
+                </td>
+                <td>
+                    <span style="color: var(--success);">✓ {{ item.success_count }}</span>
+                    {% if item.fail_count > 0 %}
+                    <span style="color: var(--danger);">✗ {{ item.fail_count }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
-{% endblock %}
+{% endif %}
 
+<script>
+function togglePartnersList(show) {
+    document.getElementById('partnersList').style.display = show ? 'block' : 'none';
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.partner-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const count = document.querySelectorAll('.partner-checkbox:checked').length;
+    document.getElementById('selectedCount').textContent = count;
+}
+
+// Обновлять счётчик при клике на чекбоксы
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.partner-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+});
+</script>
+{% endblock %}

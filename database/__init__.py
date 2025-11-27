@@ -1,7 +1,7 @@
 # Database module
 
 from .connection import get_db, init_db, close_db, AsyncSessionLocal
-from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus
+from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory
 from .crud import (
     get_partner_by_telegram_id,
     get_partner_by_phone,

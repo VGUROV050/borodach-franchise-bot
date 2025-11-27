@@ -146,3 +146,34 @@ class PartnerBranch(Base):
     def __repr__(self) -> str:
         return f"<PartnerBranch partner={self.partner_id} branch={self.branch_id}>"
 
+
+class BroadcastHistory(Base):
+    """История рассылок."""
+    
+    __tablename__ = "broadcast_history"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Текст сообщения
+    message: Mapped[str] = mapped_column(Text)
+    
+    # Получатели (JSON список имён или "Все верифицированные")
+    recipients: Mapped[str] = mapped_column(Text)
+    recipients_count: Mapped[int] = mapped_column(default=0)
+    
+    # Результаты отправки
+    success_count: Mapped[int] = mapped_column(default=0)
+    fail_count: Mapped[int] = mapped_column(default=0)
+    
+    # Кто отправил
+    sent_by: Mapped[str] = mapped_column(String(100), default="admin")
+    
+    # Временные метки
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<BroadcastHistory {self.id}: {self.sent_at}>"
+

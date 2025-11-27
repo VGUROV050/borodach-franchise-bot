@@ -506,14 +506,28 @@ async def broadcast_page(request: Request):
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
+    from sqlalchemy import select
+    from database.models import BroadcastHistory
+    
     async with AsyncSessionLocal() as db:
-        verified_count = len(await get_all_partners(db, status=PartnerStatus.VERIFIED))
-        all_count = len(await get_all_partners(db))
+        verified_partners = await get_all_partners(db, status=PartnerStatus.VERIFIED)
+        all_partners = await get_all_partners(db)
+        
+        # История рассылок (последние 20)
+        result = await db.execute(
+            select(BroadcastHistory)
+            .order_by(BroadcastHistory.sent_at.desc())
+            .limit(20)
+        )
+        history = list(result.scalars().all())
     
     return templates.TemplateResponse("broadcast.html", {
         "request": request,
-        "verified_count": verified_count,
-        "all_count": all_count,
+        "verified_partners": verified_partners,
+        "all_partners": all_partners,
+        "verified_count": len(verified_partners),
+        "all_count": len(all_partners),
+        "history": history,
     })
 
 
@@ -521,7 +535,8 @@ async def broadcast_page(request: Request):
 async def send_broadcast(
     request: Request,
     message: str = Form(...),
-    recipient_type: str = Form("verified"),  # verified, all
+    recipient_type: str = Form("all_verified"),  # all_verified, selected
+    partner_ids: list[int] = Form(default=[]),
 ):
     """Отправить рассылку."""
     if not verify_session(request):
@@ -530,28 +545,51 @@ async def send_broadcast(
     if not message.strip():
         return RedirectResponse(url="/broadcast?error=empty", status_code=302)
     
+    from sqlalchemy import select
+    from database.models import BroadcastHistory
+    
     # Получаем партнёров
     async with AsyncSessionLocal() as db:
-        if recipient_type == "verified":
-            partners = await get_all_partners(db, status=PartnerStatus.VERIFIED)
+        if recipient_type == "selected" and partner_ids:
+            # Выбранные партнёры
+            all_partners = await get_all_partners(db)
+            partners = [p for p in all_partners if p.id in partner_ids]
+            recipients_text = ", ".join([p.full_name for p in partners])
         else:
-            partners = await get_all_partners(db)
-    
-    # Отправляем сообщения
-    success_count = 0
-    fail_count = 0
-    
-    for partner in partners:
-        if partner.telegram_id:
-            result = await send_telegram_notification(
-                partner.telegram_id,
-                message,
-                show_main_menu=True if partner.status == PartnerStatus.VERIFIED else False,
-            )
-            if result:
-                success_count += 1
-            else:
-                fail_count += 1
+            # Все верифицированные
+            partners = await get_all_partners(db, status=PartnerStatus.VERIFIED)
+            recipients_text = "Все верифицированные партнёры"
+        
+        if not partners:
+            return RedirectResponse(url="/broadcast?error=no_recipients", status_code=302)
+        
+        # Отправляем сообщения
+        success_count = 0
+        fail_count = 0
+        
+        for partner in partners:
+            if partner.telegram_id:
+                result = await send_telegram_notification(
+                    partner.telegram_id,
+                    message,
+                    show_main_menu=True if partner.status == PartnerStatus.VERIFIED else False,
+                )
+                if result:
+                    success_count += 1
+                else:
+                    fail_count += 1
+        
+        # Сохраняем в историю
+        broadcast = BroadcastHistory(
+            message=message[:500],  # Ограничиваем длину для БД
+            recipients=recipients_text[:500],
+            recipients_count=len(partners),
+            success_count=success_count,
+            fail_count=fail_count,
+            sent_by="admin",
+        )
+        db.add(broadcast)
+        await db.commit()
     
     logger.info(f"Broadcast sent: {success_count} success, {fail_count} failed")
     
