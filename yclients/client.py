@@ -117,7 +117,7 @@ class YClientsAPI:
 
 async def get_monthly_revenue(company_id: str) -> dict:
     """
-    Получить выручку за текущий месяц для филиала через аналитику.
+    Получить выручку за текущий месяц для филиала через записи.
     
     Returns:
         {
@@ -138,52 +138,84 @@ async def get_monthly_revenue(company_id: str) -> dict:
     date_from = start_of_month.strftime("%Y-%m-%d")
     date_to = today.strftime("%Y-%m-%d")
     
-    # Получаем аналитику через API
+    # Получаем записи через API /records/
     try:
+        all_records = []
+        page = 1
+        
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{BASE_URL}/company/{company_id}/analytics/overall/",
-                headers=api.headers,
-                params={
-                    "date_from": date_from,
-                    "date_to": date_to,
-                },
-                timeout=30.0,
-            )
+            # Пагинация - получаем все записи
+            while True:
+                response = await client.get(
+                    f"{BASE_URL}/records/{company_id}",
+                    headers=api.headers,
+                    params={
+                        "start_date": date_from,
+                        "end_date": date_to,
+                        "page": page,
+                        "count": 100,  # записей на страницу
+                    },
+                    timeout=30.0,
+                )
+                
+                logger.info(f"YClients records response for {company_id}, page {page}: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    records = data.get("data", [])
+                    
+                    if not records:
+                        break
+                    
+                    all_records.extend(records)
+                    
+                    # Если получили меньше 100, значит это последняя страница
+                    if len(records) < 100:
+                        break
+                    
+                    page += 1
+                else:
+                    logger.error(f"YClients records API error: {response.status_code} - {response.text}")
+                    return {
+                        "success": False,
+                        "error": f"Ошибка API: {response.status_code}",
+                    }
+        
+        # Считаем статистику по записям
+        total_revenue = 0.0
+        completed_count = 0
+        
+        for record in all_records:
+            # Статусы: -1 = отменена, 0 = ожидание, 1 = подтверждена, 2 = пришел/завершена
+            attendance = record.get("attendance", 0)
             
-            logger.info(f"YClients analytics response for {company_id}: {response.status_code}")
+            # Считаем только завершённые записи (attendance = 1 или 2, или visit = 1)
+            visit = record.get("visit", 0)
             
-            if response.status_code == 200:
-                data = response.json()
-                analytics = data.get("data", {})
+            if visit == 1 or attendance == 2:
+                completed_count += 1
                 
-                # Суммарный доход из аналитики
-                total_revenue = float(analytics.get("total_income", 0) or 0)
-                # Количество записей
-                records_count = int(analytics.get("records_count", 0) or 0)
-                # Завершённые записи
-                completed_count = int(analytics.get("records_completed", 0) or analytics.get("visits_count", 0) or 0)
-                
-                logger.info(f"YClients analytics for {company_id}: revenue={total_revenue}, records={records_count}, completed={completed_count}")
-                
-                # Форматируем даты для отображения
-                period = f"{start_of_month.strftime('%d.%m.%Y')} — {today.strftime('%d.%m.%Y')}"
-                
-                return {
-                    "success": True,
-                    "revenue": total_revenue,
-                    "records_count": completed_count,
-                    "total_records": records_count,
-                    "period": period,
-                }
-            else:
-                logger.error(f"YClients analytics API error: {response.status_code} - {response.text}")
-                return {
-                    "success": False,
-                    "error": f"Ошибка API: {response.status_code}",
-                }
+                # Суммируем стоимость услуг
+                services = record.get("services", [])
+                for service in services:
+                    cost = float(service.get("cost", 0) or 0)
+                    total_revenue += cost
+        
+        logger.info(f"YClients stats for {company_id}: total_records={len(all_records)}, completed={completed_count}, revenue={total_revenue}")
+        
+        # Форматируем даты для отображения
+        period = f"{start_of_month.strftime('%d.%m.%Y')} — {today.strftime('%d.%m.%Y')}"
+        
+        return {
+            "success": True,
+            "revenue": total_revenue,
+            "records_count": completed_count,
+            "total_records": len(all_records),
+            "period": period,
+        }
+            
     except Exception as e:
-        logger.error(f"YClients analytics exception: {e}")
+        logger.error(f"YClients records exception: {e}")
         return {
             "success": False,
             "error": "Ошибка подключения к YClients",
