@@ -495,3 +495,68 @@ async def delete_branch(
     logger.info(f"Branch {branch_id} deleted")
     return RedirectResponse(url="/branches", status_code=302)
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Рассылка сообщений
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/broadcast", response_class=HTMLResponse)
+async def broadcast_page(request: Request):
+    """Страница рассылки сообщений."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    async with AsyncSessionLocal() as db:
+        verified_count = len(await get_all_partners(db, status=PartnerStatus.VERIFIED))
+        all_count = len(await get_all_partners(db))
+    
+    return templates.TemplateResponse("broadcast.html", {
+        "request": request,
+        "verified_count": verified_count,
+        "all_count": all_count,
+    })
+
+
+@router.post("/broadcast/send")
+async def send_broadcast(
+    request: Request,
+    message: str = Form(...),
+    recipient_type: str = Form("verified"),  # verified, all
+):
+    """Отправить рассылку."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    if not message.strip():
+        return RedirectResponse(url="/broadcast?error=empty", status_code=302)
+    
+    # Получаем партнёров
+    async with AsyncSessionLocal() as db:
+        if recipient_type == "verified":
+            partners = await get_all_partners(db, status=PartnerStatus.VERIFIED)
+        else:
+            partners = await get_all_partners(db)
+    
+    # Отправляем сообщения
+    success_count = 0
+    fail_count = 0
+    
+    for partner in partners:
+        if partner.telegram_id:
+            result = await send_telegram_notification(
+                partner.telegram_id,
+                message,
+                show_main_menu=True if partner.status == PartnerStatus.VERIFIED else False,
+            )
+            if result:
+                success_count += 1
+            else:
+                fail_count += 1
+    
+    logger.info(f"Broadcast sent: {success_count} success, {fail_count} failed")
+    
+    return RedirectResponse(
+        url=f"/broadcast?success={success_count}&failed={fail_count}", 
+        status_code=302
+    )
+
