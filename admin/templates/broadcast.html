@@ -327,35 +327,34 @@
     display: inline-block;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    z-index: 100;
-    margin-top: 0.5rem;
-    margin-bottom: 1rem;
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
 }
 
 .emoji-grid {
-    display: grid;
-    grid-template-columns: repeat(9, 28px);
-    gap: 1px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    max-width: 270px;
 }
 
 .emoji-grid span {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.125rem;
     cursor: pointer;
     border-radius: 4px;
-    transition: all 0.1s;
+    transition: background 0.1s;
 }
 
 .emoji-grid span:hover {
     background: var(--accent-light);
-    transform: scale(1.15);
 }
 </style>
 
