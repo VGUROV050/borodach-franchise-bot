@@ -145,8 +145,8 @@ async def get_monthly_revenue(company_id: str) -> dict:
                 f"{BASE_URL}/company/{company_id}/analytics/overall/",
                 headers=api.headers,
                 params={
-                    "start_date": date_from,
-                    "end_date": date_to,
+                    "date_from": date_from,
+                    "date_to": date_to,
                 },
                 timeout=30.0,
             )
