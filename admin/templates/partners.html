@@ -45,8 +45,14 @@
                     <span class="badge badge-rejected">Отклонён</span>
                     {% endif %}
                 </td>
-                <td style="max-width: 200px; font-size: 0.85rem;">
-                    {{ partner.branches_text[:50] + '...' if partner.branches_text and partner.branches_text|length > 50 else partner.branches_text or '—' }}
+                <td style="max-width: 250px; font-size: 0.85rem;">
+                    {% if partner.branches %}
+                        {% for pb in partner.branches %}
+                        <div>• {{ pb.branch.display_name or pb.branch.city }}</div>
+                        {% endfor %}
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
                 </td>
                 <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
                 <td class="flex gap-1">
