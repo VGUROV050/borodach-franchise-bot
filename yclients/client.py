@@ -171,12 +171,12 @@ async def get_monthly_revenue(company_id: str) -> dict:
     
     logger.info(f"YClients stats for {company_id}: total={total_records}, completed={completed_records}, revenue={total_revenue}")
     
-    # Название месяца на русском
-    months_ru = [
-        "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-        "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
-    ]
-    period = f"{months_ru[today.month - 1]} {today.year}"
+    # Форматируем даты для отображения
+    date_from = start_of_month.strftime("%d.%m.%Y")
+    date_to = today.strftime("%d.%m.%Y")
+    period = f"{date_from} — {date_to}"
+    
+    logger.info(f"YClients period: {date_from} to {date_to}")
     
     return {
         "success": True,
@@ -184,5 +184,7 @@ async def get_monthly_revenue(company_id: str) -> dict:
         "records_count": completed_records,
         "total_records": total_records,
         "period": period,
+        "date_from": date_from,
+        "date_to": date_to,
     }
 

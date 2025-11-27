@@ -288,10 +288,12 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Получаем статистику по каждому филиалу
     from yclients import get_monthly_revenue
     
-    stats_text = "📊 <b>Статистика по филиалам</b>\n\n"
+    stats_text = "📊 <b>Статистика по филиалам</b>\n"
     total_revenue = 0
     total_records = 0
     period = ""
+    
+    # Добавим период сверху после первого успешного запроса
     
     for pb in partner_branches:
         branch = pb.branch
@@ -309,7 +311,11 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             revenue = result.get("revenue", 0)
             completed = result.get("records_count", 0)
             total = result.get("total_records", 0)
-            period = result.get("period", "")
+            
+            # Сохраняем период из первого успешного ответа
+            if not period:
+                period = result.get("period", "")
+                stats_text += f"📅 Период: <b>{period}</b>\n\n"
             
             total_revenue += revenue
             total_records += completed
@@ -324,7 +330,7 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Итого
     if total_revenue > 0 or total_records > 0:
         stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
-        stats_text += f"📈 <b>Итого за {period}:</b>\n"
+        stats_text += f"📈 <b>Итого:</b>\n"
         stats_text += f"   💰 Выручка: {total_revenue:,.0f} ₽\n"
         stats_text += f"   ✅ Завершено записей: {total_records}"
     
