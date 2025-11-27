@@ -146,15 +146,30 @@ async def get_monthly_revenue(company_id: str) -> dict:
     # Считаем выручку из записей
     total_revenue = 0
     completed_records = 0
+    total_records = len(records)
     
     for record in records:
-        # Считаем только завершённые записи (visit_id присутствует или статус completed)
-        if record.get("visit_id") or record.get("attendance") == 1:
-            # Берём стоимость услуг
+        # attendance: 2 = подтверждён, 1 = пришёл (завершён), 0 = не пришёл, -1 = ожидает
+        attendance = record.get("attendance", 0)
+        
+        # Считаем только завершённые записи (attendance = 1 или 2)
+        if attendance >= 1:
+            completed_records += 1
+            
+            # Способ 1: Сумма из услуг
             services = record.get("services", [])
             for service in services:
-                total_revenue += float(service.get("cost", 0))
-            completed_records += 1
+                # cost — итоговая стоимость, cost_per_unit * amount
+                cost = service.get("cost", 0) or service.get("cost_per_unit", 0)
+                total_revenue += float(cost)
+            
+            # Способ 2: Если услуг нет, берём из самой записи
+            if not services:
+                # Пробуем взять стоимость из записи
+                record_cost = record.get("cost", 0) or record.get("price_min", 0)
+                total_revenue += float(record_cost)
+    
+    logger.info(f"YClients stats for {company_id}: total={total_records}, completed={completed_records}, revenue={total_revenue}")
     
     # Название месяца на русском
     months_ru = [
@@ -167,6 +182,7 @@ async def get_monthly_revenue(company_id: str) -> dict:
         "success": True,
         "revenue": total_revenue,
         "records_count": completed_records,
+        "total_records": total_records,
         "period": period,
     }
 

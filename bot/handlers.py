@@ -307,15 +307,16 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         
         if result.get("success"):
             revenue = result.get("revenue", 0)
-            records = result.get("records_count", 0)
+            completed = result.get("records_count", 0)
+            total = result.get("total_records", 0)
             period = result.get("period", "")
             
             total_revenue += revenue
-            total_records += records
+            total_records += completed
             
             stats_text += f"🏢 <b>{branch_name}</b>\n"
             stats_text += f"   💰 Выручка: {revenue:,.0f} ₽\n"
-            stats_text += f"   👥 Визитов: {records}\n\n"
+            stats_text += f"   ✅ Завершено: {completed} из {total} записей\n\n"
         else:
             stats_text += f"🏢 <b>{branch_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n\n"
@@ -325,7 +326,7 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
         stats_text += f"📈 <b>Итого за {period}:</b>\n"
         stats_text += f"   💰 Выручка: {total_revenue:,.0f} ₽\n"
-        stats_text += f"   👥 Визитов: {total_records}"
+        stats_text += f"   ✅ Завершено записей: {total_records}"
     
     # Удаляем сообщение о загрузке и отправляем результат
     await loading_msg.delete()
