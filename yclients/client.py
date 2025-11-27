@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import httpx
 
-from config.settings import YCLIENTS_PARTNER_TOKEN
+from config.settings import YCLIENTS_PARTNER_TOKEN, YCLIENTS_USER_TOKEN
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,19 @@ BASE_URL = "https://api.yclients.com/api/v1"
 class YClientsAPI:
     """Клиент для работы с YClients API."""
     
-    def __init__(self, partner_token: str = None):
+    def __init__(self, partner_token: str = None, user_token: str = None):
         self.partner_token = partner_token or YCLIENTS_PARTNER_TOKEN
+        self.user_token = user_token or YCLIENTS_USER_TOKEN
+        
+        # Формируем заголовок авторизации
+        # YClients требует: Bearer PARTNER_TOKEN, User USER_TOKEN
+        if self.user_token:
+            auth_header = f"Bearer {self.partner_token}, User {self.user_token}"
+        else:
+            auth_header = f"Bearer {self.partner_token}"
+        
         self.headers = {
-            "Authorization": f"Bearer {self.partner_token}",
+            "Authorization": auth_header,
             "Accept": "application/vnd.api.v2+json",
             "Content-Type": "application/json",
         }
