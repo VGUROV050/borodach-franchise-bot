@@ -268,14 +268,16 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         partner = await get_partner_by_telegram_id(db, message.from_user.id)
         
         if not partner:
-            await loading_msg.edit_text("❌ Партнёр не найден")
+            await loading_msg.delete()
+            await message.answer("❌ Партнёр не найден", reply_markup=main_menu_keyboard())
             return
         
         from database import get_partner_branches
         partner_branches = await get_partner_branches(db, partner.id)
     
     if not partner_branches:
-        await loading_msg.edit_text(
+        await loading_msg.delete()
+        await message.answer(
             "🏢 <b>Статистика по филиалам</b>\n\n"
             "У вас пока нет привязанных филиалов.\n"
             "Обратитесь к администратору для привязки.",
@@ -325,7 +327,9 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         stats_text += f"   💰 Выручка: {total_revenue:,.0f} ₽\n"
         stats_text += f"   👥 Визитов: {total_records}"
     
-    await loading_msg.edit_text(stats_text, reply_markup=main_menu_keyboard())
+    # Удаляем сообщение о загрузке и отправляем результат
+    await loading_msg.delete()
+    await message.answer(stats_text, reply_markup=main_menu_keyboard())
 
 
 # ═══════════════════════════════════════════════════════════════════
