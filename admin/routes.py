@@ -3,11 +3,12 @@
 import logging
 from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from config.settings import BASE_DIR, ADMIN_USERNAME, ADMIN_PASSWORD
+from config.settings import BASE_DIR, ADMIN_USERNAME, ADMIN_PASSWORD, TELEGRAM_BOT_TOKEN
 from database import (
     AsyncSessionLocal,
     get_all_partners,
@@ -20,6 +21,33 @@ from database import (
 from .auth import verify_session, create_session
 
 logger = logging.getLogger(__name__)
+
+
+async def send_telegram_notification(chat_id: int, text: str) -> bool:
+    """Отправить уведомление пользователю через Telegram Bot API."""
+    if not TELEGRAM_BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN not set, skipping notification")
+        return False
+    
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+            })
+            
+            if response.status_code == 200:
+                logger.info(f"Notification sent to {chat_id}")
+                return True
+            else:
+                logger.error(f"Failed to send notification: {response.text}")
+                return False
+    except Exception as e:
+        logger.error(f"Error sending notification: {e}")
+        return False
 
 router = APIRouter()
 templates = Jinja2Templates(directory=f"{BASE_DIR}/admin/templates")
@@ -166,8 +194,16 @@ async def verify_partner(
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     from database.crud import link_partner_to_branch
+    from sqlalchemy import select
+    from database.models import Partner
     
     async with AsyncSessionLocal() as db:
+        # Получаем партнёра для telegram_id
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner_data = result.scalar_one_or_none()
+        telegram_id = partner_data.telegram_id if partner_data else None
+        partner_name = partner_data.full_name if partner_data else ""
+        
         # Обновляем статус
         partner = await update_partner_status(
             db=db,
@@ -187,6 +223,18 @@ async def verify_partner(
                 branch_id=branch_id,
                 is_owner=True,
             )
+    
+    # Отправляем уведомление пользователю
+    if telegram_id:
+        await send_telegram_notification(
+            telegram_id,
+            f"🎉 <b>Поздравляем, {partner_name}!</b>\n\n"
+            f"Ваша заявка на регистрацию одобрена!\n\n"
+            f"Теперь вы можете:\n"
+            f"• 🆕 Создавать задачи\n"
+            f"• 📋 Просматривать свои задачи\n\n"
+            f"Нажмите /start чтобы начать работу.",
+        )
     
     logger.info(f"Partner {partner_id} verified with branches: {branch_ids}")
     return RedirectResponse(url="/", status_code=302)

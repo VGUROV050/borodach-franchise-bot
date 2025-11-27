@@ -238,6 +238,13 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
             "Мы уведомим вас о результате.",
         )
         
+        # Показываем кнопку проверки статуса
+        from .keyboards import pending_verification_keyboard
+        await message.answer(
+            "Нажмите кнопку ниже, чтобы проверить статус заявки:",
+            reply_markup=pending_verification_keyboard(),
+        )
+        
         logger.info(f"New partner registration: {user.id} ({full_name}), branches: {branches}")
         
     except Exception as e:
