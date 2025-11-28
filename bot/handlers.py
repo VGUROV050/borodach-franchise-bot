@@ -165,28 +165,37 @@ async def my_barbershops_handler(message: types.Message, state: FSMContext) -> N
         partner = await get_partner_by_telegram_id(db, message.from_user.id)
         
         companies = []
+        has_pending = False
+        pending_text = ""
+        
         if partner:
             from database import get_partner_companies
             companies = await get_partner_companies(db, partner.id)
+            has_pending = partner.has_pending_branch
+            pending_text = partner.branches_text or ""
+    
+    text_parts = ["💈 <b>Ваши барбершопы</b>\n"]
     
     if companies:
         companies_text = "\n".join([
             f"• <b>{c.name}</b>" + (f" ({c.city})" if c.city else "")
             for c in companies
         ])
-        text = (
-            f"💈 <b>Ваши барбершопы</b>\n\n"
-            f"{companies_text}\n\n"
-            "Вы можете запросить добавление ещё одного барбершопа."
-        )
+        text_parts.append(companies_text)
     else:
-        text = (
-            "💈 <b>Ваши барбершопы</b>\n\n"
-            "У вас пока нет привязанных барбершопов.\n\n"
-            "Нажмите кнопку ниже, чтобы запросить добавление."
-        )
+        text_parts.append("У вас пока нет привязанных барбершопов.")
     
-    await message.answer(text, reply_markup=barbershops_menu_keyboard())
+    # Показываем информацию о заявке если есть
+    if has_pending and pending_text:
+        text_parts.append(
+            f"\n\n📝 <b>Заявка на добавление:</b>\n"
+            f"<i>{pending_text}</i>\n"
+            f"⏳ Статус: <b>На рассмотрении</b>"
+        )
+    elif not has_pending:
+        text_parts.append("\n\nВы можете запросить добавление ещё одного барбершопа.")
+    
+    await message.answer("\n".join(text_parts), reply_markup=barbershops_menu_keyboard())
 
 
 @router.message(F.text == BTN_ADD_BARBERSHOP)
@@ -194,6 +203,18 @@ async def add_barbershop_start(message: types.Message, state: FSMContext) -> Non
     """Начало добавления барбершопа."""
     if not await _check_verified(message):
         return
+    
+    # Проверяем, нет ли уже заявки на рассмотрении
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        if partner and partner.has_pending_branch:
+            await message.answer(
+                "⏳ <b>У вас уже есть заявка на рассмотрении</b>\n\n"
+                f"📝 <i>{partner.branches_text}</i>\n\n"
+                "Дождитесь её обработки администратором.",
+                reply_markup=barbershops_menu_keyboard(),
+            )
+            return
     
     await state.set_state(AddBarbershopStates.waiting_for_barbershop_text)
     
