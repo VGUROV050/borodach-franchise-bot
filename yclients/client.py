@@ -32,26 +32,6 @@ class YClientsAPI:
             "Content-Type": "application/json",
         }
     
-    async def test_endpoint(self, endpoint: str, params: dict = None) -> dict:
-        """Тестовый запрос к любому эндпоинту для отладки."""
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{BASE_URL}{endpoint}",
-                    headers=self.headers,
-                    params=params,
-                    timeout=30.0,
-                )
-                logger.info(f"YClients [{endpoint}] status={response.status_code}")
-                logger.info(f"YClients [{endpoint}] response: {response.text[:1000]}")
-                return {
-                    "status": response.status_code,
-                    "data": response.json() if response.status_code == 200 else None,
-                    "error": response.text if response.status_code != 200 else None,
-                }
-        except Exception as e:
-            logger.error(f"YClients [{endpoint}] exception: {e}")
-            return {"status": 0, "error": str(e)}
     
     async def get_company_info(self, company_id: str) -> Optional[dict]:
         """Получить информацию о компании/филиале."""
@@ -171,8 +151,6 @@ async def get_monthly_revenue(company_id: str) -> dict:
                 "date_to": date_to,
             }
             
-            logger.info(f"YClients analytics request: {url} params={params}")
-            
             response = await client.get(
                 url,
                 headers=api.headers,
@@ -180,8 +158,7 @@ async def get_monthly_revenue(company_id: str) -> dict:
                 timeout=30.0,
             )
             
-            logger.info(f"YClients analytics response: status={response.status_code}")
-            logger.info(f"YClients analytics body: {response.text[:1500]}")
+            logger.info(f"YClients analytics for {company_id}: status={response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
@@ -198,8 +175,6 @@ async def get_monthly_revenue(company_id: str) -> dict:
                     record_stats = analytics.get("record_stats", {})
                     completed_count = record_stats.get("current_completed_count", 0)
                     total_count = record_stats.get("current_total_count", 0)
-                    
-                    logger.info(f"YClients parsed: revenue={revenue}, completed={completed_count}, total={total_count}")
                     
                     return {
                         "success": True,
