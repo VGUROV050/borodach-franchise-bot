@@ -282,19 +282,19 @@ def analyze_geography(ratings: list) -> dict:
                     (current_avg * (current_count - 1) + avg_check) / current_count
                 )
             
-            # По регионам (области) - все салоны включая миллионники
-            region = get_region(city)
-            result["by_region"][region]["count"] += 1
-            result["by_region"][region]["revenue"] += revenue
-            result["by_region"][region]["salons"].append(salon_info)
-            
-            # Миллионники vs остальные (для статистики)
+            # Миллионники vs остальные
             if is_millionnik(city):
                 result["millionniki_count"] += 1
                 result["millionniki_revenue"] += revenue
+                # Миллионники НЕ добавляем в регионы - они отдельно
             else:
                 result["other_count"] += 1
                 result["other_revenue"] += revenue
+                # Только НЕ-миллионники идут в регионы
+                region = get_region(city)
+                result["by_region"][region]["count"] += 1
+                result["by_region"][region]["revenue"] += revenue
+                result["by_region"][region]["salons"].append(salon_info)
         else:
             result["unknown_cities"].append(r.company_name)
             result["other_count"] += 1
