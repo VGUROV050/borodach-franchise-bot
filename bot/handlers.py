@@ -417,7 +417,7 @@ async def contact_development_handler(message: types.Message, state: FSMContext)
         "• Открытие новых точек\n"
         "• Вопросы по франшизе\n"
         "• Стратегическое развитие",
-        reply_markup=contact_office_keyboard(),
+        reply_markup=main_menu_keyboard(),
         disable_web_page_preview=True,
     )
 
@@ -436,7 +436,7 @@ async def contact_marketing_handler(message: types.Message, state: FSMContext) -
         "• Рекламные материалы\n"
         "• Маркетинговые акции\n"
         "• SMM и продвижение",
-        reply_markup=contact_office_keyboard(),
+        reply_markup=main_menu_keyboard(),
         disable_web_page_preview=True,
     )
 
