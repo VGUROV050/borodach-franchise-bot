@@ -116,10 +116,16 @@ class YClientsAPI:
             return None
 
 
-async def get_monthly_revenue(company_id: str) -> dict:
+async def get_monthly_revenue(company_id: str, year: int = None, month: int = None) -> dict:
     """
-    Получить выручку за текущий месяц для филиала.
+    Получить выручку за указанный месяц для филиала.
+    Если год/месяц не указаны - берётся текущий месяц.
     Использует эндпоинт /company/{id}/analytics/overall/
+    
+    Args:
+        company_id: ID компании в YClients
+        year: Год (опционально, по умолчанию - текущий)
+        month: Месяц (опционально, по умолчанию - текущий)
     
     Returns:
         {
@@ -132,13 +138,25 @@ async def get_monthly_revenue(company_id: str) -> dict:
     """
     api = YClientsAPI()
     
-    # Получаем даты текущего месяца
+    # Определяем даты
     today = datetime.now()
-    start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    if year is None or month is None:
+        # Текущий месяц (неполный)
+        start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date = today
+    else:
+        # Указанный месяц (полный)
+        start_of_month = datetime(year, month, 1)
+        # Конец месяца - последний день
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = datetime(year, month + 1, 1) - timedelta(days=1)
     
     date_from = start_of_month.strftime("%Y-%m-%d")
-    date_to = today.strftime("%Y-%m-%d")
-    period = f"{start_of_month.strftime('%d.%m.%Y')} — {today.strftime('%d.%m.%Y')}"
+    date_to = end_date.strftime("%Y-%m-%d")
+    period = f"{start_of_month.strftime('%d.%m.%Y')} — {end_date.strftime('%d.%m.%Y')}"
     
     try:
         async with httpx.AsyncClient() as client:
@@ -261,9 +279,14 @@ async def get_chain_companies(chain_id: str = None) -> list[dict]:
         return []
 
 
-async def get_all_companies_revenue() -> list[dict]:
+async def get_all_companies_revenue(year: int = None, month: int = None) -> list[dict]:
     """
-    Получить выручку всех салонов сети за текущий месяц.
+    Получить выручку всех салонов сети за указанный месяц.
+    Если год/месяц не указаны - берётся текущий месяц (неполный).
+    
+    Args:
+        year: Год (опционально)
+        month: Месяц (опционально)
     
     Returns:
         Список словарей с данными:
@@ -279,14 +302,27 @@ async def get_all_companies_revenue() -> list[dict]:
     results = []
     api = YClientsAPI()
     
-    # Получаем даты текущего месяца
+    # Определяем даты
     today = datetime.now()
-    start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    if year is None or month is None:
+        # Текущий месяц (неполный)
+        start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date = today
+        period_name = "текущий месяц"
+    else:
+        # Указанный месяц (полный)
+        start_of_month = datetime(year, month, 1)
+        if month == 12:
+            end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end_date = datetime(year, month + 1, 1) - timedelta(days=1)
+        period_name = f"{year}-{month:02d}"
     
     date_from = start_of_month.strftime("%Y-%m-%d")
-    date_to = today.strftime("%Y-%m-%d")
+    date_to = end_date.strftime("%Y-%m-%d")
     
-    logger.info(f"Fetching revenue for {len(companies)} companies...")
+    logger.info(f"Fetching revenue for {len(companies)} companies for {period_name}...")
     
     async with httpx.AsyncClient() as client:
         for i, company in enumerate(companies):
@@ -346,17 +382,21 @@ async def get_all_companies_revenue() -> list[dict]:
     return results
 
 
-async def calculate_network_ranking() -> list[dict]:
+async def calculate_network_ranking(year: int = None, month: int = None) -> list[dict]:
     """
-    Рассчитать рейтинг всех салонов сети по выручке.
+    Рассчитать рейтинг всех салонов сети по выручке за указанный месяц.
     Учитываются только салоны с выручкой > 0.
+    
+    Args:
+        year: Год (опционально, по умолчанию - текущий месяц)
+        month: Месяц (опционально)
     
     Returns:
         Список словарей с рейтингом (отсортирован по выручке DESC):
         [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "avg_check": 1500.0, "rank": 1}, ...]
     """
-    # Получаем выручку всех салонов
-    all_revenue = await get_all_companies_revenue()
+    # Получаем выручку всех салонов за указанный месяц
+    all_revenue = await get_all_companies_revenue(year, month)
     
     if not all_revenue:
         return []

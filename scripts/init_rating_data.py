@@ -15,9 +15,16 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from database import AsyncSessionLocal, update_network_rating, NetworkRatingHistory
+from database import AsyncSessionLocal, update_network_rating, NetworkRatingHistory, NetworkRating
 from yclients import calculate_network_ranking
 from sqlalchemy import select
+
+# Для обратной совместимости
+month_names = {
+    1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+    5: "май", 6: "июнь", 7: "июль", 8: "август",
+    9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
+}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -63,11 +70,11 @@ def get_prev_month(year: int, month: int) -> tuple[int, int]:
     return year, month - 1
 
 
-async def save_history_for_month(ranking: list, year: int, month: int):
+async def fetch_and_save_history_for_month(year: int, month: int):
     """
-    Сохранить рейтинг как историю за указанный месяц.
+    Загрузить данные из YClients за указанный месяц и сохранить как историю.
     """
-    logger.info(f"Сохраняем историю за {year}-{month:02d}...")
+    logger.info(f"Загружаем данные из YClients за {year}-{month:02d}...")
     
     async with AsyncSessionLocal() as db:
         # Проверяем, есть ли уже данные за этот период
@@ -80,8 +87,18 @@ async def save_history_for_month(ranking: list, year: int, month: int):
         if existing.scalar():
             logger.info(f"История за {year}-{month:02d} уже существует, пропускаем")
             return False
-        
-        # Сохраняем историю
+    
+    # Загружаем реальные данные за указанный месяц из YClients
+    ranking = await calculate_network_ranking(year, month)
+    
+    if not ranking:
+        logger.error(f"Не удалось получить данные за {year}-{month:02d}")
+        return False
+    
+    logger.info(f"Получено {len(ranking)} салонов за {year}-{month:02d}")
+    
+    # Сохраняем в БД
+    async with AsyncSessionLocal() as db:
         total_companies = ranking[0]["total_companies"] if ranking else 0
         for company in ranking:
             history = NetworkRatingHistory(
@@ -102,9 +119,9 @@ async def save_history_for_month(ranking: list, year: int, month: int):
     return True
 
 
-async def save_history_for_two_months(ranking: list):
+async def load_historical_data():
     """
-    Сохранить текущий рейтинг как историю за 2 предыдущих месяца.
+    Загрузить исторические данные за 2 предыдущих месяца из YClients.
     Это нужно для:
     - Вкладка "Прошлый месяц": октябрь vs сентябрь
     - Вкладка "Текущий месяц": ноябрь vs октябрь
@@ -117,9 +134,14 @@ async def save_history_for_two_months(ranking: list):
     # Позапрошлый месяц (сентябрь)
     prev_prev_year, prev_prev_month = get_prev_month(prev_year, prev_month)
     
-    # Сохраняем историю за оба месяца
-    await save_history_for_month(ranking, prev_year, prev_month)
-    await save_history_for_month(ranking, prev_prev_year, prev_prev_month)
+    # Загружаем реальные исторические данные за оба месяца
+    logger.info("=" * 30)
+    logger.info(f"Загружаем данные за {prev_prev_year}-{prev_prev_month:02d} (позапрошлый месяц)...")
+    await fetch_and_save_history_for_month(prev_prev_year, prev_prev_month)
+    
+    logger.info("=" * 30)
+    logger.info(f"Загружаем данные за {prev_year}-{prev_month:02d} (прошлый месяц)...")
+    await fetch_and_save_history_for_month(prev_year, prev_month)
 
 
 async def update_current_with_previous_ranks():
@@ -152,7 +174,6 @@ async def update_current_with_previous_ranks():
         }
         
         # Обновляем текущий рейтинг
-        from database import NetworkRating
         current = await db.execute(select(NetworkRating))
         current_records = current.scalars().all()
         
@@ -174,20 +195,21 @@ async def main():
     logger.info("Инициализация данных рейтинга сети")
     logger.info("=" * 50)
     
-    # 1. Загружаем текущий рейтинг
+    # 1. Загружаем текущий рейтинг (ноябрь)
     ranking = await load_current_rating()
     
     if not ranking:
         logger.error("Не удалось загрузить рейтинг")
         return
     
-    # 2. Сохраняем как историю за 2 предыдущих месяца (октябрь и сентябрь)
+    # 2. Загружаем РЕАЛЬНЫЕ исторические данные из YClients
+    # за октябрь и сентябрь (каждый месяц отдельным запросом)
     # Это позволит сравнивать:
     # - Октябрь vs Сентябрь (вкладка "Прошлый месяц")
     # - Ноябрь vs Октябрь (вкладка "Текущий месяц")
-    await save_history_for_two_months(ranking)
+    await load_historical_data()
     
-    # 3. Обновляем текущий рейтинг с previous_rank
+    # 3. Обновляем текущий рейтинг с previous_rank из октября
     await update_current_with_previous_ranks()
     
     logger.info("=" * 50)
