@@ -132,9 +132,21 @@ async def registration_name_cancel(message: types.Message, state: FSMContext) ->
     )
 
 
-@router.message(RegistrationStates.waiting_for_full_name)
+@router.message(RegistrationStates.waiting_for_full_name, F.contact)
+async def registration_name_contact_ignored(message: types.Message, state: FSMContext) -> None:
+    """Игнорируем контакт на этапе ФИО."""
+    await message.answer(
+        "⚠️ Контакт уже получен. Пожалуйста, введите ваше <b>ФИО</b>:",
+        reply_markup=cancel_registration_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_full_name, F.text)
 async def registration_full_name(message: types.Message, state: FSMContext) -> None:
     """Получили ФИО → запрашиваем барбершоп."""
+    if message.text == BTN_CANCEL_REGISTRATION:
+        return  # Обрабатывается другим хендлером
+    
     full_name = message.text.strip()
     
     if len(full_name) < 3:
@@ -172,9 +184,21 @@ async def registration_barbershop_cancel(message: types.Message, state: FSMConte
     )
 
 
-@router.message(RegistrationStates.waiting_for_barbershop)
+@router.message(RegistrationStates.waiting_for_barbershop, F.contact)
+async def registration_barbershop_contact_ignored(message: types.Message, state: FSMContext) -> None:
+    """Игнорируем контакт на этапе барбершопа."""
+    await message.answer(
+        "⚠️ Контакт уже получен. Пожалуйста, укажите ваш барбершоп:",
+        reply_markup=cancel_registration_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_barbershop, F.text)
 async def registration_barbershop(message: types.Message, state: FSMContext) -> None:
     """Получили барбершоп → спрашиваем про ещё барбершопы."""
+    if message.text == BTN_CANCEL_REGISTRATION:
+        return  # Обрабатывается другим хендлером
+    
     barbershop_text = message.text.strip()
     
     if len(barbershop_text) < 3:
