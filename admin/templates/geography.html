@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}География сети — Borodach Admin{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>🗺 География сети</h1>
+</div>
+
+<!-- Миллионники vs остальные -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="stat-card">
+        <div class="stat-value">{{ geo.total_salons }}</div>
+        <div class="stat-label">Всего салонов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--accent);">{{ geo.millionniki_count }}</div>
+        <div class="stat-label">В миллионниках ({{ geo.millionniki_percent }}%)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--warning);">{{ geo.other_count }}</div>
+        <div class="stat-label">В других городах ({{ geo.other_percent }}%)</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--success);">{{ geo.by_city|length }}</div>
+        <div class="stat-label">Городов присутствия</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- По регионам -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">📍 По федеральным округам</div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Регион</th>
+                    <th style="text-align: right;">Салонов</th>
+                    <th style="text-align: right;">Выручка</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for region, data in geo.by_region.items() %}
+                <tr>
+                    <td style="font-weight: 500;">{{ region }}</td>
+                    <td style="text-align: right;">
+                        <span class="badge badge-verified">{{ data.count }}</span>
+                    </td>
+                    <td style="text-align: right; color: var(--success); font-weight: 500;">
+                        {{ "{:,.0f}".format(data.revenue).replace(",", " ") }} ₽
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- По городам -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">🏙 По городам (топ-20)</div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Город</th>
+                    <th style="text-align: right;">Салонов</th>
+                    <th style="text-align: right;">Выручка</th>
+                    <th style="text-align: right;">Ср. чек</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for city, data in geo.by_city.items()[:20] %}
+                <tr>
+                    <td>
+                        <span style="font-weight: 500;">{{ city }}</span>
+                        {% if city.lower() in ['москва', 'санкт-петербург', 'спб', 'казань', 'екатеринбург', 'новосибирск', 'нижний новгород', 'красноярск', 'челябинск', 'самара', 'уфа', 'ростов-на-дону', 'омск', 'краснодар', 'воронеж', 'пермь', 'волгоград'] %}
+                        <span style="font-size: 0.75rem; color: var(--accent);">★ млн</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        <span class="badge badge-verified">{{ data.count }}</span>
+                    </td>
+                    <td style="text-align: right; color: var(--success); font-weight: 500;">
+                        {{ "{:,.0f}".format(data.revenue).replace(",", " ") }} ₽
+                    </td>
+                    <td style="text-align: right; color: var(--text-muted);">
+                        {{ "{:,.0f}".format(data.avg_check).replace(",", " ") }} ₽
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if geo.by_city|length > 20 %}
+        <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.875rem;">
+            ... и ещё {{ geo.by_city|length - 20 }} городов
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Выручка: миллионники vs остальные -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <div class="card-title">💰 Выручка: миллионники vs другие города</div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1rem;">
+        <div style="text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">
+                {{ "{:,.0f}".format(geo.millionniki_revenue).replace(",", " ") }} ₽
+            </div>
+            <div style="color: var(--text-muted); margin-top: 0.5rem;">
+                Выручка в миллионниках
+                {% if geo.millionniki_revenue + geo.other_revenue > 0 %}
+                ({{ "%.1f"|format(geo.millionniki_revenue / (geo.millionniki_revenue + geo.other_revenue) * 100) }}%)
+                {% endif %}
+            </div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--warning);">
+                {{ "{:,.0f}".format(geo.other_revenue).replace(",", " ") }} ₽
+            </div>
+            <div style="color: var(--text-muted); margin-top: 0.5rem;">
+                Выручка в других городах
+                {% if geo.millionniki_revenue + geo.other_revenue > 0 %}
+                ({{ "%.1f"|format(geo.other_revenue / (geo.millionniki_revenue + geo.other_revenue) * 100) }}%)
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if geo.unknown_cities %}
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <div class="card-title">⚠️ Не удалось определить город ({{ geo.unknown_cities|length }})</div>
+    </div>
+    <div style="padding: 1rem; color: var(--text-muted); font-size: 0.875rem;">
+        {% for name in geo.unknown_cities[:10] %}
+        <code style="margin-right: 0.5rem; margin-bottom: 0.5rem; display: inline-block;">{{ name }}</code>
+        {% endfor %}
+        {% if geo.unknown_cities|length > 10 %}
+        <span>... и ещё {{ geo.unknown_cities|length - 10 }}</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+

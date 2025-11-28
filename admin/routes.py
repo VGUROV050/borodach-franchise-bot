@@ -716,3 +716,34 @@ async def network_rating_refresh(request: Request):
     # Редиректим обратно с сообщением
     return RedirectResponse(url="/network-rating?refresh=started", status_code=302)
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Geography Analytics
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/geography", response_class=HTMLResponse)
+async def geography_page(request: Request):
+    """Страница географической аналитики сети."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_network_ratings
+    from .analytics import analyze_geography
+    
+    async with AsyncSessionLocal() as db:
+        all_ratings = await get_all_network_ratings(db)
+    
+    # Фильтруем салоны с выручкой > 0
+    ratings = [r for r in all_ratings if r.revenue > 0]
+    
+    # Анализируем географию
+    geo = analyze_geography(ratings)
+    
+    return templates.TemplateResponse(
+        "geography.html",
+        {
+            "request": request,
+            "geo": geo,
+        },
+    )
+
