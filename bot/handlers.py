@@ -326,8 +326,8 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
                 rating = await get_network_rating_by_company(db, yclients_id)
             
             if rating and rating.rank > 0:
-                # Место в рейтинге
-                rank_text = f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}"
+                # Рейтинг по выручке
+                rank_text = f"   🏆 Рейтинг по выручке в сети: <b>{rating.rank}</b> из {rating.total_companies}"
                 
                 # Изменение позиции (если есть данные за прошлый месяц)
                 if rating.previous_rank and rating.previous_rank > 0:
