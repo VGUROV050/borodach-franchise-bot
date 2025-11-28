@@ -155,7 +155,12 @@ def extract_city_from_name(salon_name: str) -> Optional[str]:
     # Убираем лишние пробелы
     name = salon_name.strip()
     
-    # Вариант 1: "Москва - метро" -> берём до " - "
+    # Вариант 1: "Москва — м. Преображенская" (длинное тире)
+    if " — " in name:
+        city = name.split(" — ")[0].strip()
+        return city
+    
+    # Вариант 2: "Москва - метро" (короткое тире с пробелами)
     if " - " in name:
         city = name.split(" - ")[0].strip()
         return city
