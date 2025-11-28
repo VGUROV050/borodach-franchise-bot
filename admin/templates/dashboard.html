@@ -12,7 +12,7 @@
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ pending_branches_count|default(0) }}</div>
-        <div class="stat-label">Запросов на филиалы</div>
+        <div class="stat-label">Запросов на барбершопы</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{ verified_partners|length }}</div>
@@ -39,7 +39,7 @@
                 
                 {% if partner.branches_text %}
                 <div class="partner-branches">
-                    <strong>🏢 Филиалы (текст):</strong><br>
+                    <strong>💈 Барбершопы (текст):</strong><br>
                     <pre>{{ partner.branches_text }}</pre>
                 </div>
                 {% endif %}
@@ -70,7 +70,7 @@
 {% if pending_branches %}
 <div class="card">
     <div class="card-header">
-        <h2 class="card-title">🏢 Запросы на добавление филиалов</h2>
+        <h2 class="card-title">💈 Запросы на добавление барбершопов</h2>
         <span class="badge badge-warning">{{ pending_branches_count }}</span>
     </div>
     
@@ -85,13 +85,13 @@
                 </div>
                 
                 <div class="partner-branches">
-                    <strong>🏢 Текущие филиалы:</strong><br>
-                    {% if partner.branches %}
-                        {% for pb in partner.branches %}
-                            • {{ pb.branch.display_name or pb.branch.city }}<br>
+                    <strong>💈 Текущие барбершопы:</strong><br>
+                    {% if partner.companies %}
+                        {% for pc in partner.companies %}
+                            • {{ pc.company.name }}{% if pc.company.city %} ({{ pc.company.city }}){% endif %}<br>
                         {% endfor %}
                     {% else %}
-                        <em>Нет привязанных филиалов</em>
+                        <em>Нет привязанных барбершопов</em>
                     {% endif %}
                 </div>
                 

@@ -121,25 +121,6 @@
                     | <a href="/yclients-companies/sync" style="color: var(--accent);">🔄 Обновить список</a>
                 </div>
                 
-                {% elif branches %}
-                <!-- Старые филиалы для совместимости -->
-                <p class="text-muted mb-1" style="font-size: 0.9rem;">
-                    Выберите филиалы (старая схема):
-                </p>
-                
-                <div class="company-list">
-                    {% for branch in branches %}
-                    <label class="company-item">
-                        <input type="checkbox" name="branch_ids" value="{{ branch.id }}">
-                        <span>
-                            <strong>{{ branch.display_name or branch.city }}</strong>
-                            <span class="company-city">
-                                {{ branch.city }}, {{ branch.address }}
-                            </span>
-                        </span>
-                    </label>
-                    {% endfor %}
-                </div>
                 {% else %}
                 <div class="alert" style="background: var(--warning-light); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px;">
                     ⚠️ Салоны ещё не загружены. 

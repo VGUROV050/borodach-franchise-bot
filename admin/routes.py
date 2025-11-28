@@ -192,7 +192,7 @@ async def verify_partner_page(
     request: Request,
     partner_id: int,
 ):
-    """Страница верификации партнёра с выбором салонов YClients."""
+    """Страница верификации партнёра с выбором барбершопов YClients."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
@@ -204,11 +204,8 @@ async def verify_partner_page(
         result = await db.execute(select(Partner).where(Partner.id == partner_id))
         partner = result.scalar_one_or_none()
         
-        # Получаем салоны YClients вместо ручных филиалов
+        # Получаем барбершопы из YClients
         companies = await get_all_yclients_companies(db, only_active=True)
-        
-        # Также получаем старые филиалы для совместимости
-        branches = await get_all_branches(db, only_active=True)
     
     if not partner:
         raise HTTPException(status_code=404, detail="Партнёр не найден")
@@ -216,8 +213,7 @@ async def verify_partner_page(
     return templates.TemplateResponse("verify_partner.html", {
         "request": request,
         "partner": partner,
-        "companies": companies,  # Новые салоны YClients
-        "branches": branches,     # Старые для совместимости
+        "companies": companies,
     })
 
 
@@ -225,14 +221,13 @@ async def verify_partner_page(
 async def verify_partner(
     request: Request,
     partner_id: int,
-    company_ids: list[int] = Form(default=[]),     # Новые салоны YClients
-    branch_ids: list[int] = Form(default=[]),       # Старые филиалы для совместимости
+    company_ids: list[int] = Form(default=[]),
 ):
-    """Верифицировать партнёра с привязкой к салонам YClients."""
+    """Верифицировать партнёра с привязкой к барбершопам YClients."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from database.crud import link_partner_to_branch, link_partner_to_company
+    from database.crud import link_partner_to_company
     from sqlalchemy import select
     from database.models import Partner
     
@@ -254,21 +249,12 @@ async def verify_partner(
         if not partner:
             raise HTTPException(status_code=404, detail="Партнёр не найден")
         
-        # Привязываем к салонам YClients (новая схема)
+        # Привязываем к барбершопам YClients
         for company_id in company_ids:
             await link_partner_to_company(
                 db=db,
                 partner_id=partner_id,
-                company_id=company_id,
-                is_owner=True,
-            )
-        
-        # Привязываем к старым филиалам (для совместимости)
-        for branch_id in branch_ids:
-            await link_partner_to_branch(
-                db=db,
-                partner_id=partner_id,
-                branch_id=branch_id,
+                yclients_company_id=company_id,
                 is_owner=True,
             )
     
@@ -285,7 +271,7 @@ async def verify_partner(
             show_main_menu=True,
         )
     
-    logger.info(f"Partner {partner_id} verified with companies: {company_ids}, branches: {branch_ids}")
+    logger.info(f"Partner {partner_id} verified with companies: {company_ids}")
     return RedirectResponse(url="/", status_code=302)
 
 
