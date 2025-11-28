@@ -581,30 +581,53 @@ async def delete_branch(
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/yclients-companies", response_class=HTMLResponse)
-async def yclients_companies_page(request: Request):
-    """Страница списка салонов YClients."""
+async def yclients_companies_page(request: Request, status: str = None):
+    """Страница списка салонов YClients с фильтрацией по статусу."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
     from database import get_all_yclients_companies
+    from sqlalchemy import select
+    from database.models import YClientsCompany
     
     async with AsyncSessionLocal() as db:
-        companies = await get_all_yclients_companies(db, only_active=True)
+        # Получаем все компании для статистики
+        all_result = await db.execute(select(YClientsCompany).order_by(YClientsCompany.name))
+        all_companies = list(all_result.scalars().all())
+        
+        # Считаем статистику
+        active_count = sum(1 for c in all_companies if c.is_active)
+        inactive_count = len(all_companies) - active_count
+        
+        # Фильтруем по статусу
+        if status == "active":
+            companies = [c for c in all_companies if c.is_active]
+            current_filter = "active"
+        elif status == "inactive":
+            companies = [c for c in all_companies if not c.is_active]
+            current_filter = "inactive"
+        else:
+            companies = all_companies
+            current_filter = "all"
     
-    # Группируем по городам для статистики
+    # Группируем по городам для статистики (только активные)
     cities = {}
-    for c in companies:
-        city = c.city or "Неизвестно"
-        if city not in cities:
-            cities[city] = 0
-        cities[city] += 1
+    for c in all_companies:
+        if c.is_active:
+            city = c.city or "Неизвестно"
+            if city not in cities:
+                cities[city] = 0
+            cities[city] += 1
     
     return templates.TemplateResponse("yclients_companies.html", {
         "request": request,
         "companies": companies,
-        "total_count": len(companies),
+        "total_count": len(all_companies),
+        "active_count": active_count,
+        "inactive_count": inactive_count,
         "cities_count": len(cities),
         "cities": sorted(cities.items(), key=lambda x: x[1], reverse=True),
+        "current_filter": current_filter,
     })
 
 
@@ -615,7 +638,6 @@ async def sync_yclients_companies_route(request: Request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     from yclients import sync_companies_to_db
-    import asyncio
     
     # Запускаем синхронизацию
     added, updated = await sync_companies_to_db()
@@ -623,6 +645,33 @@ async def sync_yclients_companies_route(request: Request):
     logger.info(f"YClients companies sync: {added} added, {updated} updated")
     
     return RedirectResponse(url="/yclients-companies?synced=1", status_code=302)
+
+
+@router.post("/yclients-companies/{company_id}/toggle-status")
+async def toggle_company_status(request: Request, company_id: int):
+    """Переключить статус активности салона."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select
+    from database.models import YClientsCompany
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(YClientsCompany).where(YClientsCompany.id == company_id)
+        )
+        company = result.scalar()
+        
+        if not company:
+            raise HTTPException(status_code=404, detail="Салон не найден")
+        
+        # Переключаем статус
+        company.is_active = not company.is_active
+        await db.commit()
+        
+        logger.info(f"Company {company_id} ({company.name}) status changed to {'active' if company.is_active else 'inactive'}")
+    
+    return {"success": True, "is_active": company.is_active}
 
 
 # ═══════════════════════════════════════════════════════════════════
