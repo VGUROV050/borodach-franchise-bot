@@ -44,7 +44,8 @@
                 <th style="width: 80px;">Место</th>
                 <th>Салон</th>
                 <th style="text-align: right;">Выручка</th>
-                <th style="text-align: right; width: 120px;">% от сети</th>
+                <th style="text-align: right;">Ср. чек</th>
+                <th style="text-align: right; width: 100px;">% от сети</th>
             </tr>
         </thead>
         <tbody>
@@ -68,6 +69,11 @@
                 <td style="text-align: right;">
                     <span style="font-weight: 600; color: var(--success);">
                         {{ "{:,.0f}".format(r.revenue).replace(",", " ") }} ₽
+                    </span>
+                </td>
+                <td style="text-align: right;">
+                    <span style="color: var(--text-muted);">
+                        {{ "{:,.0f}".format(r.avg_check).replace(",", " ") }} ₽
                     </span>
                 </td>
                 <td style="text-align: right;">

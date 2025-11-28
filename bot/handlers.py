@@ -322,12 +322,14 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
             
-            # Получаем место в рейтинге сети
+            # Получаем место в рейтинге сети и средний чек
             async with AsyncSessionLocal() as db:
                 rating = await get_network_rating_by_company(db, branch.yclients_id)
             
             if rating and rating.rank > 0:
                 stats_text += f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}\n"
+                if rating.avg_check > 0:
+                    stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
         else:
             stats_text += f"\n🏢 <b>{branch_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"

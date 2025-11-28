@@ -267,7 +267,7 @@ async def get_all_companies_revenue() -> list[dict]:
     
     Returns:
         Список словарей с данными:
-        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0}, ...]
+        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "avg_check": 1500.0}, ...]
     """
     # Получаем список салонов сети
     companies = await get_chain_companies()
@@ -305,19 +305,28 @@ async def get_all_companies_revenue() -> list[dict]:
                 )
                 
                 revenue = 0.0
+                avg_check = 0.0
                 
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
                         analytics = data.get("data", {})
+                        
+                        # Общая выручка
                         income_stats = analytics.get("income_total_stats", {})
                         revenue_str = income_stats.get("current_sum", "0")
                         revenue = float(revenue_str.replace(",", ".").replace(" ", "") if revenue_str else 0)
+                        
+                        # Средний чек
+                        avg_stats = analytics.get("income_average_stats", {})
+                        avg_str = avg_stats.get("current_sum", "0")
+                        avg_check = float(avg_str.replace(",", ".").replace(" ", "") if avg_str else 0)
                 
                 results.append({
                     "company_id": company_id,
                     "company_name": company_name,
                     "revenue": revenue,
+                    "avg_check": avg_check,
                 })
                 
                 # Логируем прогресс каждые 20 салонов
@@ -330,6 +339,7 @@ async def get_all_companies_revenue() -> list[dict]:
                     "company_id": company_id,
                     "company_name": company_name,
                     "revenue": 0.0,
+                    "avg_check": 0.0,
                 })
     
     logger.info(f"Finished fetching revenue for {len(results)} companies")
@@ -339,10 +349,11 @@ async def get_all_companies_revenue() -> list[dict]:
 async def calculate_network_ranking() -> list[dict]:
     """
     Рассчитать рейтинг всех салонов сети по выручке.
+    Учитываются только салоны с выручкой > 0.
     
     Returns:
         Список словарей с рейтингом (отсортирован по выручке DESC):
-        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "rank": 1}, ...]
+        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "avg_check": 1500.0, "rank": 1}, ...]
     """
     # Получаем выручку всех салонов
     all_revenue = await get_all_companies_revenue()
@@ -350,16 +361,19 @@ async def calculate_network_ranking() -> list[dict]:
     if not all_revenue:
         return []
     
-    # Сортируем по выручке (от большей к меньшей)
-    sorted_companies = sorted(all_revenue, key=lambda x: x["revenue"], reverse=True)
+    # Фильтруем салоны с выручкой > 0
+    active_companies = [c for c in all_revenue if c["revenue"] > 0]
     
-    # Присваиваем места
+    # Сортируем по выручке (от большей к меньшей)
+    sorted_companies = sorted(active_companies, key=lambda x: x["revenue"], reverse=True)
+    
+    # Присваиваем места (только среди активных салонов)
     total = len(sorted_companies)
     for i, company in enumerate(sorted_companies):
         company["rank"] = i + 1
         company["total_companies"] = total
     
-    logger.info(f"Calculated ranking for {total} companies. Top 3: {sorted_companies[:3]}")
+    logger.info(f"Calculated ranking for {total} active companies (filtered from {len(all_revenue)} total). Top 3: {sorted_companies[:3]}")
     
     return sorted_companies
 

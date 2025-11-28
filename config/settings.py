@@ -26,7 +26,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 # YClients API
 YCLIENTS_PARTNER_TOKEN = os.getenv("YCLIENTS_PARTNER_TOKEN", "")
 YCLIENTS_USER_TOKEN = os.getenv("YCLIENTS_USER_TOKEN", "")
-YCLIENTS_CHAIN_ID = os.getenv("YCLIENTS_CHAIN_ID", "413872")  # ID сети салонов
+YCLIENTS_CHAIN_ID = os.getenv("YCLIENTS_CHAIN_ID", "318")  # ID сети салонов
 
 # ID проектов/групп в Bitrix24 для каждого отдела
 BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # Отдел Развития

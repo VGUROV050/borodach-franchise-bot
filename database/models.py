@@ -196,10 +196,13 @@ class NetworkRating(Base):
     # Выручка за текущий месяц
     revenue: Mapped[float] = mapped_column(Float, default=0.0)
     
+    # Средний чек
+    avg_check: Mapped[float] = mapped_column(Float, default=0.0)
+    
     # Место в рейтинге (1 = лидер)
     rank: Mapped[int] = mapped_column(Integer, default=0, index=True)
     
-    # Всего салонов в сети
+    # Всего салонов в сети (с выручкой > 0)
     total_companies: Mapped[int] = mapped_column(Integer, default=0)
     
     # Когда обновлено

@@ -43,6 +43,7 @@ async def update_network_rating_job():
                     revenue=company["revenue"],
                     rank=company["rank"],
                     total_companies=company["total_companies"],
+                    avg_check=company.get("avg_check", 0.0),
                 )
         
         duration = (datetime.now() - start_time).total_seconds()

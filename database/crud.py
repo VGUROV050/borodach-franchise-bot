@@ -368,6 +368,7 @@ async def update_network_rating(
     revenue: float,
     rank: int,
     total_companies: int,
+    avg_check: float = 0.0,
 ) -> NetworkRating:
     """Обновить или создать запись рейтинга салона."""
     result = await db.execute(
@@ -381,6 +382,7 @@ async def update_network_rating(
         rating.revenue = revenue
         rating.rank = rank
         rating.total_companies = total_companies
+        rating.avg_check = avg_check
     else:
         # Создаём новую запись
         rating = NetworkRating(
@@ -389,6 +391,7 @@ async def update_network_rating(
             revenue=revenue,
             rank=rank,
             total_companies=total_companies,
+            avg_check=avg_check,
         )
         db.add(rating)
     
