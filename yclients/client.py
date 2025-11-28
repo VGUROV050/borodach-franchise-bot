@@ -139,12 +139,13 @@ class YClientsAPI:
 async def get_monthly_revenue(company_id: str) -> dict:
     """
     Получить выручку за текущий месяц для филиала.
-    Тестируем несколько эндпоинтов чтобы найти рабочий.
+    Использует эндпоинт /company/{id}/analytics/overall/
     
     Returns:
         {
             "success": True/False,
             "revenue": float,
+            "completed_count": int,
             "period": str,
             "error": str (если ошибка)
         }
@@ -161,150 +162,64 @@ async def get_monthly_revenue(company_id: str) -> dict:
     
     try:
         async with httpx.AsyncClient() as client:
-            # ═══════════════════════════════════════════════════════════════
-            # Пробуем эндпоинт: /finance_transactions/{company_id}
-            # ═══════════════════════════════════════════════════════════════
-            logger.info(f"Testing /finance_transactions/{company_id}")
-            resp1 = await client.get(
-                f"{BASE_URL}/finance_transactions/{company_id}",
-                headers=api.headers,
-                params={"start_date": date_from, "end_date": date_to},
-                timeout=30.0,
-            )
-            logger.info(f"finance_transactions: status={resp1.status_code}, body={resp1.text[:500]}")
+            # Эндпоинт аналитики: /company/{company_id}/analytics/overall/
+            url = f"{BASE_URL}/company/{company_id}/analytics/overall/"
             
-            if resp1.status_code == 200:
-                data = resp1.json()
-                transactions = data.get("data", [])
-                if transactions:
-                    # Считаем сумму приходных транзакций
-                    total = sum(
-                        float(t.get("amount", 0) or 0) 
-                        for t in transactions 
-                        if t.get("type") in [1, "income", "приход"]  # тип = приход
-                    )
-                    if total > 0:
-                        return {"success": True, "revenue": total, "period": period, "source": "finance_transactions"}
-            
-            # ═══════════════════════════════════════════════════════════════
-            # Пробуем эндпоинт: /company/{company_id}/finance/report
-            # ═══════════════════════════════════════════════════════════════
-            logger.info(f"Testing /company/{company_id}/finance/report")
-            resp2 = await client.get(
-                f"{BASE_URL}/company/{company_id}/finance/report",
-                headers=api.headers,
-                params={"start_date": date_from, "end_date": date_to},
-                timeout=30.0,
-            )
-            logger.info(f"finance/report: status={resp2.status_code}, body={resp2.text[:500]}")
-            
-            if resp2.status_code == 200:
-                data = resp2.json()
-                revenue = data.get("data", {}).get("revenue") or data.get("data", {}).get("income") or data.get("data", {}).get("total")
-                if revenue:
-                    return {"success": True, "revenue": float(revenue), "period": period, "source": "finance/report"}
-            
-            # ═══════════════════════════════════════════════════════════════
-            # Пробуем эндпоинт: /timetable/seances/{company_id} (сеансы с оплатой)
-            # ═══════════════════════════════════════════════════════════════
-            logger.info(f"Testing /timetable/seances/{company_id}")
-            resp3 = await client.get(
-                f"{BASE_URL}/timetable/seances/{company_id}",
-                headers=api.headers,
-                params={"date_from": date_from, "date_to": date_to},
-                timeout=30.0,
-            )
-            logger.info(f"timetable/seances: status={resp3.status_code}, body={resp3.text[:500]}")
-            
-            # ═══════════════════════════════════════════════════════════════
-            # Пробуем эндпоинт: /activity/{company_id}/search (посещения)
-            # ═══════════════════════════════════════════════════════════════
-            logger.info(f"Testing /activity/{company_id}/search")
-            resp4 = await client.post(
-                f"{BASE_URL}/activity/{company_id}/search",
-                headers=api.headers,
-                json={"from": date_from, "to": date_to},
-                timeout=30.0,
-            )
-            logger.info(f"activity/search: status={resp4.status_code}, body={resp4.text[:500]}")
-            
-            # ═══════════════════════════════════════════════════════════════
-            # Пробуем эндпоинт: /records/{company_id} и считаем вручную
-            # ═══════════════════════════════════════════════════════════════
-            logger.info(f"Testing /records/{company_id} with manual calculation")
-            
-            all_records = []
-            page = 1
-            
-            while page <= 10:  # максимум 10 страниц для безопасности
-                resp5 = await client.get(
-                    f"{BASE_URL}/records/{company_id}",
-                    headers=api.headers,
-                    params={
-                        "start_date": date_from,
-                        "end_date": date_to,
-                        "page": page,
-                        "count": 200,
-                    },
-                    timeout=30.0,
-                )
-                
-                if resp5.status_code != 200:
-                    logger.error(f"records error: {resp5.status_code} - {resp5.text}")
-                    break
-                
-                data = resp5.json()
-                records = data.get("data", [])
-                
-                if not records:
-                    break
-                
-                all_records.extend(records)
-                
-                if len(records) < 200:
-                    break
-                page += 1
-            
-            # Логируем структуру первой записи
-            if all_records:
-                logger.info(f"First record FULL: {all_records[0]}")
-            
-            # Считаем выручку по завершённым записям
-            total_revenue = 0.0
-            completed = 0
-            
-            for rec in all_records:
-                # Проверяем статус: клиент пришёл
-                # attendance: 2 = пришёл, visit: 1 = пришёл
-                attendance = rec.get("attendance", 0)
-                visit = rec.get("visit", 0)
-                
-                if attendance == 2 or visit == 1:
-                    completed += 1
-                    
-                    # Пробуем разные поля для суммы
-                    # 1. services[].cost
-                    services = rec.get("services", [])
-                    for svc in services:
-                        cost = float(svc.get("cost", 0) or 0)
-                        total_revenue += cost
-                    
-                    # 2. Если services пусто - пробуем поле самой записи
-                    if not services:
-                        total_revenue += float(rec.get("cost", 0) or 0)
-                        total_revenue += float(rec.get("cost_to_pay", 0) or 0)
-                        total_revenue += float(rec.get("paid_full", 0) or 0)
-            
-            logger.info(f"Records calculation: total={len(all_records)}, completed={completed}, revenue={total_revenue}")
-            
-            return {
-                "success": True,
-                "revenue": total_revenue,
-                "period": period,
-                "source": "records_manual",
-                "total_records": len(all_records),
-                "completed": completed,
+            # Параметры периода
+            params = {
+                "date_from": date_from,
+                "date_to": date_to,
             }
+            
+            logger.info(f"YClients analytics request: {url} params={params}")
+            
+            response = await client.get(
+                url,
+                headers=api.headers,
+                params=params,
+                timeout=30.0,
+            )
+            
+            logger.info(f"YClients analytics response: status={response.status_code}")
+            logger.info(f"YClients analytics body: {response.text[:1500]}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success"):
+                    analytics = data.get("data", {})
+                    
+                    # Получаем общую выручку из income_total_stats
+                    income_stats = analytics.get("income_total_stats", {})
+                    revenue_str = income_stats.get("current_sum", "0")
+                    revenue = float(revenue_str.replace(",", ".").replace(" ", "") if revenue_str else 0)
+                    
+                    # Получаем статистику записей
+                    record_stats = analytics.get("record_stats", {})
+                    completed_count = record_stats.get("current_completed_count", 0)
+                    total_count = record_stats.get("current_total_count", 0)
+                    
+                    logger.info(f"YClients parsed: revenue={revenue}, completed={completed_count}, total={total_count}")
+                    
+                    return {
+                        "success": True,
+                        "revenue": revenue,
+                        "completed_count": completed_count,
+                        "total_count": total_count,
+                        "period": period,
+                    }
+                else:
+                    logger.error(f"YClients analytics success=false: {data}")
+                    return {
+                        "success": False,
+                        "error": "API вернул success=false",
+                    }
+            else:
+                logger.error(f"YClients analytics error: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "error": f"Ошибка API: {response.status_code}",
+                }
             
     except Exception as e:
         logger.error(f"YClients exception: {e}")

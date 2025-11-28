@@ -288,8 +288,9 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Получаем статистику по каждому филиалу
     from yclients import get_monthly_revenue
     
-    stats_text = "📊 <b>Выручка за текущий месяц</b>\n"
+    stats_text = "📊 <b>Статистика за текущий месяц</b>\n"
     total_revenue = 0
+    total_completed = 0
     period = ""
     
     for pb in partner_branches:
@@ -306,6 +307,8 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         
         if result.get("success"):
             revenue = result.get("revenue", 0)
+            completed = result.get("completed_count", 0)
+            total_count = result.get("total_count", 0)
             
             # Период из первого успешного ответа
             if not period:
@@ -313,13 +316,11 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
                 stats_text += f"📅 <b>{period}</b>\n"
             
             total_revenue += revenue
+            total_completed += completed
             
             stats_text += f"\n🏢 <b>{branch_name}</b>\n"
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
-            
-            # Дополнительная инфо если есть
-            if result.get("completed"):
-                stats_text += f"   ✅ Завершено визитов: {result.get('completed')}\n"
+            stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
         else:
             stats_text += f"\n🏢 <b>{branch_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"
@@ -327,7 +328,9 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Итого (если несколько филиалов)
     if len(partner_branches) > 1 and total_revenue > 0:
         stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
-        stats_text += f"📈 <b>Итого: {total_revenue:,.0f} ₽</b>"
+        stats_text += f"📈 <b>Итого:</b>\n"
+        stats_text += f"   💰 Выручка: <b>{total_revenue:,.0f} ₽</b>\n"
+        stats_text += f"   ✅ Завершено записей: {total_completed}"
     
     # Удаляем сообщение о загрузке и отправляем результат
     await loading_msg.delete()
