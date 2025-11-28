@@ -278,7 +278,7 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     if not partner_branches:
         await loading_msg.delete()
         await message.answer(
-            "🏢 <b>Статистика по филиалам</b>\n\n"
+            "📊 <b>Статистика по филиалам</b>\n\n"
             "У вас пока нет привязанных филиалов.\n"
             "Обратитесь к администратору для привязки.",
             reply_markup=main_menu_keyboard(),
@@ -288,20 +288,17 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Получаем статистику по каждому филиалу
     from yclients import get_monthly_revenue
     
-    stats_text = "📊 <b>Статистика по филиалам</b>\n"
+    stats_text = "📊 <b>Выручка за текущий месяц</b>\n"
     total_revenue = 0
-    total_records = 0
     period = ""
-    
-    # Добавим период сверху после первого успешного запроса
     
     for pb in partner_branches:
         branch = pb.branch
-        branch_name = branch.display_name or f"{branch.city}, {branch.address}"
+        branch_name = branch.display_name or branch.name or f"{branch.city}, {branch.address}"
         
         if not branch.yclients_id:
-            stats_text += f"🏢 <b>{branch_name}</b>\n"
-            stats_text += "   ⚠️ YClients ID не указан\n\n"
+            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+            stats_text += "   ⚠️ YClients ID не указан\n"
             continue
         
         # Получаем выручку
@@ -309,30 +306,28 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         
         if result.get("success"):
             revenue = result.get("revenue", 0)
-            completed = result.get("records_count", 0)
-            total = result.get("total_records", 0)
             
-            # Сохраняем период из первого успешного ответа
+            # Период из первого успешного ответа
             if not period:
                 period = result.get("period", "")
-                stats_text += f"📅 Период: <b>{period}</b>\n\n"
+                stats_text += f"📅 <b>{period}</b>\n"
             
             total_revenue += revenue
-            total_records += completed
             
-            stats_text += f"🏢 <b>{branch_name}</b>\n"
-            stats_text += f"   💰 Выручка: {revenue:,.0f} ₽\n"
-            stats_text += f"   ✅ Завершено: {completed} из {total} записей\n\n"
+            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+            stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
+            
+            # Дополнительная инфо если есть
+            if result.get("completed"):
+                stats_text += f"   ✅ Завершено визитов: {result.get('completed')}\n"
         else:
-            stats_text += f"🏢 <b>{branch_name}</b>\n"
-            stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n\n"
+            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+            stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"
     
-    # Итого
-    if total_revenue > 0 or total_records > 0:
-        stats_text += "━━━━━━━━━━━━━━━━━━━━━\n"
-        stats_text += f"📈 <b>Итого:</b>\n"
-        stats_text += f"   💰 Выручка: {total_revenue:,.0f} ₽\n"
-        stats_text += f"   ✅ Завершено записей: {total_records}"
+    # Итого (если несколько филиалов)
+    if len(partner_branches) > 1 and total_revenue > 0:
+        stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
+        stats_text += f"📈 <b>Итого: {total_revenue:,.0f} ₽</b>"
     
     # Удаляем сообщение о загрузке и отправляем результат
     await loading_msg.delete()
