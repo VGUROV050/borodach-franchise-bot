@@ -71,21 +71,14 @@ async def save_as_previous_month(ranking: list):
         prev_year = today.year
         prev_month = today.month - 1
     
-    # Определяем начало и конец прошлого месяца
-    period_start = datetime(prev_year, prev_month, 1)
-    
-    if prev_month == 12:
-        period_end = datetime(prev_year + 1, 1, 1)
-    else:
-        period_end = datetime(prev_year, prev_month + 1, 1)
-    
     logger.info(f"Сохраняем историю за {prev_year}-{prev_month:02d}...")
     
     async with AsyncSessionLocal() as db:
         # Проверяем, есть ли уже данные за этот период
         existing = await db.execute(
             select(NetworkRatingHistory).where(
-                NetworkRatingHistory.period_start == period_start
+                NetworkRatingHistory.year == prev_year,
+                NetworkRatingHistory.month == prev_month
             ).limit(1)
         )
         if existing.scalar():
@@ -93,6 +86,7 @@ async def save_as_previous_month(ranking: list):
             return
         
         # Сохраняем историю
+        total_companies = ranking[0]["total_companies"] if ranking else 0
         for company in ranking:
             history = NetworkRatingHistory(
                 yclients_company_id=company["company_id"],
@@ -100,8 +94,9 @@ async def save_as_previous_month(ranking: list):
                 revenue=company["revenue"],
                 avg_check=company.get("avg_check", 0.0),
                 rank=company["rank"],
-                period_start=period_start,
-                period_end=period_end,
+                total_companies=total_companies,
+                year=prev_year,
+                month=prev_month,
             )
             db.add(history)
         
@@ -122,15 +117,14 @@ async def update_current_with_previous_ranks():
         prev_year = today.year
         prev_month = today.month - 1
     
-    period_start = datetime(prev_year, prev_month, 1)
-    
     logger.info("Обновляем previous_rank в текущем рейтинге...")
     
     async with AsyncSessionLocal() as db:
         # Получаем ранги из истории
         history = await db.execute(
             select(NetworkRatingHistory).where(
-                NetworkRatingHistory.period_start == period_start
+                NetworkRatingHistory.year == prev_year,
+                NetworkRatingHistory.month == prev_month
             )
         )
         history_records = history.scalars().all()
