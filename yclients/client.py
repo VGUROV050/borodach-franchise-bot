@@ -217,8 +217,8 @@ async def get_chain_companies(chain_id: str = None) -> list[dict]:
     
     try:
         async with httpx.AsyncClient() as client:
-            # Эндпоинт для получения салонов сети
-            url = f"{BASE_URL}/chain/{chain_id}/companies"
+            # Эндпоинт для получения доступных сетей (с салонами внутри)
+            url = f"{BASE_URL}/groups"
             
             response = await client.get(
                 url,
@@ -226,24 +226,38 @@ async def get_chain_companies(chain_id: str = None) -> list[dict]:
                 timeout=60.0,
             )
             
-            logger.info(f"YClients chain companies: status={response.status_code}")
+            logger.info(f"YClients groups: status={response.status_code}")
             
             if response.status_code == 200:
                 data = response.json()
                 
                 if data.get("success"):
-                    companies = data.get("data", [])
-                    logger.info(f"Found {len(companies)} companies in chain {chain_id}")
-                    return companies
+                    groups = data.get("data", [])
+                    
+                    # Ищем нужную сеть по ID
+                    for group in groups:
+                        if str(group.get("id")) == str(chain_id):
+                            companies = group.get("companies", [])
+                            logger.info(f"Found {len(companies)} companies in group {chain_id}")
+                            return companies
+                    
+                    # Если не нашли по ID, берём первую сеть
+                    if groups:
+                        companies = groups[0].get("companies", [])
+                        logger.info(f"Using first group, found {len(companies)} companies")
+                        return companies
+                    
+                    logger.error(f"No groups found")
+                    return []
                 else:
-                    logger.error(f"YClients chain error: {data}")
+                    logger.error(f"YClients groups error: {data}")
                     return []
             else:
-                logger.error(f"YClients chain error: {response.status_code} - {response.text}")
+                logger.error(f"YClients groups error: {response.status_code} - {response.text}")
                 return []
                 
     except Exception as e:
-        logger.error(f"YClients chain exception: {e}")
+        logger.error(f"YClients groups exception: {e}")
         return []
 
 
