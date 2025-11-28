@@ -155,7 +155,7 @@ async def tasks_menu_handler(message: types.Message, state: FSMContext) -> None:
 
 @router.message(F.text == BTN_MY_BRANCHES)
 async def my_branches_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать филиалы пользователя."""
+    """Показать салоны пользователя."""
     if not await _check_verified(message):
         return
     
@@ -164,27 +164,26 @@ async def my_branches_handler(message: types.Message, state: FSMContext) -> None
     async with AsyncSessionLocal() as db:
         partner = await get_partner_by_telegram_id(db, message.from_user.id)
         
+        companies = []
         if partner:
-            from database import get_partner_branches
-            branches = await get_partner_branches(db, partner.id)
-        else:
-            branches = []
+            from database import get_partner_companies
+            companies = await get_partner_companies(db, partner.id)
     
-    if branches:
-        branches_text = "\n".join([
-            f"• {pb.branch.display_name or pb.branch.name}" 
-            for pb in branches
+    if companies:
+        companies_text = "\n".join([
+            f"• <b>{c.name}</b>" + (f" ({c.city})" if c.city else "")
+            for c in companies
         ])
         text = (
-            f"🏢 <b>Ваши филиалы</b>\n\n"
-            f"{branches_text}\n\n"
-            "Вы можете добавить ещё филиал, нажав кнопку ниже."
+            f"🏢 <b>Ваши салоны</b>\n\n"
+            f"{companies_text}\n\n"
+            "Вы можете запросить добавление ещё одного салона, нажав кнопку ниже."
         )
     else:
         text = (
-            "🏢 <b>Ваши филиалы</b>\n\n"
-            "У вас пока нет привязанных филиалов.\n\n"
-            "Нажмите кнопку ниже, чтобы добавить филиал."
+            "🏢 <b>Ваши салоны</b>\n\n"
+            "У вас пока нет привязанных салонов.\n\n"
+            "Нажмите кнопку ниже, чтобы запросить добавление салона."
         )
     
     await message.answer(text, reply_markup=branches_menu_keyboard())

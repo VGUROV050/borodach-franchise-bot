@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование — {{ partner.full_name }}{% endblock %}
+
+{% block content %}
+<style>
+    .company-list {
+        max-height: 400px;
+        overflow-y: auto;
+        background: var(--bg-main);
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+    .company-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+    .company-item:hover {
+        background: var(--border);
+    }
+    .company-item input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+    }
+    .search-input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+    }
+    .linked-companies {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    .linked-company-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--success-light);
+        color: #047857;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+</style>
+
+<h1 class="mb-2">✏️ Редактирование партнёра</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">{{ partner.full_name }}</h2>
+        <span class="badge {% if partner.status.value == 'verified' %}badge-verified{% elif partner.status.value == 'pending' %}badge-pending{% else %}badge-rejected{% endif %}">
+            {{ partner.status.value }}
+        </span>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1.5rem;">
+        <!-- Информация о партнёре -->
+        <div>
+            <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">📋 Данные партнёра</h3>
+            
+            <table style="width: 100%;">
+                <tr>
+                    <td class="text-muted" style="width: 140px; padding: 0.5rem 0;">Telegram ID:</td>
+                    <td style="padding: 0.5rem 0;"><code>{{ partner.telegram_id }}</code></td>
+                </tr>
+                <tr>
+                    <td class="text-muted" style="padding: 0.5rem 0;">Username:</td>
+                    <td style="padding: 0.5rem 0;">@{{ partner.telegram_username or '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted" style="padding: 0.5rem 0;">Телефон:</td>
+                    <td style="padding: 0.5rem 0;"><strong>{{ partner.phone or '—' }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="text-muted" style="padding: 0.5rem 0;">Регистрация:</td>
+                    <td style="padding: 0.5rem 0;">{{ partner.created_at.strftime('%d.%m.%Y %H:%M') if partner.created_at else '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted" style="padding: 0.5rem 0;">Верификация:</td>
+                    <td style="padding: 0.5rem 0;">{{ partner.verified_at.strftime('%d.%m.%Y %H:%M') if partner.verified_at else '—' }}</td>
+                </tr>
+            </table>
+            
+            {% if partner.branches_text %}
+            <div style="margin-top: 1rem;">
+                <strong class="text-muted">Текст филиалов от партнёра:</strong>
+                <pre style="margin-top: 0.5rem; background: var(--bg-main); padding: 1rem; border-radius: 8px; white-space: pre-wrap; font-size: 0.85rem;">{{ partner.branches_text }}</pre>
+            </div>
+            {% endif %}
+            
+            <!-- Текущие привязанные салоны -->
+            <div style="margin-top: 1.5rem;">
+                <strong class="text-muted">Привязанные салоны:</strong>
+                {% if linked_companies %}
+                <div class="linked-companies">
+                    {% for company in linked_companies %}
+                    <span class="linked-company-badge">
+                        ✅ {{ company.name }}
+                        {% if company.city %}<small>({{ company.city }})</small>{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted" style="margin-top: 0.5rem;">Нет привязанных салонов</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Выбор салонов -->
+        <div>
+            <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">🔗 Привязка к салонам</h3>
+            
+            <form method="post" action="/partners/{{ partner.id }}/edit">
+                {% if companies %}
+                <p class="text-muted mb-1" style="font-size: 0.9rem;">
+                    Выберите салоны YClients для партнёра:
+                </p>
+                
+                <input type="text" id="companySearch" class="search-input" 
+                       placeholder="🔍 Поиск по названию или городу...">
+                
+                <div class="company-list" id="companyList">
+                    {% for company in companies %}
+                    <label class="company-item" 
+                           data-name="{{ company.name|lower }}" 
+                           data-city="{{ (company.city or '')|lower }}">
+                        <input type="checkbox" name="company_ids" value="{{ company.id }}"
+                               {% if company.id in linked_company_ids %}checked{% endif %}>
+                        <span>
+                            <strong>{{ company.name }}</strong>
+                            {% if company.city %}
+                            <span style="color: var(--text-muted); font-size: 0.85rem;">({{ company.city }})</span>
+                            {% endif %}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+                
+                <div class="text-muted mt-1" style="font-size: 0.85rem;">
+                    Всего активных салонов: {{ companies|length }}
+                </div>
+                {% else %}
+                <div class="alert" style="background: var(--warning-light); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px;">
+                    ⚠️ Салоны ещё не загружены. 
+                    <a href="/yclients-companies" style="color: var(--accent);">Синхронизировать из YClients</a>
+                </div>
+                {% endif %}
+                
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn btn-success">💾 Сохранить изменения</button>
+                    <a href="/partners" class="btn">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Поиск по списку салонов
+document.getElementById('companySearch')?.addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const items = document.querySelectorAll('.company-item');
+    
+    items.forEach(item => {
+        const name = item.dataset.name || '';
+        const city = item.dataset.city || '';
+        const matches = name.includes(query) || city.includes(query);
+        item.style.display = matches ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}
+

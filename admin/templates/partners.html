@@ -46,7 +46,11 @@
                     {% endif %}
                 </td>
                 <td style="max-width: 250px; font-size: 0.85rem;">
-                    {% if partner.branches %}
+                    {% if partner.companies %}
+                        {% for pc in partner.companies %}
+                        <div>• {{ pc.company.name if pc.company else '?' }}{% if pc.company and pc.company.city %} <small class="text-muted">({{ pc.company.city }})</small>{% endif %}</div>
+                        {% endfor %}
+                    {% elif partner.branches %}
                         {% for pb in partner.branches %}
                         <div>• {{ pb.branch.display_name or pb.branch.city }}</div>
                         {% endfor %}
@@ -57,15 +61,16 @@
                 <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
                 <td class="flex gap-1">
                     {% if partner.status.value == 'pending' %}
-                    <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm">✅</a>
+                    <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm" title="Верифицировать">✅</a>
                     <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
                         <input type="hidden" name="reason" value="">
-                        <button type="submit" class="btn btn-danger btn-sm">❌</button>
+                        <button type="submit" class="btn btn-danger btn-sm" title="Отклонить">❌</button>
                     </form>
                     {% endif %}
+                    <a href="/partners/{{ partner.id }}/edit" class="btn btn-sm" style="background: var(--accent); color: white;" title="Редактировать">✏️</a>
                     <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline;"
                           onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
-                        <button type="submit" class="btn btn-sm" style="background: #6c757d; color: white;">🗑</button>
+                        <button type="submit" class="btn btn-sm" style="background: #6c757d; color: white;" title="Удалить">🗑</button>
                     </form>
                 </td>
             </tr>

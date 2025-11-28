@@ -392,6 +392,90 @@ async def add_branch_to_partner(
     return RedirectResponse(url="/", status_code=302)
 
 
+@router.get("/partners/{partner_id}/edit", response_class=HTMLResponse)
+async def edit_partner_page(request: Request, partner_id: int):
+    """Страница редактирования партнёра."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from sqlalchemy import select
+    from database.models import Partner, YClientsCompany, PartnerCompany
+    from sqlalchemy.orm import selectinload
+    
+    async with AsyncSessionLocal() as db:
+        # Получаем партнёра
+        result = await db.execute(
+            select(Partner)
+            .options(selectinload(Partner.companies).selectinload(PartnerCompany.company))
+            .where(Partner.id == partner_id)
+        )
+        partner = result.scalar_one_or_none()
+        
+        if not partner:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        # Получаем привязанные салоны
+        linked_companies = [pc.company for pc in partner.companies if pc.company]
+        linked_company_ids = {c.id for c in linked_companies}
+        
+        # Получаем все активные салоны YClients
+        companies_result = await db.execute(
+            select(YClientsCompany)
+            .where(YClientsCompany.is_active == True)
+            .order_by(YClientsCompany.name)
+        )
+        companies = list(companies_result.scalars().all())
+    
+    return templates.TemplateResponse("edit_partner.html", {
+        "request": request,
+        "partner": partner,
+        "companies": companies,
+        "linked_companies": linked_companies,
+        "linked_company_ids": linked_company_ids,
+    })
+
+
+@router.post("/partners/{partner_id}/edit")
+async def edit_partner(
+    request: Request,
+    partner_id: int,
+    company_ids: list[int] = Form(default=[]),
+):
+    """Сохранить изменения привязки партнёра к салонам."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select, delete
+    from database.models import Partner, PartnerCompany
+    
+    async with AsyncSessionLocal() as db:
+        # Проверяем, существует ли партнёр
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner = result.scalar_one_or_none()
+        
+        if not partner:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        # Удаляем старые связи
+        await db.execute(
+            delete(PartnerCompany).where(PartnerCompany.partner_id == partner_id)
+        )
+        
+        # Создаём новые связи
+        for company_id in company_ids:
+            link = PartnerCompany(
+                partner_id=partner_id,
+                company_id=company_id,
+                is_owner=True,
+            )
+            db.add(link)
+        
+        await db.commit()
+    
+    logger.info(f"Partner {partner_id} updated with companies: {company_ids}")
+    return RedirectResponse(url="/partners?updated=1", status_code=302)
+
+
 @router.post("/partners/{partner_id}/delete")
 async def delete_partner(
     request: Request,
@@ -402,7 +486,7 @@ async def delete_partner(
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     from sqlalchemy import select, delete
-    from database.models import Partner, PartnerBranch
+    from database.models import Partner, PartnerBranch, PartnerCompany
     
     async with AsyncSessionLocal() as db:
         # Получаем данные партнёра для уведомления
@@ -411,9 +495,14 @@ async def delete_partner(
         telegram_id = partner.telegram_id if partner else None
         partner_name = partner.full_name if partner else ""
         
-        # Удаляем связи с филиалами
+        # Удаляем связи с филиалами (старая схема)
         await db.execute(
             delete(PartnerBranch).where(PartnerBranch.partner_id == partner_id)
+        )
+        
+        # Удаляем связи с салонами YClients (новая схема)
+        await db.execute(
+            delete(PartnerCompany).where(PartnerCompany.partner_id == partner_id)
         )
         
         # Удаляем партнёра

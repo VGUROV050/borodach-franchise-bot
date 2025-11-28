@@ -126,7 +126,8 @@ async def get_all_partners(
 ) -> list[Partner]:
     """Получить список партнёров с фильтрацией по статусу."""
     query = select(Partner).options(
-        selectinload(Partner.branches).selectinload(PartnerBranch.branch)
+        selectinload(Partner.branches).selectinload(PartnerBranch.branch),
+        selectinload(Partner.companies).selectinload(PartnerCompany.company),
     )
     
     if status:
