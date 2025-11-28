@@ -315,6 +315,52 @@ async def registration_more_invalid(message: types.Message, state: FSMContext) -
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Проверка статуса (для ожидающих верификации)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == "🔄 Проверить статус")
+async def check_status_registration(message: types.Message, state: FSMContext) -> None:
+    """Проверка статуса верификации."""
+    from database import get_partner_by_telegram_id, PartnerStatus
+    from .keyboards import pending_verification_keyboard, main_menu_keyboard, registration_start_keyboard
+    
+    logger.info(f"check_status_registration called: user={message.from_user.id}")
+    
+    telegram_id = message.from_user.id
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, telegram_id)
+    
+    if partner is None:
+        await message.answer(
+            "❌ Вы не зарегистрированы.\n"
+            "Нажмите кнопку ниже для регистрации.",
+            reply_markup=registration_start_keyboard(),
+        )
+        return
+    
+    if partner.status == PartnerStatus.PENDING:
+        await message.answer(
+            "⏳ <b>Статус: Ожидает рассмотрения</b>\n\n"
+            "Ваша заявка ещё не рассмотрена.\n"
+            "Пожалуйста, подождите.",
+            reply_markup=pending_verification_keyboard(),
+        )
+    elif partner.status == PartnerStatus.VERIFIED:
+        await message.answer(
+            "✅ <b>Статус: Верифицирован</b>\n\n"
+            "Добро пожаловать!",
+            reply_markup=main_menu_keyboard(),
+        )
+    elif partner.status == PartnerStatus.REJECTED:
+        await message.answer(
+            "❌ <b>Статус: Отклонён</b>\n\n"
+            f"Причина: {partner.rejection_reason or 'Не указана'}",
+            reply_markup=registration_start_keyboard(),
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Fallback: кнопка отмены без состояния
 # ═══════════════════════════════════════════════════════════════════
 
