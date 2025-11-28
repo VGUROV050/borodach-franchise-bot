@@ -75,8 +75,14 @@ class Partner(Base):
     )
     verified_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     
-    # Связь с филиалами (заполняется админом при верификации)
+    # Связь с филиалами (старая схема, заполняется админом при верификации)
     branches: Mapped[list["PartnerBranch"]] = relationship(
+        back_populates="partner",
+        cascade="all, delete-orphan",
+    )
+    
+    # Связь с салонами YClients (новая схема, автосинхронизация)
+    companies: Mapped[list["PartnerCompany"]] = relationship(
         back_populates="partner",
         cascade="all, delete-orphan",
     )
@@ -178,6 +184,82 @@ class BroadcastHistory(Base):
     
     def __repr__(self) -> str:
         return f"<BroadcastHistory {self.id}: {self.sent_at}>"
+
+
+class YClientsCompany(Base):
+    """
+    Салон из сети YClients.
+    Синхронизируется автоматически из API YClients.
+    Является единым источником правды для всех салонов сети.
+    """
+    
+    __tablename__ = "yclients_companies"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # YClients ID — уникальный идентификатор в YClients
+    yclients_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    
+    # Название салона (из YClients)
+    name: Mapped[str] = mapped_column(String(255))
+    
+    # Город (парсится из названия)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    
+    # Регион/область
+    region: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    
+    # Является ли город-миллионник
+    is_million_city: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Активность
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Когда синхронизировано
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    
+    # Связь с партнёрами
+    partner_links: Mapped[list["PartnerCompany"]] = relationship(
+        back_populates="company",
+        cascade="all, delete-orphan",
+    )
+    
+    def __repr__(self) -> str:
+        return f"<YClientsCompany {self.yclients_id}: {self.name}>"
+
+
+class PartnerCompany(Base):
+    """
+    Связь партнёра с салоном YClients (многие-ко-многим).
+    Заменяет PartnerBranch для автоматически синхронизированных салонов.
+    """
+    
+    __tablename__ = "partner_companies"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id", ondelete="CASCADE"))
+    company_id: Mapped[int] = mapped_column(ForeignKey("yclients_companies.id", ondelete="CASCADE"))
+    
+    # Роль партнёра
+    is_owner: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Временные метки
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    # Связи
+    partner: Mapped["Partner"] = relationship(back_populates="companies")
+    company: Mapped["YClientsCompany"] = relationship(back_populates="partner_links")
+    
+    def __repr__(self) -> str:
+        return f"<PartnerCompany partner={self.partner_id} company={self.company_id}>"
 
 
 class NetworkRating(Base):

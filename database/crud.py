@@ -9,7 +9,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import Partner, Branch, PartnerBranch, PartnerStatus, NetworkRating, NetworkRatingHistory
+from .models import (
+    Partner,
+    Branch,
+    PartnerBranch,
+    PartnerStatus,
+    NetworkRating,
+    NetworkRatingHistory,
+    YClientsCompany,
+    PartnerCompany,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -483,4 +492,182 @@ async def get_previous_month_ranks(
     """
     history = await get_rating_history(db, year, month)
     return {h.yclients_company_id: h.rank for h in history}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# YClients Companies CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+async def sync_yclients_companies(
+    db: AsyncSession,
+    companies: list[dict],
+) -> tuple[int, int]:
+    """
+    Синхронизировать список салонов из YClients.
+    Добавляет новые, обновляет существующие.
+    
+    Args:
+        db: Сессия БД
+        companies: Список салонов из YClients API
+            [{"id": "123", "title": "Название", "city": "Москва", "region": "МО", "is_million_city": True}, ...]
+    
+    Returns:
+        Tuple (добавлено, обновлено)
+    """
+    added = 0
+    updated = 0
+    
+    for company_data in companies:
+        yclients_id = str(company_data.get("id"))
+        name = company_data.get("title", f"Салон {yclients_id}")
+        city = company_data.get("city")
+        region = company_data.get("region")
+        is_million_city = company_data.get("is_million_city", False)
+        
+        # Проверяем, существует ли уже
+        result = await db.execute(
+            select(YClientsCompany).where(
+                YClientsCompany.yclients_id == yclients_id
+            )
+        )
+        existing = result.scalar()
+        
+        if existing:
+            # Обновляем
+            existing.name = name
+            existing.city = city
+            existing.region = region
+            existing.is_million_city = is_million_city
+            existing.is_active = True
+            updated += 1
+        else:
+            # Создаём новый
+            new_company = YClientsCompany(
+                yclients_id=yclients_id,
+                name=name,
+                city=city,
+                region=region,
+                is_million_city=is_million_city,
+                is_active=True,
+            )
+            db.add(new_company)
+            added += 1
+    
+    await db.commit()
+    logger.info(f"Synced YClients companies: {added} added, {updated} updated")
+    return added, updated
+
+
+async def get_all_yclients_companies(
+    db: AsyncSession,
+    only_active: bool = True,
+) -> list[YClientsCompany]:
+    """Получить все салоны YClients."""
+    query = select(YClientsCompany).order_by(YClientsCompany.name)
+    
+    if only_active:
+        query = query.where(YClientsCompany.is_active == True)
+    
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def get_yclients_company_by_id(
+    db: AsyncSession,
+    yclients_id: str,
+) -> Optional[YClientsCompany]:
+    """Получить салон по YClients ID."""
+    result = await db.execute(
+        select(YClientsCompany).where(
+            YClientsCompany.yclients_id == yclients_id
+        )
+    )
+    return result.scalar()
+
+
+async def get_yclients_company_by_pk(
+    db: AsyncSession,
+    company_id: int,
+) -> Optional[YClientsCompany]:
+    """Получить салон по первичному ключу."""
+    result = await db.execute(
+        select(YClientsCompany).where(
+            YClientsCompany.id == company_id
+        )
+    )
+    return result.scalar()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Partner-Company Links CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+async def link_partner_to_company(
+    db: AsyncSession,
+    partner_id: int,
+    company_id: int,
+    is_owner: bool = False,
+) -> PartnerCompany:
+    """Привязать партнёра к салону YClients."""
+    # Проверяем, есть ли уже связь
+    result = await db.execute(
+        select(PartnerCompany).where(
+            PartnerCompany.partner_id == partner_id,
+            PartnerCompany.company_id == company_id,
+        )
+    )
+    existing = result.scalar()
+    
+    if existing:
+        logger.info(f"Partner {partner_id} already linked to company {company_id}")
+        return existing
+    
+    # Создаём связь
+    link = PartnerCompany(
+        partner_id=partner_id,
+        company_id=company_id,
+        is_owner=is_owner,
+    )
+    db.add(link)
+    await db.commit()
+    
+    logger.info(f"Linked partner {partner_id} to company {company_id}")
+    return link
+
+
+async def unlink_partner_from_company(
+    db: AsyncSession,
+    partner_id: int,
+    company_id: int,
+) -> bool:
+    """Удалить связь партнёра с салоном."""
+    result = await db.execute(
+        select(PartnerCompany).where(
+            PartnerCompany.partner_id == partner_id,
+            PartnerCompany.company_id == company_id,
+        )
+    )
+    link = result.scalar()
+    
+    if link:
+        await db.delete(link)
+        await db.commit()
+        logger.info(f"Unlinked partner {partner_id} from company {company_id}")
+        return True
+    
+    return False
+
+
+async def get_partner_companies(
+    db: AsyncSession,
+    partner_id: int,
+) -> list[YClientsCompany]:
+    """Получить все салоны партнёра."""
+    result = await db.execute(
+        select(YClientsCompany)
+        .join(PartnerCompany)
+        .where(PartnerCompany.partner_id == partner_id)
+        .order_by(YClientsCompany.name)
+    )
+    return list(result.scalars().all())
 

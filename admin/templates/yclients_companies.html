@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Салоны YClients{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">🏢 Салоны YClients</div>
+        <form action="/yclients-companies/sync" method="POST" style="display: inline;">
+            <button type="submit" class="btn btn-primary">
+                🔄 Синхронизировать из YClients
+            </button>
+        </form>
+    </div>
+    
+    {% if request.query_params.get('synced') %}
+    <div class="alert alert-success" style="margin: 1rem; padding: 0.75rem 1rem; border-radius: 6px; background: var(--success-light); border: 1px solid var(--success);">
+        ✅ Синхронизация завершена успешно!
+    </div>
+    {% endif %}
+    
+    <!-- Статистика -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1rem; border-bottom: 1px solid var(--border);">
+        <div style="text-align: center; padding: 1rem; background: var(--bg-main); border-radius: 8px;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--accent);">{{ total_count }}</div>
+            <div class="text-muted">Всего салонов</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--bg-main); border-radius: 8px;">
+            <div style="font-size: 2rem; font-weight: 700; color: var(--success);">{{ cities_count }}</div>
+            <div class="text-muted">Городов</div>
+        </div>
+    </div>
+    
+    <!-- Поиск -->
+    <div style="padding: 1rem; border-bottom: 1px solid var(--border);">
+        <input type="text" id="searchInput" placeholder="🔍 Поиск по названию или городу..." 
+               style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9375rem;">
+    </div>
+    
+    {% if companies %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">ID</th>
+                <th>Название</th>
+                <th style="width: 150px;">Город</th>
+                <th style="width: 180px;">Регион</th>
+                <th style="width: 100px; text-align: center;">Миллионник</th>
+            </tr>
+        </thead>
+        <tbody id="companiesTable">
+            {% for company in companies %}
+            <tr class="company-row" data-name="{{ company.name|lower }}" data-city="{{ (company.city or '')|lower }}">
+                <td>
+                    <code style="font-size: 0.75rem;">{{ company.yclients_id }}</code>
+                </td>
+                <td>
+                    <div style="font-weight: 500;">{{ company.name }}</div>
+                </td>
+                <td>
+                    {% if company.city %}
+                    <span class="badge" style="background: var(--accent-light); color: var(--accent);">
+                        {{ company.city }}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if company.region %}
+                    <span class="text-muted" style="font-size: 0.875rem;">{{ company.region }}</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">
+                    {% if company.is_million_city %}
+                    <span style="color: var(--success);">✓</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">🏢</div>
+        <div class="empty-state-text">Салоны не найдены</div>
+        <div class="text-muted">Нажмите "Синхронизировать", чтобы загрузить список из YClients</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Статистика по городам -->
+{% if cities %}
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <div class="card-title">🌍 Распределение по городам</div>
+    </div>
+    <div style="padding: 1rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% for city, count in cities[:30] %}
+            <span class="badge" style="background: var(--bg-main); border: 1px solid var(--border); padding: 0.5rem 0.75rem;">
+                {{ city }}: <strong>{{ count }}</strong>
+            </span>
+            {% endfor %}
+            {% if cities|length > 30 %}
+            <span class="text-muted" style="padding: 0.5rem;">...и ещё {{ cities|length - 30 }} городов</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Поиск по таблице
+document.getElementById('searchInput').addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const rows = document.querySelectorAll('.company-row');
+    
+    rows.forEach(row => {
+        const name = row.dataset.name;
+        const city = row.dataset.city;
+        const matches = name.includes(query) || city.includes(query);
+        row.style.display = matches ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}
+

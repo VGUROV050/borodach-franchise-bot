@@ -192,16 +192,22 @@ async def verify_partner_page(
     request: Request,
     partner_id: int,
 ):
-    """Страница верификации партнёра с выбором филиалов."""
+    """Страница верификации партнёра с выбором салонов YClients."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
     from sqlalchemy import select
     from database.models import Partner
+    from database import get_all_yclients_companies
     
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Partner).where(Partner.id == partner_id))
         partner = result.scalar_one_or_none()
+        
+        # Получаем салоны YClients вместо ручных филиалов
+        companies = await get_all_yclients_companies(db, only_active=True)
+        
+        # Также получаем старые филиалы для совместимости
         branches = await get_all_branches(db, only_active=True)
     
     if not partner:
@@ -210,7 +216,8 @@ async def verify_partner_page(
     return templates.TemplateResponse("verify_partner.html", {
         "request": request,
         "partner": partner,
-        "branches": branches,
+        "companies": companies,  # Новые салоны YClients
+        "branches": branches,     # Старые для совместимости
     })
 
 
@@ -218,13 +225,14 @@ async def verify_partner_page(
 async def verify_partner(
     request: Request,
     partner_id: int,
-    branch_ids: list[int] = Form(default=[]),
+    company_ids: list[int] = Form(default=[]),     # Новые салоны YClients
+    branch_ids: list[int] = Form(default=[]),       # Старые филиалы для совместимости
 ):
-    """Верифицировать партнёра с привязкой к филиалам."""
+    """Верифицировать партнёра с привязкой к салонам YClients."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from database.crud import link_partner_to_branch
+    from database.crud import link_partner_to_branch, link_partner_to_company
     from sqlalchemy import select
     from database.models import Partner
     
@@ -246,7 +254,16 @@ async def verify_partner(
         if not partner:
             raise HTTPException(status_code=404, detail="Партнёр не найден")
         
-        # Привязываем к филиалам
+        # Привязываем к салонам YClients (новая схема)
+        for company_id in company_ids:
+            await link_partner_to_company(
+                db=db,
+                partner_id=partner_id,
+                company_id=company_id,
+                is_owner=True,
+            )
+        
+        # Привязываем к старым филиалам (для совместимости)
         for branch_id in branch_ids:
             await link_partner_to_branch(
                 db=db,
@@ -268,7 +285,7 @@ async def verify_partner(
             show_main_menu=True,
         )
     
-    logger.info(f"Partner {partner_id} verified with branches: {branch_ids}")
+    logger.info(f"Partner {partner_id} verified with companies: {company_ids}, branches: {branch_ids}")
     return RedirectResponse(url="/", status_code=302)
 
 
@@ -557,6 +574,55 @@ async def delete_branch(
     
     logger.info(f"Branch {branch_id} deleted")
     return RedirectResponse(url="/branches", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Салоны YClients (автосинхронизация)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/yclients-companies", response_class=HTMLResponse)
+async def yclients_companies_page(request: Request):
+    """Страница списка салонов YClients."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_yclients_companies
+    
+    async with AsyncSessionLocal() as db:
+        companies = await get_all_yclients_companies(db, only_active=True)
+    
+    # Группируем по городам для статистики
+    cities = {}
+    for c in companies:
+        city = c.city or "Неизвестно"
+        if city not in cities:
+            cities[city] = 0
+        cities[city] += 1
+    
+    return templates.TemplateResponse("yclients_companies.html", {
+        "request": request,
+        "companies": companies,
+        "total_count": len(companies),
+        "cities_count": len(cities),
+        "cities": sorted(cities.items(), key=lambda x: x[1], reverse=True),
+    })
+
+
+@router.post("/yclients-companies/sync")
+async def sync_yclients_companies_route(request: Request):
+    """Синхронизировать список салонов из YClients API."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from yclients import sync_companies_to_db
+    import asyncio
+    
+    # Запускаем синхронизацию
+    added, updated = await sync_companies_to_db()
+    
+    logger.info(f"YClients companies sync: {added} added, {updated} updated")
+    
+    return RedirectResponse(url="/yclients-companies?synced=1", status_code=302)
 
 
 # ═══════════════════════════════════════════════════════════════════

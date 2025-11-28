@@ -417,3 +417,54 @@ async def calculate_network_ranking(year: int = None, month: int = None) -> list
     
     return sorted_companies
 
+
+async def sync_companies_to_db() -> tuple[int, int]:
+    """
+    Синхронизировать список салонов из YClients в локальную БД.
+    Парсит город и регион из названия салона.
+    
+    Returns:
+        Tuple (добавлено, обновлено)
+    """
+    from admin.analytics import extract_city_from_name, MILLION_PLUS_CITIES, CITY_TO_REGION_MAP
+    from database import AsyncSessionLocal, sync_yclients_companies
+    
+    # Получаем список салонов из YClients
+    companies = await get_chain_companies()
+    
+    if not companies:
+        logger.error("No companies found to sync")
+        return 0, 0
+    
+    logger.info(f"Syncing {len(companies)} companies to database...")
+    
+    # Подготавливаем данные с парсингом города
+    companies_data = []
+    for company in companies:
+        name = company.get("title", "")
+        yclients_id = str(company.get("id"))
+        
+        # Парсим город из названия
+        city = extract_city_from_name(name)
+        
+        # Определяем регион
+        region = CITY_TO_REGION_MAP.get(city, "Неизвестный регион") if city else None
+        
+        # Является ли город-миллионник
+        is_million_city = city in MILLION_PLUS_CITIES if city else False
+        
+        companies_data.append({
+            "id": yclients_id,
+            "title": name,
+            "city": city,
+            "region": region,
+            "is_million_city": is_million_city,
+        })
+    
+    # Сохраняем в БД
+    async with AsyncSessionLocal() as db:
+        added, updated = await sync_yclients_companies(db, companies_data)
+    
+    logger.info(f"Sync complete: {added} added, {updated} updated")
+    return added, updated
+

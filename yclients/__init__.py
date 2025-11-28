@@ -6,6 +6,7 @@ from .client import (
     get_chain_companies,
     get_all_companies_revenue,
     calculate_network_ranking,
+    sync_companies_to_db,
 )
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "get_chain_companies",
     "get_all_companies_revenue",
     "calculate_network_ranking",
+    "sync_companies_to_db",
 ]
 
 

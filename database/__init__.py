@@ -1,7 +1,18 @@
 # Database module
 
 from .connection import get_db, init_db, close_db, AsyncSessionLocal
-from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory, NetworkRating, NetworkRatingHistory
+from .models import (
+    Base,
+    Partner,
+    Branch,
+    PartnerBranch,
+    PartnerStatus,
+    BroadcastHistory,
+    NetworkRating,
+    NetworkRatingHistory,
+    YClientsCompany,
+    PartnerCompany,
+)
 from .crud import (
     get_partner_by_telegram_id,
     get_partner_by_phone,
@@ -25,6 +36,12 @@ from .crud import (
     save_rating_history,
     get_rating_history,
     get_previous_month_ranks,
+    # YClients Companies
+    sync_yclients_companies,
+    get_all_yclients_companies,
+    get_yclients_company_by_id,
+    link_partner_to_company,
+    get_partner_companies,
 )
 
 __all__ = [
@@ -40,6 +57,9 @@ __all__ = [
     "PartnerBranch",
     "PartnerStatus",
     "NetworkRating",
+    "NetworkRatingHistory",
+    "YClientsCompany",
+    "PartnerCompany",
     # CRUD
     "get_partner_by_telegram_id",
     "get_partner_by_phone",
@@ -60,5 +80,14 @@ __all__ = [
     "get_network_rating_by_company",
     "update_network_rating",
     "get_all_network_ratings",
+    "save_rating_history",
+    "get_rating_history",
+    "get_previous_month_ranks",
+    # YClients Companies
+    "sync_yclients_companies",
+    "get_all_yclients_companies",
+    "get_yclients_company_by_id",
+    "link_partner_to_company",
+    "get_partner_companies",
 ]
 
