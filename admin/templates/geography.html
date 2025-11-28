@@ -3,11 +3,64 @@
 {% block title %}География сети — Borodach Admin{% endblock %}
 
 {% block content %}
+<style>
+    .expandable-row {
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .expandable-row:hover {
+        background: var(--bg-main) !important;
+    }
+    .expand-icon {
+        display: inline-block;
+        width: 20px;
+        transition: transform 0.2s;
+    }
+    .expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+    .salons-list {
+        display: none;
+        background: var(--bg-main);
+        border-radius: 8px;
+        margin: 0.5rem 0;
+        padding: 0.75rem;
+    }
+    .salons-list.show {
+        display: block;
+    }
+    .salon-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.375rem 0.5rem;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.8125rem;
+    }
+    .salon-item:last-child {
+        border-bottom: none;
+    }
+    .salon-name {
+        color: var(--text);
+        flex: 1;
+    }
+    .salon-rank {
+        color: var(--text-muted);
+        margin-right: 1rem;
+        min-width: 50px;
+    }
+    .salon-revenue {
+        color: var(--success);
+        font-weight: 500;
+        min-width: 100px;
+        text-align: right;
+    }
+</style>
+
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
     <h1>🗺 География сети</h1>
 </div>
 
-<!-- Миллионники vs остальные -->
+<!-- Общая статистика -->
 <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
     <div class="stat-card">
         <div class="stat-value">{{ geo.total_salons }}</div>
@@ -27,78 +80,92 @@
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-    <!-- По регионам -->
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">📍 По регионам/областям</div>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Регион</th>
-                    <th style="text-align: right;">Салонов</th>
-                    <th style="text-align: right;">Выручка</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for region, data in geo.by_region.items() %}
-                <tr>
-                    <td style="font-weight: 500;">{{ region }}</td>
-                    <td style="text-align: right;">
-                        <span class="badge badge-verified">{{ data.count }}</span>
-                    </td>
-                    <td style="text-align: right; color: var(--success); font-weight: 500;">
-                        {{ "{:,.0f}".format(data.revenue).replace(",", " ") }} ₽
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<!-- Миллионники и Регионы -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">📍 Города-миллионники и регионы</div>
+        <span class="text-muted" style="font-size: 0.875rem;">Нажмите на строку чтобы увидеть салоны</span>
     </div>
     
-    <!-- По городам -->
-    <div class="card">
-        <div class="card-header">
-            <div class="card-title">🏙 По городам (топ-20)</div>
-        </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Город</th>
-                    <th style="text-align: right;">Салонов</th>
-                    <th style="text-align: right;">Выручка</th>
-                    <th style="text-align: right;">Ср. чек</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for city, data in (geo.by_city.items() | list)[:20] %}
-                <tr>
-                    <td>
-                        <span style="font-weight: 500;">{{ city }}</span>
-                        {% if city.lower() in ['москва', 'санкт-петербург', 'спб', 'казань', 'екатеринбург', 'новосибирск', 'нижний новгород', 'красноярск', 'челябинск', 'самара', 'уфа', 'ростов-на-дону', 'омск', 'краснодар', 'воронеж', 'пермь', 'волгоград'] %}
-                        <span style="font-size: 0.75rem; color: var(--accent);">★ млн</span>
-                        {% endif %}
-                    </td>
-                    <td style="text-align: right;">
-                        <span class="badge badge-verified">{{ data.count }}</span>
-                    </td>
-                    <td style="text-align: right; color: var(--success); font-weight: 500;">
-                        {{ "{:,.0f}".format(data.revenue).replace(",", " ") }} ₽
-                    </td>
-                    <td style="text-align: right; color: var(--text-muted);">
-                        {{ "{:,.0f}".format(data.avg_check).replace(",", " ") }} ₽
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% if geo.by_city|length > 20 %}
-        <div style="padding: 1rem; text-align: center; color: var(--text-muted); font-size: 0.875rem;">
-            ... и ещё {{ geo.by_city|length - 20 }} городов
-        </div>
-        {% endif %}
-    </div>
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40px;"></th>
+                <th>Город / Регион</th>
+                <th style="text-align: right;">Салонов</th>
+                <th style="text-align: right;">Выручка</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Города-миллионники -->
+            {% if geo.millionniki %}
+            <tr style="background: var(--accent-light);">
+                <td colspan="4" style="font-weight: 600; color: var(--accent); padding: 0.5rem 1rem;">
+                    🏙 Города-миллионники
+                </td>
+            </tr>
+            {% for city in geo.millionniki %}
+            <tr class="expandable-row" onclick="toggleSalons('millionnik-{{ loop.index }}', this)">
+                <td><span class="expand-icon">▶</span></td>
+                <td style="font-weight: 500;">{{ city.name }}</td>
+                <td style="text-align: right;">
+                    <span class="badge badge-verified">{{ city.count }}</span>
+                </td>
+                <td style="text-align: right; color: var(--success); font-weight: 500;">
+                    {{ "{:,.0f}".format(city.revenue).replace(",", " ") }} ₽
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="padding: 0;">
+                    <div id="millionnik-{{ loop.index }}" class="salons-list">
+                        {% for salon in city.salons %}
+                        <div class="salon-item">
+                            <span class="salon-rank">#{{ salon.rank }}</span>
+                            <span class="salon-name">{{ salon.name }}</span>
+                            <span class="salon-revenue">{{ "{:,.0f}".format(salon.revenue).replace(",", " ") }} ₽</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+            
+            <!-- Регионы/Области -->
+            {% if geo.regions %}
+            <tr style="background: var(--warning-light);">
+                <td colspan="4" style="font-weight: 600; color: #b45309; padding: 0.5rem 1rem; margin-top: 1rem;">
+                    🗺 Регионы / Области
+                </td>
+            </tr>
+            {% for region in geo.regions %}
+            <tr class="expandable-row" onclick="toggleSalons('region-{{ loop.index }}', this)">
+                <td><span class="expand-icon">▶</span></td>
+                <td style="font-weight: 500;">{{ region.name }}</td>
+                <td style="text-align: right;">
+                    <span class="badge badge-warning">{{ region.count }}</span>
+                </td>
+                <td style="text-align: right; color: var(--success); font-weight: 500;">
+                    {{ "{:,.0f}".format(region.revenue).replace(",", " ") }} ₽
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="padding: 0;">
+                    <div id="region-{{ loop.index }}" class="salons-list">
+                        {% for salon in region.salons %}
+                        <div class="salon-item">
+                            <span class="salon-rank">#{{ salon.rank }}</span>
+                            <span class="salon-name">{{ salon.name }}</span>
+                            <span class="salon-revenue">{{ "{:,.0f}".format(salon.revenue).replace(",", " ") }} ₽</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
 </div>
 
 <!-- Выручка: миллионники vs остальные -->
@@ -147,5 +214,19 @@
     </div>
 </div>
 {% endif %}
-{% endblock %}
 
+<script>
+function toggleSalons(id, row) {
+    const list = document.getElementById(id);
+    const icon = row.querySelector('.expand-icon');
+    
+    if (list.classList.contains('show')) {
+        list.classList.remove('show');
+        icon.classList.remove('expanded');
+    } else {
+        list.classList.add('show');
+        icon.classList.add('expanded');
+    }
+}
+</script>
+{% endblock %}

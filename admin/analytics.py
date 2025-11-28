@@ -239,11 +239,9 @@ def analyze_geography(ratings: list) -> dict:
     Returns:
         {
             "total_salons": int,
-            "millionniki_count": int,
-            "millionniki_percent": float,
-            "other_count": int,
+            "millionniki": [{"name": "Москва", "count": 10, "revenue": 1000000, "salons": [...]}, ...],
+            "regions": [{"name": "Московская область", "count": 20, "revenue": 5000000, "salons": [...]}, ...],
             "by_city": {"Москва": {"count": 10, "revenue": 1000000}, ...},
-            "by_region": {"Центральный ФО": {"count": 20, "revenue": 5000000}, ...},
             "unknown_cities": ["Непонятное название", ...]
         }
     """
@@ -253,8 +251,10 @@ def analyze_geography(ratings: list) -> dict:
         "millionniki_revenue": 0,
         "other_count": 0,
         "other_revenue": 0,
-        "by_city": defaultdict(lambda: {"count": 0, "revenue": 0, "avg_check": 0}),
-        "by_region": defaultdict(lambda: {"count": 0, "revenue": 0}),
+        "millionniki": [],  # Города-миллионники с салонами
+        "regions": [],      # Области с салонами
+        "by_city": defaultdict(lambda: {"count": 0, "revenue": 0, "avg_check": 0, "salons": []}),
+        "by_region": defaultdict(lambda: {"count": 0, "revenue": 0, "salons": []}),
         "unknown_cities": [],
     }
     
@@ -263,11 +263,18 @@ def analyze_geography(ratings: list) -> dict:
         revenue = r.revenue or 0
         avg_check = getattr(r, 'avg_check', 0) or 0
         
+        salon_info = {
+            "name": r.company_name,
+            "revenue": revenue,
+            "avg_check": avg_check,
+            "rank": r.rank,
+        }
+        
         if city:
             # По городам
             result["by_city"][city]["count"] += 1
             result["by_city"][city]["revenue"] += revenue
-            # Средний чек - берём среднее
+            result["by_city"][city]["salons"].append(salon_info)
             if avg_check > 0:
                 current_avg = result["by_city"][city]["avg_check"]
                 current_count = result["by_city"][city]["count"]
@@ -275,12 +282,13 @@ def analyze_geography(ratings: list) -> dict:
                     (current_avg * (current_count - 1) + avg_check) / current_count
                 )
             
-            # По регионам
+            # По регионам (области) - все салоны включая миллионники
             region = get_region(city)
             result["by_region"][region]["count"] += 1
             result["by_region"][region]["revenue"] += revenue
+            result["by_region"][region]["salons"].append(salon_info)
             
-            # Миллионники vs остальные
+            # Миллионники vs остальные (для статистики)
             if is_millionnik(city):
                 result["millionniki_count"] += 1
                 result["millionniki_revenue"] += revenue
@@ -301,17 +309,46 @@ def analyze_geography(ratings: list) -> dict:
         result["millionniki_percent"] = 0
         result["other_percent"] = 0
     
-    # Конвертируем defaultdict в обычный dict для сортировки
+    # Формируем список миллионников (только города где мы есть)
+    millionnik_cities = ["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", 
+                        "Казань", "Нижний Новгород", "Красноярск", "Челябинск",
+                        "Самара", "Уфа", "Ростов-на-Дону", "Омск", "Краснодар",
+                        "Воронеж", "Пермь", "Волгоград"]
+    
+    for city in millionnik_cities:
+        if city in result["by_city"]:
+            data = result["by_city"][city]
+            result["millionniki"].append({
+                "name": city,
+                "count": data["count"],
+                "revenue": data["revenue"],
+                "avg_check": data["avg_check"],
+                "salons": sorted(data["salons"], key=lambda x: x["revenue"], reverse=True),
+            })
+    
+    # Сортируем миллионники по количеству салонов
+    result["millionniki"] = sorted(result["millionniki"], key=lambda x: x["count"], reverse=True)
+    
+    # Формируем список регионов (области)
+    for region, data in result["by_region"].items():
+        if region != "Не определено":
+            result["regions"].append({
+                "name": region,
+                "count": data["count"],
+                "revenue": data["revenue"],
+                "salons": sorted(data["salons"], key=lambda x: x["revenue"], reverse=True),
+            })
+    
+    # Сортируем регионы по количеству салонов
+    result["regions"] = sorted(result["regions"], key=lambda x: x["count"], reverse=True)
+    
+    # Конвертируем defaultdict в обычный dict
     result["by_city"] = dict(sorted(
         result["by_city"].items(), 
         key=lambda x: x[1]["count"], 
         reverse=True
     ))
-    result["by_region"] = dict(sorted(
-        result["by_region"].items(), 
-        key=lambda x: x[1]["count"], 
-        reverse=True
-    ))
+    result["by_region"] = dict(result["by_region"])
     
     return result
 
