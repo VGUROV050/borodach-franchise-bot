@@ -318,17 +318,29 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             total_completed += completed
             
             stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
-            if company.city:
-                stats_text += f"   📍 {company.city}\n"
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
             
-            # Получаем место в рейтинге сети и средний чек
+            # Получаем место в рейтинге сети, изменение и средний чек
             async with AsyncSessionLocal() as db:
                 rating = await get_network_rating_by_company(db, yclients_id)
             
             if rating and rating.rank > 0:
-                stats_text += f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}\n"
+                # Место в рейтинге
+                rank_text = f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}"
+                
+                # Изменение позиции (если есть данные за прошлый месяц)
+                if rating.previous_rank and rating.previous_rank > 0:
+                    change = rating.previous_rank - rating.rank
+                    if change > 0:
+                        rank_text += f" <b>↑{change}</b> 📈"
+                    elif change < 0:
+                        rank_text += f" <b>↓{abs(change)}</b> 📉"
+                    else:
+                        rank_text += " ➡️"
+                
+                stats_text += rank_text + "\n"
+                
                 if rating.avg_check > 0:
                     stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
         else:
