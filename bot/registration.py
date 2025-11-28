@@ -93,14 +93,6 @@ async def _process_contact(message: types.Message, state: FSMContext) -> None:
     )
 
 
-# Fallback: контакт без состояния (после перезапуска бота)
-@router.message(F.contact)
-async def registration_contact_fallback(message: types.Message, state: FSMContext) -> None:
-    """Получили контакт без FSM состояния — начинаем регистрацию."""
-    logger.info(f"Contact received without state, processing as registration: {message.from_user.id}")
-    await _process_contact(message, state)
-
-
 @router.message(RegistrationStates.waiting_for_contact, F.text == BTN_CANCEL_REGISTRATION)
 async def registration_contact_cancel(message: types.Message, state: FSMContext) -> None:
     """Отмена на этапе контакта."""
@@ -382,3 +374,25 @@ async def registration_cancel_fallback(message: types.Message, state: FSMContext
         "Для доступа к боту необходимо пройти регистрацию.",
         reply_markup=registration_start_keyboard(),
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Fallback: контакт без состояния (ДОЛЖЕН БЫТЬ В КОНЦЕ!)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.contact)
+async def registration_contact_fallback(message: types.Message, state: FSMContext) -> None:
+    """
+    Получили контакт без FSM состояния — начинаем регистрацию.
+    ВАЖНО: Этот хендлер должен быть ПОСЛЕДНИМ, чтобы не перехватывать
+    контакты, когда уже активно другое состояние регистрации.
+    """
+    current_state = await state.get_state()
+    
+    # Если пользователь уже в процессе регистрации, игнорируем
+    if current_state is not None:
+        logger.info(f"Contact ignored, user {message.from_user.id} already in state: {current_state}")
+        return
+    
+    logger.info(f"Contact received without state, processing as registration: {message.from_user.id}")
+    await _process_contact(message, state)
