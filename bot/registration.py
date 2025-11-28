@@ -59,6 +59,7 @@ async def registration_contact(message: types.Message, state: FSMContext) -> Non
 
 async def _process_contact(message: types.Message, state: FSMContext) -> None:
     """Обработка контакта (общая логика)."""
+    logger.info(f"_process_contact called: user={message.from_user.id}")
     contact = message.contact
     
     # Проверяем, что это контакт самого пользователя
@@ -81,6 +82,9 @@ async def _process_contact(message: types.Message, state: FSMContext) -> None:
     
     await state.update_data(phone=phone)
     await state.set_state(RegistrationStates.waiting_for_full_name)
+    
+    current_state = await state.get_state()
+    logger.info(f"State set to: {current_state} for user {message.from_user.id}")
     
     await message.answer(
         f"✅ Телефон: <b>{phone}</b>\n\n"
@@ -144,6 +148,8 @@ async def registration_name_contact_ignored(message: types.Message, state: FSMCo
 @router.message(RegistrationStates.waiting_for_full_name, F.text)
 async def registration_full_name(message: types.Message, state: FSMContext) -> None:
     """Получили ФИО → запрашиваем барбершоп."""
+    logger.info(f"registration_full_name called: user={message.from_user.id}, text={message.text}")
+    
     if message.text == BTN_CANCEL_REGISTRATION:
         return  # Обрабатывается другим хендлером
     
