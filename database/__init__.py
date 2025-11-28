@@ -1,7 +1,7 @@
 # Database module
 
 from .connection import get_db, init_db, close_db, AsyncSessionLocal
-from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory
+from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory, NetworkRating
 from .crud import (
     get_partner_by_telegram_id,
     get_partner_by_phone,
@@ -19,6 +19,9 @@ from .crud import (
     delete_partner,
     clear_partner_pending_branch,
     get_partners_with_pending_branches,
+    get_network_rating_by_company,
+    update_network_rating,
+    get_all_network_ratings,
 )
 
 __all__ = [
@@ -33,6 +36,7 @@ __all__ = [
     "Branch",
     "PartnerBranch",
     "PartnerStatus",
+    "NetworkRating",
     # CRUD
     "get_partner_by_telegram_id",
     "get_partner_by_phone",
@@ -50,5 +54,8 @@ __all__ = [
     "delete_partner",
     "clear_partner_pending_branch",
     "get_partners_with_pending_branches",
+    "get_network_rating_by_company",
+    "update_network_rating",
+    "get_all_network_ratings",
 ]
 

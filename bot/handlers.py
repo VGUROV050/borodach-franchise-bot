@@ -272,7 +272,7 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             await message.answer("❌ Партнёр не найден", reply_markup=main_menu_keyboard())
             return
         
-        from database import get_partner_branches
+        from database import get_partner_branches, get_network_rating_by_company
         partner_branches = await get_partner_branches(db, partner.id)
     
     if not partner_branches:
@@ -321,6 +321,13 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             stats_text += f"\n🏢 <b>{branch_name}</b>\n"
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
+            
+            # Получаем место в рейтинге сети
+            async with AsyncSessionLocal() as db:
+                rating = await get_network_rating_by_company(db, branch.yclients_id)
+            
+            if rating and rating.rank > 0:
+                stats_text += f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}\n"
         else:
             stats_text += f"\n🏢 <b>{branch_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"

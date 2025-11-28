@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 import httpx
 
-from config.settings import YCLIENTS_PARTNER_TOKEN, YCLIENTS_USER_TOKEN
+from config.settings import YCLIENTS_PARTNER_TOKEN, YCLIENTS_USER_TOKEN, YCLIENTS_CHAIN_ID
 
 logger = logging.getLogger(__name__)
 
@@ -202,4 +202,150 @@ async def get_monthly_revenue(company_id: str) -> dict:
             "success": False,
             "error": str(e),
         }
+
+
+async def get_chain_companies(chain_id: str = None) -> list[dict]:
+    """
+    Получить список всех салонов в сети.
+    
+    Returns:
+        Список словарей с информацией о салонах:
+        [{"id": "123", "title": "Салон 1"}, ...]
+    """
+    chain_id = chain_id or YCLIENTS_CHAIN_ID
+    api = YClientsAPI()
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            # Эндпоинт для получения салонов сети
+            url = f"{BASE_URL}/chain/{chain_id}/companies"
+            
+            response = await client.get(
+                url,
+                headers=api.headers,
+                timeout=60.0,
+            )
+            
+            logger.info(f"YClients chain companies: status={response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success"):
+                    companies = data.get("data", [])
+                    logger.info(f"Found {len(companies)} companies in chain {chain_id}")
+                    return companies
+                else:
+                    logger.error(f"YClients chain error: {data}")
+                    return []
+            else:
+                logger.error(f"YClients chain error: {response.status_code} - {response.text}")
+                return []
+                
+    except Exception as e:
+        logger.error(f"YClients chain exception: {e}")
+        return []
+
+
+async def get_all_companies_revenue() -> list[dict]:
+    """
+    Получить выручку всех салонов сети за текущий месяц.
+    
+    Returns:
+        Список словарей с данными:
+        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0}, ...]
+    """
+    # Получаем список салонов сети
+    companies = await get_chain_companies()
+    
+    if not companies:
+        logger.error("No companies found in chain")
+        return []
+    
+    results = []
+    api = YClientsAPI()
+    
+    # Получаем даты текущего месяца
+    today = datetime.now()
+    start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    date_from = start_of_month.strftime("%Y-%m-%d")
+    date_to = today.strftime("%Y-%m-%d")
+    
+    logger.info(f"Fetching revenue for {len(companies)} companies...")
+    
+    async with httpx.AsyncClient() as client:
+        for i, company in enumerate(companies):
+            company_id = str(company.get("id"))
+            company_name = company.get("title", f"Салон {company_id}")
+            
+            try:
+                url = f"{BASE_URL}/company/{company_id}/analytics/overall/"
+                params = {"date_from": date_from, "date_to": date_to}
+                
+                response = await client.get(
+                    url,
+                    headers=api.headers,
+                    params=params,
+                    timeout=30.0,
+                )
+                
+                revenue = 0.0
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        analytics = data.get("data", {})
+                        income_stats = analytics.get("income_total_stats", {})
+                        revenue_str = income_stats.get("current_sum", "0")
+                        revenue = float(revenue_str.replace(",", ".").replace(" ", "") if revenue_str else 0)
+                
+                results.append({
+                    "company_id": company_id,
+                    "company_name": company_name,
+                    "revenue": revenue,
+                })
+                
+                # Логируем прогресс каждые 20 салонов
+                if (i + 1) % 20 == 0:
+                    logger.info(f"Processed {i + 1}/{len(companies)} companies")
+                    
+            except Exception as e:
+                logger.error(f"Error fetching revenue for {company_id}: {e}")
+                results.append({
+                    "company_id": company_id,
+                    "company_name": company_name,
+                    "revenue": 0.0,
+                })
+    
+    logger.info(f"Finished fetching revenue for {len(results)} companies")
+    return results
+
+
+async def calculate_network_ranking() -> list[dict]:
+    """
+    Рассчитать рейтинг всех салонов сети по выручке.
+    
+    Returns:
+        Список словарей с рейтингом (отсортирован по выручке DESC):
+        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "rank": 1}, ...]
+    """
+    # Получаем выручку всех салонов
+    all_revenue = await get_all_companies_revenue()
+    
+    if not all_revenue:
+        return []
+    
+    # Сортируем по выручке (от большей к меньшей)
+    sorted_companies = sorted(all_revenue, key=lambda x: x["revenue"], reverse=True)
+    
+    # Присваиваем места
+    total = len(sorted_companies)
+    for i, company in enumerate(sorted_companies):
+        company["rank"] = i + 1
+        company["total_companies"] = total
+    
+    logger.info(f"Calculated ranking for {total} companies. Top 3: {sorted_companies[:3]}")
+    
+    return sorted_companies
 

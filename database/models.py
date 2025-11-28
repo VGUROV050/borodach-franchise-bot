@@ -9,7 +9,9 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
+    Integer,
     String,
     Text,
     func,
@@ -176,4 +178,37 @@ class BroadcastHistory(Base):
     
     def __repr__(self) -> str:
         return f"<BroadcastHistory {self.id}: {self.sent_at}>"
+
+
+class NetworkRating(Base):
+    """Рейтинг салонов в сети (кэш, обновляется ночью)."""
+    
+    __tablename__ = "network_rating"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # YClients ID салона
+    yclients_company_id: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    
+    # Название салона (из YClients)
+    company_name: Mapped[str] = mapped_column(String(255))
+    
+    # Выручка за текущий месяц
+    revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Место в рейтинге (1 = лидер)
+    rank: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    
+    # Всего салонов в сети
+    total_companies: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Когда обновлено
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<NetworkRating {self.company_name}: #{self.rank}>"
 

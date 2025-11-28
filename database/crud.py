@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import Partner, Branch, PartnerBranch, PartnerStatus
+from .models import Partner, Branch, PartnerBranch, PartnerStatus, NetworkRating
 
 logger = logging.getLogger(__name__)
 
@@ -342,6 +342,67 @@ async def get_partners_with_pending_branches(
             Partner.has_pending_branch == True,
         )
         .order_by(Partner.created_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Network Rating CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+async def get_network_rating_by_company(
+    db: AsyncSession,
+    yclients_company_id: str,
+) -> Optional[NetworkRating]:
+    """Получить рейтинг салона по YClients ID."""
+    result = await db.execute(
+        select(NetworkRating).where(NetworkRating.yclients_company_id == yclients_company_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_network_rating(
+    db: AsyncSession,
+    yclients_company_id: str,
+    company_name: str,
+    revenue: float,
+    rank: int,
+    total_companies: int,
+) -> NetworkRating:
+    """Обновить или создать запись рейтинга салона."""
+    result = await db.execute(
+        select(NetworkRating).where(NetworkRating.yclients_company_id == yclients_company_id)
+    )
+    rating = result.scalar_one_or_none()
+    
+    if rating:
+        # Обновляем существующую запись
+        rating.company_name = company_name
+        rating.revenue = revenue
+        rating.rank = rank
+        rating.total_companies = total_companies
+    else:
+        # Создаём новую запись
+        rating = NetworkRating(
+            yclients_company_id=yclients_company_id,
+            company_name=company_name,
+            revenue=revenue,
+            rank=rank,
+            total_companies=total_companies,
+        )
+        db.add(rating)
+    
+    await db.commit()
+    await db.refresh(rating)
+    return rating
+
+
+async def get_all_network_ratings(
+    db: AsyncSession,
+) -> list[NetworkRating]:
+    """Получить весь рейтинг сети."""
+    result = await db.execute(
+        select(NetworkRating).order_by(NetworkRating.rank)
     )
     return list(result.scalars().all())
 
