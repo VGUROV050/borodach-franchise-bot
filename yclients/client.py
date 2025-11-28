@@ -185,21 +185,42 @@ async def get_monthly_revenue(company_id: str) -> dict:
         total_revenue = 0.0
         completed_count = 0
         
+        # Логируем первые 3 записи для отладки
+        if all_records:
+            logger.info(f"YClients first record sample: {all_records[0]}")
+            if len(all_records) > 1:
+                logger.info(f"YClients second record sample: {all_records[1]}")
+        
         for record in all_records:
             # Статусы: -1 = отменена, 0 = ожидание, 1 = подтверждена, 2 = пришел/завершена
             attendance = record.get("attendance", 0)
-            
-            # Считаем только завершённые записи (attendance = 1 или 2, или visit = 1)
             visit = record.get("visit", 0)
             
-            if visit == 1 or attendance == 2:
+            # Пробуем разные варианты для определения завершённости
+            # visit=1 означает "клиент пришёл"
+            # attendance: -1=отменена, 0=ожидает, 1=подтверждена, 2=пришёл
+            
+            is_completed = visit == 1 or attendance == 2
+            
+            if is_completed:
                 completed_count += 1
                 
-                # Суммируем стоимость услуг
+                # Вариант 1: стоимость из services
                 services = record.get("services", [])
                 for service in services:
                     cost = float(service.get("cost", 0) or 0)
                     total_revenue += cost
+                
+                # Вариант 2: если services пустой, берём цену из самой записи
+                if not services:
+                    # Пробуем разные поля цены
+                    record_cost = (
+                        float(record.get("cost", 0) or 0) or
+                        float(record.get("price", 0) or 0) or
+                        float(record.get("sum", 0) or 0) or
+                        float(record.get("total_sum", 0) or 0)
+                    )
+                    total_revenue += record_cost
         
         logger.info(f"YClients stats for {company_id}: total_records={len(all_records)}, completed={completed_count}, revenue={total_revenue}")
         

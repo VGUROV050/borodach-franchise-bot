@@ -69,3 +69,4 @@ def require_auth(request: Request) -> str:
     
     return token
 
+

@@ -38,3 +38,4 @@ app.include_router(router)
 # Настраиваем шаблоны
 templates = Jinja2Templates(directory=f"{BASE_DIR}/admin/templates")
 
+
