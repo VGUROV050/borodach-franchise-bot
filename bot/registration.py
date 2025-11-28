@@ -202,6 +202,8 @@ async def registration_barbershop_contact_ignored(message: types.Message, state:
 @router.message(RegistrationStates.waiting_for_barbershop, F.text)
 async def registration_barbershop(message: types.Message, state: FSMContext) -> None:
     """Получили барбершоп → спрашиваем про ещё барбершопы."""
+    logger.info(f"registration_barbershop called: user={message.from_user.id}, text={message.text}")
+    
     if message.text == BTN_CANCEL_REGISTRATION:
         return  # Обрабатывается другим хендлером
     
@@ -221,14 +223,21 @@ async def registration_barbershop(message: types.Message, state: FSMContext) -> 
     await state.update_data(barbershops=barbershops)
     await state.set_state(RegistrationStates.waiting_for_more_barbershops)
     
+    logger.info(f"Barbershop added, state set to waiting_for_more_barbershops, user={message.from_user.id}")
+    
     # Формируем список барбершопов для отображения
     barbershops_list = "\n".join([f"  • {b}" for b in barbershops])
+    
+    # Отправляем сообщение с клавиатурой
+    keyboard = add_more_barbershops_keyboard()
+    logger.info(f"Sending keyboard with buttons: {[btn.text for row in keyboard.keyboard for btn in row]}")
     
     await message.answer(
         f"✅ <b>Барбершоп добавлен:</b> {barbershop_text}\n\n"
         f"<b>Ваши барбершопы ({len(barbershops)}):</b>\n{barbershops_list}\n\n"
-        "Хотите добавить ещё барбершоп?",
-        reply_markup=add_more_barbershops_keyboard(),
+        "Хотите добавить ещё барбершоп?\n\n"
+        "Нажмите кнопку ниже 👇",
+        reply_markup=keyboard,
     )
 
 
