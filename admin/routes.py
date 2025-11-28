@@ -675,9 +675,12 @@ async def network_rating_page(request: Request):
     from database import get_all_network_ratings
     
     async with AsyncSessionLocal() as db:
-        ratings = await get_all_network_ratings(db)
+        all_ratings = await get_all_network_ratings(db)
     
-    # Статистика
+    # Фильтруем салоны с нулевой выручкой
+    ratings = [r for r in all_ratings if r.revenue > 0]
+    
+    # Статистика (только по активным салонам)
     total_companies = len(ratings)
     total_revenue = sum(r.revenue for r in ratings) if ratings else 0
     avg_revenue = total_revenue / total_companies if total_companies > 0 else 0
