@@ -56,34 +56,30 @@ async def load_current_rating():
     return ranking
 
 
-async def save_as_previous_month(ranking: list):
+def get_prev_month(year: int, month: int) -> tuple[int, int]:
+    """Получить предыдущий месяц."""
+    if month == 1:
+        return year - 1, 12
+    return year, month - 1
+
+
+async def save_history_for_month(ranking: list, year: int, month: int):
     """
-    Сохранить текущий рейтинг как историю за предыдущий месяц.
-    Это позволит сразу видеть изменения позиций.
+    Сохранить рейтинг как историю за указанный месяц.
     """
-    today = datetime.now(ZoneInfo("Europe/Moscow"))
-    
-    # Определяем прошлый месяц
-    if today.month == 1:
-        prev_year = today.year - 1
-        prev_month = 12
-    else:
-        prev_year = today.year
-        prev_month = today.month - 1
-    
-    logger.info(f"Сохраняем историю за {prev_year}-{prev_month:02d}...")
+    logger.info(f"Сохраняем историю за {year}-{month:02d}...")
     
     async with AsyncSessionLocal() as db:
         # Проверяем, есть ли уже данные за этот период
         existing = await db.execute(
             select(NetworkRatingHistory).where(
-                NetworkRatingHistory.year == prev_year,
-                NetworkRatingHistory.month == prev_month
+                NetworkRatingHistory.year == year,
+                NetworkRatingHistory.month == month
             ).limit(1)
         )
         if existing.scalar():
-            logger.info(f"История за {prev_year}-{prev_month:02d} уже существует, пропускаем")
-            return
+            logger.info(f"История за {year}-{month:02d} уже существует, пропускаем")
+            return False
         
         # Сохраняем историю
         total_companies = ranking[0]["total_companies"] if ranking else 0
@@ -95,14 +91,35 @@ async def save_as_previous_month(ranking: list):
                 avg_check=company.get("avg_check", 0.0),
                 rank=company["rank"],
                 total_companies=total_companies,
-                year=prev_year,
-                month=prev_month,
+                year=year,
+                month=month,
             )
             db.add(history)
         
         await db.commit()
     
-    logger.info(f"История за {prev_year}-{prev_month:02d} сохранена ({len(ranking)} записей)")
+    logger.info(f"История за {year}-{month:02d} сохранена ({len(ranking)} записей)")
+    return True
+
+
+async def save_history_for_two_months(ranking: list):
+    """
+    Сохранить текущий рейтинг как историю за 2 предыдущих месяца.
+    Это нужно для:
+    - Вкладка "Прошлый месяц": октябрь vs сентябрь
+    - Вкладка "Текущий месяц": ноябрь vs октябрь
+    """
+    today = datetime.now(ZoneInfo("Europe/Moscow"))
+    
+    # Прошлый месяц (октябрь)
+    prev_year, prev_month = get_prev_month(today.year, today.month)
+    
+    # Позапрошлый месяц (сентябрь)
+    prev_prev_year, prev_prev_month = get_prev_month(prev_year, prev_month)
+    
+    # Сохраняем историю за оба месяца
+    await save_history_for_month(ranking, prev_year, prev_month)
+    await save_history_for_month(ranking, prev_prev_year, prev_prev_month)
 
 
 async def update_current_with_previous_ranks():
@@ -164,8 +181,11 @@ async def main():
         logger.error("Не удалось загрузить рейтинг")
         return
     
-    # 2. Сохраняем как историю за прошлый месяц
-    await save_as_previous_month(ranking)
+    # 2. Сохраняем как историю за 2 предыдущих месяца (октябрь и сентябрь)
+    # Это позволит сравнивать:
+    # - Октябрь vs Сентябрь (вкладка "Прошлый месяц")
+    # - Ноябрь vs Октябрь (вкладка "Текущий месяц")
+    await save_history_for_two_months(ranking)
     
     # 3. Обновляем текущий рейтинг с previous_rank
     await update_current_with_previous_ranks()

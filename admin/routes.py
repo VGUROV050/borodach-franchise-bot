@@ -685,30 +685,66 @@ async def network_rating_page(request: Request, period: str = "current"):
         9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
     }
     
+    # Вспомогательная функция для получения предыдущего месяца
+    def get_prev_month(year, month):
+        if month == 1:
+            return year - 1, 12
+        return year, month - 1
+    
     if period == "previous":
-        # Прошлый месяц из истории
-        if today.month == 1:
-            prev_year = today.year - 1
-            prev_month = 12
-        else:
-            prev_year = today.year
-            prev_month = today.month - 1
+        # Прошлый полный месяц (октябрь)
+        prev_year, prev_month = get_prev_month(today.year, today.month)
+        
+        # Позапрошлый месяц для сравнения (сентябрь)
+        prev_prev_year, prev_prev_month = get_prev_month(prev_year, prev_month)
         
         async with AsyncSessionLocal() as db:
+            # Данные за прошлый месяц (октябрь)
             history_ratings = await get_rating_history(db, prev_year, prev_month)
+            
+            # Данные за позапрошлый месяц (сентябрь) для сравнения
+            prev_prev_ratings = await get_rating_history(db, prev_prev_year, prev_prev_month)
         
-        # Фильтруем салоны с выручкой > 0
-        ratings = [r for r in history_ratings if r.revenue > 0]
+        # Создаём словарь рангов за позапрошлый месяц
+        prev_ranks = {r.yclients_company_id: r.rank for r in prev_prev_ratings}
+        
+        # Добавляем previous_rank к каждому рейтингу
+        ratings_with_change = []
+        for r in history_ratings:
+            if r.revenue > 0:
+                # Создаём объект с дополнительным полем
+                r.previous_rank = prev_ranks.get(r.yclients_company_id, 0)
+                ratings_with_change.append(r)
+        
+        ratings = ratings_with_change
         period_name = f"{month_names[prev_month]} {prev_year}"
+        compare_period = f"vs {month_names[prev_prev_month]}"
         last_update = ratings[0].created_at if ratings else None
     else:
-        # Текущий месяц
-        async with AsyncSessionLocal() as db:
-            all_ratings = await get_all_network_ratings(db)
+        # Текущий месяц (ноябрь - неполный)
+        # Прошлый месяц для сравнения (октябрь)
+        prev_year, prev_month = get_prev_month(today.year, today.month)
         
-        # Фильтруем салоны с выручкой > 0
-        ratings = [r for r in all_ratings if r.revenue > 0]
+        async with AsyncSessionLocal() as db:
+            # Текущие данные
+            all_ratings = await get_all_network_ratings(db)
+            
+            # Данные за прошлый месяц для сравнения
+            prev_ratings = await get_rating_history(db, prev_year, prev_month)
+        
+        # Создаём словарь рангов за прошлый месяц
+        prev_ranks = {r.yclients_company_id: r.rank for r in prev_ratings}
+        
+        # Добавляем previous_rank к каждому рейтингу
+        ratings_with_change = []
+        for r in all_ratings:
+            if r.revenue > 0:
+                r.previous_rank = prev_ranks.get(r.yclients_company_id, 0)
+                ratings_with_change.append(r)
+        
+        ratings = ratings_with_change
         period_name = f"{month_names[today.month]} {today.year}"
+        compare_period = f"vs {month_names[prev_month]}"
         last_update = ratings[0].updated_at if ratings else None
     
     # Статистика
@@ -727,6 +763,7 @@ async def network_rating_page(request: Request, period: str = "current"):
             "last_update": last_update,
             "period": period,
             "period_name": period_name,
+            "compare_period": compare_period,
         },
     )
 
