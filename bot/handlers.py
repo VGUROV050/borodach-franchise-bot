@@ -475,7 +475,7 @@ async def new_task_start(message: types.Message, state: FSMContext) -> None:
 
 @router.message(NewTaskStates.waiting_for_department, F.text.in_(DEPT_BUTTON_TO_KEY.keys()))
 async def new_task_department(message: types.Message, state: FSMContext) -> None:
-    """Шаг 1: Получили отдел → спрашиваем барбершоп."""
+    """Шаг 1: Получили отдел → показываем барбершопы пользователя."""
     dept_key = DEPT_BUTTON_TO_KEY[message.text]
     dept_info = DEPARTMENTS[dept_key]
     
@@ -487,6 +487,15 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
         )
         return
     
+    # Получаем барбершопы пользователя
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        if partner:
+            from database import get_partner_companies
+            companies = await get_partner_companies(db, partner.id)
+        else:
+            companies = []
+    
     await state.update_data(
         department_key=dept_key,
         department_name=dept_info["name"],
@@ -496,12 +505,22 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
     )
     await state.set_state(NewTaskStates.waiting_for_barbershop)
     
-    await message.answer(
-        f"✅ Отдел: <b>{dept_info['name']}</b>\n\n"
-        "📍 <b>По какому барбершопу вы хотите поставить задачу?</b>\n\n"
-        "Укажите город, ТЦ или адрес:",
-        reply_markup=cancel_keyboard(),
-    )
+    if companies:
+        # Показываем кнопки с барбершопами
+        from bot.keyboards import barbershop_select_keyboard
+        await message.answer(
+            f"✅ Отдел: <b>{dept_info['name']}</b>\n\n"
+            "💈 <b>Выберите барбершоп:</b>",
+            reply_markup=barbershop_select_keyboard(companies),
+        )
+    else:
+        # Нет привязанных барбершопов - просим ввести текстом
+        await message.answer(
+            f"✅ Отдел: <b>{dept_info['name']}</b>\n\n"
+            "📍 <b>По какому барбершопу вы хотите поставить задачу?</b>\n\n"
+            "У вас нет привязанных барбершопов. Укажите город, ТЦ или адрес:",
+            reply_markup=cancel_keyboard(),
+        )
 
 
 @router.message(NewTaskStates.waiting_for_department)
@@ -520,11 +539,26 @@ async def new_task_department_invalid(message: types.Message, state: FSMContext)
 @router.message(NewTaskStates.waiting_for_barbershop)
 async def new_task_barbershop(message: types.Message, state: FSMContext) -> None:
     """Шаг 2: Получили барбершоп → спрашиваем заголовок."""
-    barbershop = message.text.strip()
+    text = message.text.strip()
+    
+    # Проверяем отмену
+    if text == BTN_MAIN_MENU:
+        await state.clear()
+        await message.answer(
+            "🏠 <b>Главное меню</b>\n\nВыберите раздел:",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+    
+    # Убираем префикс 💈 если он есть (выбор кнопкой)
+    if text.startswith("💈 "):
+        barbershop = text[2:].strip()
+    else:
+        barbershop = text
     
     if not barbershop:
         await message.answer(
-            "Пожалуйста, укажите барбершоп:",
+            "Пожалуйста, выберите или укажите барбершоп:",
             reply_markup=cancel_keyboard(),
         )
         return
@@ -533,6 +567,7 @@ async def new_task_barbershop(message: types.Message, state: FSMContext) -> None
     await state.set_state(NewTaskStates.waiting_for_title)
     
     await message.answer(
+        f"💈 Барбершоп: <b>{barbershop}</b>\n\n"
         "✏️ <b>Введите краткое название задачи:</b>\n\n"
         "Например: «Обновить цены» или «Добавить сотрудника в Yclients»",
         reply_markup=cancel_keyboard(),

@@ -101,6 +101,28 @@ def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
 branches_menu_keyboard = barbershops_menu_keyboard
 
 
+def barbershop_select_keyboard(barbershops: list) -> ReplyKeyboardMarkup:
+    """
+    Клавиатура для выбора барбершопа при создании задачи.
+    barbershops - список объектов с атрибутом .name
+    """
+    keyboard_rows = []
+    
+    # Добавляем кнопки барбершопов (по 1 в ряд для читаемости)
+    for barbershop in barbershops:
+        name = barbershop.name if hasattr(barbershop, 'name') else str(barbershop)
+        keyboard_rows.append([KeyboardButton(text=f"💈 {name}")])
+    
+    # Добавляем кнопку отмены
+    keyboard_rows.append([KeyboardButton(text=BTN_MAIN_MENU)])
+    
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard_rows,
+        resize_keyboard=True,
+        input_field_placeholder="Выберите барбершоп",
+    )
+
+
 def back_keyboard() -> ReplyKeyboardMarkup:
     """Клавиатура с кнопкой назад."""
     keyboard = ReplyKeyboardMarkup(
