@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Рейтинг сети — Borodach Admin{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h1>🏆 Рейтинг сети</h1>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        {% if last_update %}
+        <span class="text-muted" style="font-size: 0.875rem;">
+            Обновлено: {{ last_update.strftime('%d.%m.%Y %H:%M') }}
+        </span>
+        {% endif %}
+        <a href="/network-rating/refresh" class="btn btn-primary" onclick="return confirm('Обновить рейтинг сейчас? Это займёт 3-5 минут.');">
+            🔄 Обновить сейчас
+        </a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ total_companies }}</div>
+        <div class="stat-label">Салонов в сети</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--success);">{{ "{:,.0f}".format(total_revenue).replace(",", " ") }} ₽</div>
+        <div class="stat-label">Общая выручка сети</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" style="color: var(--warning);">{{ "{:,.0f}".format(avg_revenue).replace(",", " ") }} ₽</div>
+        <div class="stat-label">Средняя выручка</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Рейтинг салонов по выручке за текущий месяц</div>
+    </div>
+    
+    {% if ratings %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 80px;">Место</th>
+                <th>Салон</th>
+                <th style="text-align: right;">Выручка</th>
+                <th style="text-align: right; width: 120px;">% от сети</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in ratings %}
+            <tr>
+                <td>
+                    {% if r.rank == 1 %}
+                    <span style="font-size: 1.5rem;">🥇</span>
+                    {% elif r.rank == 2 %}
+                    <span style="font-size: 1.5rem;">🥈</span>
+                    {% elif r.rank == 3 %}
+                    <span style="font-size: 1.5rem;">🥉</span>
+                    {% else %}
+                    <span style="font-weight: 600; color: var(--text-muted);">{{ r.rank }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div style="font-weight: 500;">{{ r.company_name }}</div>
+                    <div class="text-muted" style="font-size: 0.8125rem;">ID: {{ r.yclients_company_id }}</div>
+                </td>
+                <td style="text-align: right;">
+                    <span style="font-weight: 600; color: var(--success);">
+                        {{ "{:,.0f}".format(r.revenue).replace(",", " ") }} ₽
+                    </span>
+                </td>
+                <td style="text-align: right;">
+                    {% if total_revenue > 0 %}
+                    <span class="text-muted">{{ "%.1f"|format(r.revenue / total_revenue * 100) }}%</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+        <p>Данные рейтинга ещё не загружены.</p>
+        <p style="margin-top: 0.5rem;">Нажмите "Обновить сейчас" или дождитесь автоматического обновления в 1:00 МСК.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

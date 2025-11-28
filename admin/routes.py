@@ -661,3 +661,55 @@ async def send_broadcast(
         status_code=302
     )
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Network Rating
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/network-rating", response_class=HTMLResponse)
+async def network_rating_page(request: Request):
+    """Страница рейтинга сети."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_network_ratings
+    
+    async with AsyncSessionLocal() as db:
+        ratings = await get_all_network_ratings(db)
+    
+    # Статистика
+    total_companies = len(ratings)
+    total_revenue = sum(r.revenue for r in ratings) if ratings else 0
+    avg_revenue = total_revenue / total_companies if total_companies > 0 else 0
+    last_update = ratings[0].updated_at if ratings else None
+    
+    return templates.TemplateResponse(
+        "network_rating.html",
+        {
+            "request": request,
+            "ratings": ratings,
+            "total_companies": total_companies,
+            "total_revenue": total_revenue,
+            "avg_revenue": avg_revenue,
+            "last_update": last_update,
+        },
+    )
+
+
+@router.get("/network-rating/refresh")
+async def network_rating_refresh(request: Request):
+    """Принудительное обновление рейтинга."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from scheduler import update_network_rating_now
+    import asyncio
+    
+    # Запускаем обновление в фоне
+    asyncio.create_task(update_network_rating_now())
+    
+    logger.info("Manual network rating refresh triggered from admin panel")
+    
+    # Редиректим обратно с сообщением
+    return RedirectResponse(url="/network-rating?refresh=started", status_code=302)
+
