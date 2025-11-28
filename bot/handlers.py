@@ -958,49 +958,83 @@ def _get_stage_emoji(stage_name: str) -> str:
     return "📋"
 
 
+def _extract_barbershop_from_title(title: str) -> tuple[str, str]:
+    """
+    Извлечь барбершоп из названия задачи.
+    Формат названия: [Барбершоп] Заголовок
+    
+    Returns:
+        (barbershop, clean_title)
+    """
+    import re
+    match = re.match(r'\[(.+?)\]\s*(.+)', title)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+    return "Не указан", title
+
+
 def _format_tasks_list(tasks: list, title: str) -> str:
-    """Форматировать список задач, сгруппированных по отделам и этапам."""
+    """Форматировать список задач: Барбершоп → Отдел → Статус."""
     if not tasks:
         return "📭 <b>Задач не найдено</b>"
     
-    # Группируем по отделам, затем по этапам
-    depts_dict: dict[str, dict[str, list]] = {}
+    # Группируем: барбершоп → отдел → статус → задачи
+    grouped: dict[str, dict[str, dict[str, list]]] = {}
     
     for task in tasks:
+        full_title = task.get("title", "Без названия")
+        barbershop, clean_title = _extract_barbershop_from_title(full_title)
         dept_name = task.get("department_name", "Без отдела")
         stage_name = task.get("stage_name", "") or "Без этапа"
         
-        if dept_name not in depts_dict:
-            depts_dict[dept_name] = {}
-        if stage_name not in depts_dict[dept_name]:
-            depts_dict[dept_name][stage_name] = []
+        # Сохраняем чистый заголовок в задаче
+        task["clean_title"] = clean_title
         
-        depts_dict[dept_name][stage_name].append(task)
+        if barbershop not in grouped:
+            grouped[barbershop] = {}
+        if dept_name not in grouped[barbershop]:
+            grouped[barbershop][dept_name] = {}
+        if stage_name not in grouped[barbershop][dept_name]:
+            grouped[barbershop][dept_name][stage_name] = []
+        
+        grouped[barbershop][dept_name][stage_name].append(task)
     
-    lines = [f"📋 <b>{title}</b>\n"]
+    lines = [f"📋 <b>{title}</b>"]
     
-    for dept_name, stages in depts_dict.items():
-        # Заголовок отдела
-        lines.append(f"\n<b>{dept_name}</b>")
+    # Если только один барбершоп - не показываем группировку
+    single_barbershop = len(grouped) == 1
+    
+    for barbershop, departments in grouped.items():
+        if not single_barbershop:
+            lines.append(f"\n💈 <b>{barbershop}</b>")
         
-        # Сортируем этапы в нужном порядке
-        sorted_stages = sorted(stages.keys(), key=_get_stage_sort_key)
-        
-        for stage_name in sorted_stages:
-            stage_tasks = stages[stage_name]
-            emoji = _get_stage_emoji(stage_name)
-            lines.append(f"  <i>{emoji} {stage_name}:</i>")
+        for dept_name, stages in departments.items():
+            if single_barbershop:
+                lines.append(f"\n<b>{dept_name}</b>")
+            else:
+                lines.append(f"  📁 <i>{dept_name}</i>")
             
-            for task in stage_tasks:
-                task_id = task.get("id", "?")
-                title_text = task.get("title", "Без названия")
-                date_str = _format_task_date(task.get("createdDate", ""))
+            # Сортируем этапы в нужном порядке
+            sorted_stages = sorted(stages.keys(), key=_get_stage_sort_key)
+            
+            for stage_name in sorted_stages:
+                stage_tasks = stages[stage_name]
+                emoji = _get_stage_emoji(stage_name)
                 
-                if len(title_text) > 55:
-                    title_text = title_text[:52] + "..."
+                indent = "  " if single_barbershop else "    "
+                lines.append(f"{indent}<i>{emoji} {stage_name}:</i>")
                 
-                date_display = f" • {date_str}" if date_str else ""
-                lines.append(f"    • <b>#{task_id}</b> — {title_text}{date_display}")
+                for task in stage_tasks:
+                    task_id = task.get("id", "?")
+                    title_text = task.get("clean_title", "Без названия")
+                    date_str = _format_task_date(task.get("createdDate", ""))
+                    
+                    if len(title_text) > 50:
+                        title_text = title_text[:47] + "..."
+                    
+                    date_display = f" • {date_str}" if date_str else ""
+                    task_indent = "    " if single_barbershop else "      "
+                    lines.append(f"{task_indent}• <b>#{task_id}</b> — {title_text}{date_display}")
     
     return "\n".join(lines)
 
