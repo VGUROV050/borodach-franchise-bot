@@ -264,7 +264,7 @@ async def update_partner_for_branch_request(
     partner_id: int,
     branch_text: str,
 ) -> Optional[Partner]:
-    """Обновить партнёра: добавить заявку на новый филиал."""
+    """Обновить партнёра: добавить заявку на новый барбершоп."""
     result = await db.execute(
         select(Partner).where(Partner.id == partner_id)
     )
@@ -273,13 +273,10 @@ async def update_partner_for_branch_request(
     if not partner:
         return None
     
-    # Добавляем текст филиала к существующим (если есть)
-    if partner.branches_text:
-        partner.branches_text = f"{partner.branches_text}\n---\n{branch_text}"
-    else:
-        partner.branches_text = branch_text
+    # Заменяем текст заявки (не добавляем к старому)
+    partner.branches_text = branch_text
     
-    # Если партнёр уже верифицирован, помечаем что есть запрос на новый филиал
+    # Помечаем что есть запрос на новый барбершоп
     partner.has_pending_branch = True
     
     await db.commit()
@@ -326,7 +323,7 @@ async def clear_partner_pending_branch(
     db: AsyncSession,
     partner_id: int,
 ) -> Optional[Partner]:
-    """Очистить флаг ожидающего филиала."""
+    """Очистить флаг и текст заявки на барбершоп."""
     result = await db.execute(
         select(Partner).where(Partner.id == partner_id)
     )
@@ -336,6 +333,7 @@ async def clear_partner_pending_branch(
         return None
     
     partner.has_pending_branch = False
+    partner.branches_text = None  # Очищаем текст заявки
     
     await db.commit()
     await db.refresh(partner)
