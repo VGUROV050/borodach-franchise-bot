@@ -4,7 +4,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 # Константы для текста кнопок (используются и в handlers)
 BTN_TASKS = "📋 Задачи"
-BTN_MY_BRANCHES = "🏢 Мои филиалы"
+BTN_MY_BARBERSHOPS = "💈 Мои барбершопы"
 BTN_STATISTICS = "📊 Статистика"
 BTN_BACK = "⬅️ Назад"
 BTN_MAIN_MENU = "🏠 Главное меню"
@@ -13,11 +13,13 @@ BTN_MAIN_MENU = "🏠 Главное меню"
 BTN_NEW_TASK = "🆕 Новая задача"
 BTN_MY_TASKS = "📋 Мои задачи"
 
-# Подменю филиалов
-BTN_ADD_BRANCH = "➕ Добавить филиал"
+# Подменю барбершопов
+BTN_ADD_BARBERSHOP = "➕ Добавить барбершоп"
 
-# Для совместимости (старое название)
+# Для совместимости (старые названия)
 BTN_CANCEL = BTN_MAIN_MENU
+BTN_MY_BRANCHES = BTN_MY_BARBERSHOPS  # Для обратной совместимости
+BTN_ADD_BRANCH = BTN_ADD_BARBERSHOP   # Для обратной совместимости
 
 # Кнопки отделов
 BTN_DEPT_DEVELOPMENT = "🚀 Отдел Развития"
@@ -41,9 +43,12 @@ BTN_REJECT_CANCEL = "❌ Нет"
 
 # Кнопки регистрации
 BTN_START_REGISTRATION = "📝 Пройти регистрацию"
-BTN_ADD_MORE_BRANCH = "➕ Добавить ещё филиал"
+BTN_ADD_MORE_BARBERSHOP = "➕ Добавить ещё барбершоп"
 BTN_FINISH_REGISTRATION = "✅ Завершить регистрацию"
 BTN_CANCEL_REGISTRATION = "❌ Отменить"
+
+# Для обратной совместимости
+BTN_ADD_MORE_BRANCH = BTN_ADD_MORE_BARBERSHOP
 
 # Маппинг кнопок на ключи отделов (для handlers)
 DEPT_BUTTON_TO_KEY = {
@@ -57,7 +62,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BRANCHES)],
+            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BARBERSHOPS)],
             [KeyboardButton(text=BTN_STATISTICS)],
         ],
         resize_keyboard=True,
@@ -79,17 +84,21 @@ def tasks_menu_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def branches_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Меню филиалов."""
+def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Меню барбершопов."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_ADD_BRANCH)],
+            [KeyboardButton(text=BTN_ADD_BARBERSHOP)],
             [KeyboardButton(text=BTN_MAIN_MENU)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
     )
     return keyboard
+
+
+# Для обратной совместимости
+branches_menu_keyboard = barbershops_menu_keyboard
 
 
 def back_keyboard() -> ReplyKeyboardMarkup:
@@ -249,17 +258,21 @@ def cancel_registration_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def add_more_branches_keyboard() -> ReplyKeyboardMarkup:
-    """Клавиатура добавления филиалов."""
+def add_more_barbershops_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура добавления барбершопов."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_ADD_MORE_BRANCH)],
+            [KeyboardButton(text=BTN_ADD_MORE_BARBERSHOP)],
             [KeyboardButton(text=BTN_FINISH_REGISTRATION)],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Добавить филиал или завершить?",
+        input_field_placeholder="Добавить барбершоп или завершить?",
     )
     return keyboard
+
+
+# Для обратной совместимости
+add_more_branches_keyboard = add_more_barbershops_keyboard
 
 
 def pending_verification_keyboard() -> ReplyKeyboardMarkup:

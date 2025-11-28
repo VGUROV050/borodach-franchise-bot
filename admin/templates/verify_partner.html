@@ -80,19 +80,19 @@
             
             {% if partner.branches_text %}
             <div class="partner-branches mt-2">
-                <strong>🏢 Филиалы (текст от партнёра):</strong>
+                <strong>💈 Барбершопы (текст от партнёра):</strong>
                 <pre style="margin-top: 0.5rem; background: var(--bg-main); padding: 1rem; border-radius: 8px; white-space: pre-wrap;">{{ partner.branches_text }}</pre>
             </div>
             {% endif %}
         </div>
         
         <div>
-            <h3 class="mb-1" style="font-size: 1rem; color: var(--text-muted);">🔗 Привязка к салонам</h3>
+            <h3 class="mb-1" style="font-size: 1rem; color: var(--text-muted);">🔗 Привязка к барбершопам</h3>
             
             <form method="post" action="/partners/{{ partner.id }}/verify">
                 {% if companies %}
                 <p class="text-muted mb-1" style="font-size: 0.9rem;">
-                    Выберите салоны YClients, к которым относится партнёр:
+                    Выберите барбершопы, к которым относится партнёр:
                 </p>
                 
                 <input type="text" id="companySearch" class="search-input" 

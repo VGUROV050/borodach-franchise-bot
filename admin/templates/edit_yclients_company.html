@@ -3,7 +3,7 @@
 {% block title %}Редактирование — {{ company.name }}{% endblock %}
 
 {% block content %}
-<h1 class="mb-2">✏️ Редактирование салона</h1>
+<h1 class="mb-2">✏️ Редактирование барбершопа</h1>
 
 <div class="card">
     <div class="card-header">
@@ -56,7 +56,7 @@
                 <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">⚙️ Настройки</h3>
                 
                 <div class="form-group">
-                    <label class="form-label">Статус салона:</label>
+                    <label class="form-label">Статус барбершопа:</label>
                     <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px; transition: all 0.2s;"
                                class="status-option" data-status="active">
@@ -64,7 +64,7 @@
                                    style="width: 18px; height: 18px; accent-color: var(--success);">
                             <span>
                                 <strong style="color: var(--success);">✅ Активен</strong>
-                                <br><small class="text-muted">Салон работает и участвует в статистике</small>
+                                <br><small class="text-muted">Барбершоп работает и участвует в статистике</small>
                             </span>
                         </label>
                         <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px; transition: all 0.2s;"
@@ -73,7 +73,7 @@
                                    style="width: 18px; height: 18px; accent-color: var(--danger);">
                             <span>
                                 <strong style="color: var(--danger);">❌ Неактивен</strong>
-                                <br><small class="text-muted">Салон не работает / закрыт</small>
+                                <br><small class="text-muted">Барбершоп не работает / закрыт</small>
                             </span>
                         </label>
                     </div>

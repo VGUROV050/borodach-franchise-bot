@@ -10,10 +10,10 @@ from .keyboards import (
     cancel_registration_keyboard,
     registration_start_keyboard,
     share_contact_keyboard,
-    add_more_branches_keyboard,
+    add_more_barbershops_keyboard,
     BTN_CANCEL_REGISTRATION,
     BTN_START_REGISTRATION,
-    BTN_ADD_MORE_BRANCH,
+    BTN_ADD_MORE_BARBERSHOP,
     BTN_FINISH_REGISTRATION,
 )
 
@@ -25,8 +25,8 @@ router = Router()
 class RegistrationStates(StatesGroup):
     waiting_for_contact = State()
     waiting_for_full_name = State()
-    waiting_for_branch = State()
-    waiting_for_more_branches = State()
+    waiting_for_barbershop = State()
+    waiting_for_more_barbershops = State()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -37,7 +37,7 @@ class RegistrationStates(StatesGroup):
 async def registration_start(message: types.Message, state: FSMContext) -> None:
     """Начало регистрации нового партнёра."""
     await state.set_state(RegistrationStates.waiting_for_contact)
-    await state.update_data(branches=[])
+    await state.update_data(barbershops=[])
     
     await message.answer(
         "📝 <b>Регистрация нового партнёра</b>\n\n"
@@ -76,8 +76,8 @@ async def _process_contact(message: types.Message, state: FSMContext) -> None:
     
     # Инициализируем данные если их нет (после перезапуска бота)
     data = await state.get_data()
-    if not data.get("branches"):
-        await state.update_data(branches=[])
+    if not data.get("barbershops"):
+        await state.update_data(barbershops=[])
     
     await state.update_data(phone=phone)
     await state.set_state(RegistrationStates.waiting_for_full_name)
@@ -134,7 +134,7 @@ async def registration_name_cancel(message: types.Message, state: FSMContext) ->
 
 @router.message(RegistrationStates.waiting_for_full_name)
 async def registration_full_name(message: types.Message, state: FSMContext) -> None:
-    """Получили ФИО → запрашиваем филиал."""
+    """Получили ФИО → запрашиваем барбершоп."""
     full_name = message.text.strip()
     
     if len(full_name) < 3:
@@ -145,11 +145,11 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
         return
     
     await state.update_data(full_name=full_name)
-    await state.set_state(RegistrationStates.waiting_for_branch)
+    await state.set_state(RegistrationStates.waiting_for_barbershop)
     
     await message.answer(
         f"✅ ФИО: <b>{full_name}</b>\n\n"
-        "🏢 <b>Укажите ваш филиал</b>\n\n"
+        "💈 <b>Укажите ваш барбершоп</b>\n\n"
         "Напишите как вам удобно, например:\n"
         "• Москва, Мега Тёплый Стан\n"
         "• Казань, ТЦ Кольцо\n"
@@ -159,12 +159,12 @@ async def registration_full_name(message: types.Message, state: FSMContext) -> N
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Шаг 3: Филиал
+# Шаг 3: Барбершоп
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(RegistrationStates.waiting_for_branch, F.text == BTN_CANCEL_REGISTRATION)
-async def registration_branch_cancel(message: types.Message, state: FSMContext) -> None:
-    """Отмена на этапе филиала."""
+@router.message(RegistrationStates.waiting_for_barbershop, F.text == BTN_CANCEL_REGISTRATION)
+async def registration_barbershop_cancel(message: types.Message, state: FSMContext) -> None:
+    """Отмена на этапе барбершопа."""
     await state.clear()
     await message.answer(
         "❌ Регистрация отменена.",
@@ -172,52 +172,52 @@ async def registration_branch_cancel(message: types.Message, state: FSMContext) 
     )
 
 
-@router.message(RegistrationStates.waiting_for_branch)
-async def registration_branch(message: types.Message, state: FSMContext) -> None:
-    """Получили филиал → спрашиваем про ещё филиалы."""
-    branch_text = message.text.strip()
+@router.message(RegistrationStates.waiting_for_barbershop)
+async def registration_barbershop(message: types.Message, state: FSMContext) -> None:
+    """Получили барбершоп → спрашиваем про ещё барбершопы."""
+    barbershop_text = message.text.strip()
     
-    if len(branch_text) < 3:
+    if len(barbershop_text) < 3:
         await message.answer(
-            "⚠️ Пожалуйста, укажите филиал подробнее:",
+            "⚠️ Пожалуйста, укажите барбершоп подробнее:",
             reply_markup=cancel_registration_keyboard(),
         )
         return
     
     data = await state.get_data()
-    branches = data.get("branches", [])
-    branches.append(branch_text)
+    barbershops = data.get("barbershops", [])
+    barbershops.append(barbershop_text)
     
-    await state.update_data(branches=branches)
-    await state.set_state(RegistrationStates.waiting_for_more_branches)
+    await state.update_data(barbershops=barbershops)
+    await state.set_state(RegistrationStates.waiting_for_more_barbershops)
     
-    # Формируем список филиалов для отображения
-    branches_list = "\n".join([f"  • {b}" for b in branches])
+    # Формируем список барбершопов для отображения
+    barbershops_list = "\n".join([f"  • {b}" for b in barbershops])
     
     await message.answer(
-        f"✅ <b>Филиал добавлен:</b> {branch_text}\n\n"
-        f"<b>Ваши филиалы ({len(branches)}):</b>\n{branches_list}\n\n"
-        "Хотите добавить ещё филиал?",
-        reply_markup=add_more_branches_keyboard(),
+        f"✅ <b>Барбершоп добавлен:</b> {barbershop_text}\n\n"
+        f"<b>Ваши барбершопы ({len(barbershops)}):</b>\n{barbershops_list}\n\n"
+        "Хотите добавить ещё барбершоп?",
+        reply_markup=add_more_barbershops_keyboard(),
     )
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Шаг 4: Ещё филиалы или завершение
+# Шаг 4: Ещё барбершопы или завершение
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(RegistrationStates.waiting_for_more_branches, F.text == BTN_ADD_MORE_BRANCH)
+@router.message(RegistrationStates.waiting_for_more_barbershops, F.text == BTN_ADD_MORE_BARBERSHOP)
 async def registration_add_more(message: types.Message, state: FSMContext) -> None:
-    """Пользователь хочет добавить ещё филиал."""
-    await state.set_state(RegistrationStates.waiting_for_branch)
+    """Пользователь хочет добавить ещё барбершоп."""
+    await state.set_state(RegistrationStates.waiting_for_barbershop)
     
     await message.answer(
-        "🏢 Укажите следующий филиал:",
+        "💈 Укажите следующий барбершоп:",
         reply_markup=cancel_registration_keyboard(),
     )
 
 
-@router.message(RegistrationStates.waiting_for_more_branches, F.text == BTN_FINISH_REGISTRATION)
+@router.message(RegistrationStates.waiting_for_more_barbershops, F.text == BTN_FINISH_REGISTRATION)
 async def registration_finish(message: types.Message, state: FSMContext) -> None:
     """Завершение регистрации — сохраняем в БД."""
     data = await state.get_data()
@@ -225,10 +225,10 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
     user = message.from_user
     full_name = data.get("full_name")
     phone = data.get("phone")
-    branches = data.get("branches", [])
+    barbershops = data.get("barbershops", [])
     
-    # Формируем текст филиалов для сохранения
-    branches_text = "\n".join(branches) if branches else None
+    # Формируем текст барбершопов для сохранения
+    branches_text = "\n".join(barbershops) if barbershops else None
     
     processing_msg = await message.answer("⏳ Сохраняю данные...")
     
@@ -245,13 +245,13 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
                 branches_text=branches_text,
             )
         
-        branches_list = "\n".join([f"  • {b}" for b in branches])
+        barbershops_list = "\n".join([f"  • {b}" for b in barbershops])
         
         await processing_msg.edit_text(
             "✅ <b>Заявка на регистрацию отправлена!</b>\n\n"
             f"👤 ФИО: {full_name}\n"
             f"📱 Телефон: {phone}\n"
-            f"🏢 Филиалы:\n{branches_list}\n\n"
+            f"💈 Барбершопы:\n{barbershops_list}\n\n"
             "⏳ Ваша заявка будет рассмотрена администратором.\n"
             "Мы уведомим вас о результате.",
         )
@@ -263,7 +263,7 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
             reply_markup=pending_verification_keyboard(),
         )
         
-        logger.info(f"New partner registration: {user.id} ({full_name}), branches: {branches}")
+        logger.info(f"New partner registration: {user.id} ({full_name}), barbershops: {barbershops}")
         
     except Exception as e:
         logger.error(f"Failed to create partner: {e}")
@@ -275,12 +275,12 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
     await state.clear()
 
 
-@router.message(RegistrationStates.waiting_for_more_branches)
+@router.message(RegistrationStates.waiting_for_more_barbershops)
 async def registration_more_invalid(message: types.Message, state: FSMContext) -> None:
     """Неверный выбор."""
     await message.answer(
         "⚠️ Выберите действие из кнопок ниже:",
-        reply_markup=add_more_branches_keyboard(),
+        reply_markup=add_more_barbershops_keyboard(),
     )
 
 

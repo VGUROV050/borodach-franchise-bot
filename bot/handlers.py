@@ -14,7 +14,7 @@ from database import AsyncSessionLocal, get_partner_by_telegram_id, PartnerStatu
 from .keyboards import (
     main_menu_keyboard,
     tasks_menu_keyboard,
-    branches_menu_keyboard,
+    barbershops_menu_keyboard,
     cancel_keyboard,
     department_keyboard,
     confirm_description_keyboard,
@@ -26,10 +26,10 @@ from .keyboards import (
     registration_start_keyboard,
     pending_verification_keyboard,
     BTN_TASKS,
-    BTN_MY_BRANCHES,
+    BTN_MY_BARBERSHOPS,
     BTN_STATISTICS,
     BTN_MAIN_MENU,
-    BTN_ADD_BRANCH,
+    BTN_ADD_BARBERSHOP,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -67,7 +67,7 @@ router = Router()
 
 class NewTaskStates(StatesGroup):
     waiting_for_department = State()
-    waiting_for_branch = State()
+    waiting_for_barbershop = State()
     waiting_for_title = State()
     waiting_for_description = State()
     waiting_for_confirm = State()
@@ -81,8 +81,8 @@ class CancelTaskStates(StatesGroup):
     waiting_for_confirm = State()
 
 
-class AddBranchStates(StatesGroup):
-    waiting_for_branch_text = State()
+class AddBarbershopStates(StatesGroup):
+    waiting_for_barbershop_text = State()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -150,12 +150,12 @@ async def tasks_menu_handler(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Мои филиалы
+# Мои барбершопы
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(F.text == BTN_MY_BRANCHES)
-async def my_branches_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать салоны пользователя."""
+@router.message(F.text == BTN_MY_BARBERSHOPS)
+async def my_barbershops_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать барбершопы пользователя."""
     if not await _check_verified(message):
         return
     
@@ -175,31 +175,31 @@ async def my_branches_handler(message: types.Message, state: FSMContext) -> None
             for c in companies
         ])
         text = (
-            f"🏢 <b>Ваши салоны</b>\n\n"
+            f"💈 <b>Ваши барбершопы</b>\n\n"
             f"{companies_text}\n\n"
-            "Вы можете запросить добавление ещё одного салона, нажав кнопку ниже."
+            "Вы можете запросить добавление ещё одного барбершопа."
         )
     else:
         text = (
-            "🏢 <b>Ваши салоны</b>\n\n"
-            "У вас пока нет привязанных салонов.\n\n"
-            "Нажмите кнопку ниже, чтобы запросить добавление салона."
+            "💈 <b>Ваши барбершопы</b>\n\n"
+            "У вас пока нет привязанных барбершопов.\n\n"
+            "Нажмите кнопку ниже, чтобы запросить добавление."
         )
     
-    await message.answer(text, reply_markup=branches_menu_keyboard())
+    await message.answer(text, reply_markup=barbershops_menu_keyboard())
 
 
-@router.message(F.text == BTN_ADD_BRANCH)
-async def add_branch_start(message: types.Message, state: FSMContext) -> None:
-    """Начало добавления филиала."""
+@router.message(F.text == BTN_ADD_BARBERSHOP)
+async def add_barbershop_start(message: types.Message, state: FSMContext) -> None:
+    """Начало добавления барбершопа."""
     if not await _check_verified(message):
         return
     
-    await state.set_state(AddBranchStates.waiting_for_branch_text)
+    await state.set_state(AddBarbershopStates.waiting_for_barbershop_text)
     
     await message.answer(
-        "🏢 <b>Добавление филиала</b>\n\n"
-        "Укажите информацию о вашем филиале:\n"
+        "💈 <b>Добавление барбершопа</b>\n\n"
+        "Укажите информацию о вашем барбершопе:\n"
         "• Город\n"
         "• Адрес\n"
         "• Название (если есть)\n\n"
@@ -208,9 +208,9 @@ async def add_branch_start(message: types.Message, state: FSMContext) -> None:
     )
 
 
-@router.message(AddBranchStates.waiting_for_branch_text)
-async def add_branch_process(message: types.Message, state: FSMContext) -> None:
-    """Обработка текста филиала."""
+@router.message(AddBarbershopStates.waiting_for_barbershop_text)
+async def add_barbershop_process(message: types.Message, state: FSMContext) -> None:
+    """Обработка текста барбершопа."""
     if message.text == BTN_MAIN_MENU:
         await state.clear()
         await message.answer(
@@ -219,9 +219,9 @@ async def add_branch_process(message: types.Message, state: FSMContext) -> None:
         )
         return
     
-    branch_text = message.text.strip()
+    barbershop_text = message.text.strip()
     
-    if len(branch_text) < 5:
+    if len(barbershop_text) < 5:
         await message.answer(
             "❌ Слишком короткое описание. Пожалуйста, укажите город и адрес.",
             reply_markup=cancel_keyboard(),
@@ -233,28 +233,28 @@ async def add_branch_process(message: types.Message, state: FSMContext) -> None:
         
         if partner:
             from database import update_partner_for_branch_request
-            await update_partner_for_branch_request(db, partner.id, branch_text)
+            await update_partner_for_branch_request(db, partner.id, barbershop_text)
     
     await state.clear()
     
     await message.answer(
-        "✅ <b>Заявка на добавление филиала отправлена!</b>\n\n"
-        f"📍 {branch_text}\n\n"
-        "Администратор рассмотрит вашу заявку и привяжет филиал.\n"
-        "Вы получите уведомление, когда филиал будет добавлен.",
+        "✅ <b>Заявка на добавление барбершопа отправлена!</b>\n\n"
+        f"📍 {barbershop_text}\n\n"
+        "Администратор рассмотрит вашу заявку и привяжет барбершоп.\n"
+        "Вы получите уведомление, когда барбершоп будет добавлен.",
         reply_markup=main_menu_keyboard(),
     )
     
-    logger.info(f"Partner {message.from_user.id} requested new branch: {branch_text}")
+    logger.info(f"Partner {message.from_user.id} requested new barbershop: {barbershop_text}")
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Статистика по филиалам (YClients)
+# Статистика по барбершопам (YClients)
 # ═══════════════════════════════════════════════════════════════════
 
 @router.message(F.text == BTN_STATISTICS)
 async def statistics_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать статистику по филиалам из YClients."""
+    """Показать статистику по барбершопам из YClients."""
     if not await _check_verified(message):
         return
     
@@ -271,20 +271,20 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             await message.answer("❌ Партнёр не найден", reply_markup=main_menu_keyboard())
             return
         
-        from database import get_partner_branches, get_network_rating_by_company
-        partner_branches = await get_partner_branches(db, partner.id)
+        from database import get_partner_companies, get_network_rating_by_company
+        companies = await get_partner_companies(db, partner.id)
     
-    if not partner_branches:
+    if not companies:
         await loading_msg.delete()
         await message.answer(
-            "📊 <b>Статистика по филиалам</b>\n\n"
-            "У вас пока нет привязанных филиалов.\n"
+            "📊 <b>Статистика по барбершопам</b>\n\n"
+            "У вас пока нет привязанных барбершопов.\n"
             "Обратитесь к администратору для привязки.",
             reply_markup=main_menu_keyboard(),
         )
         return
     
-    # Получаем статистику по каждому филиалу
+    # Получаем статистику по каждому барбершопу
     from yclients import get_monthly_revenue
     
     stats_text = "📊 <b>Статистика за текущий месяц</b>\n"
@@ -292,17 +292,17 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     total_completed = 0
     period = ""
     
-    for pb in partner_branches:
-        branch = pb.branch
-        branch_name = branch.display_name or branch.name or f"{branch.city}, {branch.address}"
+    for company in companies:
+        barbershop_name = company.name
+        yclients_id = company.yclients_id
         
-        if not branch.yclients_id:
-            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+        if not yclients_id:
+            stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
             stats_text += "   ⚠️ YClients ID не указан\n"
             continue
         
         # Получаем выручку
-        result = await get_monthly_revenue(branch.yclients_id)
+        result = await get_monthly_revenue(yclients_id)
         
         if result.get("success"):
             revenue = result.get("revenue", 0)
@@ -317,24 +317,26 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             total_revenue += revenue
             total_completed += completed
             
-            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+            stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
+            if company.city:
+                stats_text += f"   📍 {company.city}\n"
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
             
             # Получаем место в рейтинге сети и средний чек
             async with AsyncSessionLocal() as db:
-                rating = await get_network_rating_by_company(db, branch.yclients_id)
+                rating = await get_network_rating_by_company(db, yclients_id)
             
             if rating and rating.rank > 0:
                 stats_text += f"   🏆 Место в сети: <b>{rating.rank}</b> из {rating.total_companies}\n"
                 if rating.avg_check > 0:
                     stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
         else:
-            stats_text += f"\n🏢 <b>{branch_name}</b>\n"
+            stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"
     
-    # Итого (если несколько филиалов)
-    if len(partner_branches) > 1 and total_revenue > 0:
+    # Итого (если несколько барбершопов)
+    if len(companies) > 1 and total_revenue > 0:
         stats_text += "\n━━━━━━━━━━━━━━━━━━━━━\n"
         stats_text += f"📈 <b>Итого:</b>\n"
         stats_text += f"   💰 Выручка: <b>{total_revenue:,.0f} ₽</b>\n"
@@ -398,7 +400,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
         "Это бот для франчайзи <b>BORODACH</b>.\n\n"
         "Здесь вы можете:\n"
         "• 📋 Работать с задачами\n"
-        "• 🏢 Управлять своими филиалами\n\n"
+        "• 💈 Управлять своими барбершопами\n\n"
         "Выберите раздел в меню ниже 👇",
         reply_markup=main_menu_keyboard(),
     )
@@ -461,7 +463,7 @@ async def new_task_start(message: types.Message, state: FSMContext) -> None:
 
 @router.message(NewTaskStates.waiting_for_department, F.text.in_(DEPT_BUTTON_TO_KEY.keys()))
 async def new_task_department(message: types.Message, state: FSMContext) -> None:
-    """Шаг 1: Получили отдел → спрашиваем филиал."""
+    """Шаг 1: Получили отдел → спрашиваем барбершоп."""
     dept_key = DEPT_BUTTON_TO_KEY[message.text]
     dept_info = DEPARTMENTS[dept_key]
     
@@ -480,11 +482,11 @@ async def new_task_department(message: types.Message, state: FSMContext) -> None
         responsible_id=dept_info["responsible_id"],
         files=[],  # Список для файлов
     )
-    await state.set_state(NewTaskStates.waiting_for_branch)
+    await state.set_state(NewTaskStates.waiting_for_barbershop)
     
     await message.answer(
         f"✅ Отдел: <b>{dept_info['name']}</b>\n\n"
-        "📍 <b>По какому филиалу вы хотите поставить задачу?</b>\n\n"
+        "📍 <b>По какому барбершопу вы хотите поставить задачу?</b>\n\n"
         "Укажите город, ТЦ или адрес:",
         reply_markup=cancel_keyboard(),
     )
@@ -500,27 +502,27 @@ async def new_task_department_invalid(message: types.Message, state: FSMContext)
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Новая задача — Шаг 2: Филиал
+# Новая задача — Шаг 2: Барбершоп
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(NewTaskStates.waiting_for_branch)
-async def new_task_branch(message: types.Message, state: FSMContext) -> None:
-    """Шаг 2: Получили филиал → спрашиваем заголовок."""
-    branch = message.text.strip()
+@router.message(NewTaskStates.waiting_for_barbershop)
+async def new_task_barbershop(message: types.Message, state: FSMContext) -> None:
+    """Шаг 2: Получили барбершоп → спрашиваем заголовок."""
+    barbershop = message.text.strip()
     
-    if not branch:
+    if not barbershop:
         await message.answer(
-            "Пожалуйста, укажите филиал:",
+            "Пожалуйста, укажите барбершоп:",
             reply_markup=cancel_keyboard(),
         )
         return
     
-    await state.update_data(branch=branch)
+    await state.update_data(barbershop=barbershop)
     await state.set_state(NewTaskStates.waiting_for_title)
     
     await message.answer(
         "✏️ <b>Введите краткое название задачи:</b>\n\n"
-        "Например: «Обновить цены в филиале» или «Добавить сотрудника в Yclients»",
+        "Например: «Обновить цены» или «Добавить сотрудника в Yclients»",
         reply_markup=cancel_keyboard(),
     )
 
@@ -576,7 +578,7 @@ async def new_task_description(message: types.Message, state: FSMContext) -> Non
     await message.answer(
         f"📋 <b>Проверьте вашу задачу:</b>\n\n"
         f"🏢 Отдел: {data['department_name']}\n"
-        f"📍 Филиал: {data['branch']}\n"
+        f"📍 Барбершоп: {data['barbershop']}\n"
         f"✏️ Задача: {data['title']}\n\n"
         f"📝 Описание:\n{description}\n\n"
         "Хотите добавить комментарий или продолжить?",
@@ -622,7 +624,7 @@ async def new_task_comment(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         f"📋 <b>Обновлённое описание:</b>\n\n"
         f"🏢 Отдел: {data['department_name']}\n"
-        f"📍 Филиал: {data['branch']}\n"
+        f"📍 Барбершоп: {data['barbershop']}\n"
         f"✏️ Задача: {data['title']}\n\n"
         f"📝 Описание:\n{updated_description}\n\n"
         "Хотите добавить ещё комментарий или продолжить?",
@@ -749,7 +751,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
     group_id = data.get("group_id")
     responsible_id = data.get("responsible_id")
     department_name = data.get("department_name", "Не указан")
-    branch = data.get("branch", "Не указан")
+    barbershop = data.get("barbershop", "Не указан")
     title = data.get("title", "Задача от франчайзи")
     description = data.get("description", "")
     files = data.get("files", [])
@@ -767,7 +769,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
             group_id=group_id,
             responsible_id=responsible_id,
             department_name=department_name,
-            branch=branch,
+            branch=barbershop,  # Передаём barbershop как branch в Bitrix
             title=title,
             description=description,
             telegram_user_id=telegram_user_id,
@@ -818,7 +820,7 @@ async def _create_task_final(message: types.Message, state: FSMContext) -> None:
             f"✅ <b>Задача успешно создана!</b>\n\n"
             f"📌 Номер задачи: <b>#{task_id}</b>\n"
             f"🏢 Отдел: {department_name}\n"
-            f"📍 Филиал: {branch}\n"
+            f"📍 Барбершоп: {barbershop}\n"
             f"✏️ Задача: {title}\n"
             f"🕐 Создана: {created_at}"
             f"{files_text}\n\n"

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Салоны YClients{% endblock %}
+{% block title %}Барбершопы{% endblock %}
 
 {% block content %}
 <style>
@@ -59,7 +59,7 @@
 
 <div class="card">
     <div class="card-header">
-        <div class="card-title">🏢 Салоны YClients</div>
+        <div class="card-title">💈 Барбершопы</div>
         <form action="/yclients-companies/sync" method="POST" style="display: inline;">
             <button type="submit" class="btn btn-primary">
                 🔄 Синхронизировать из YClients
@@ -75,7 +75,7 @@
     
     {% if request.query_params.get('updated') %}
     <div class="alert alert-success" style="margin: 1rem; padding: 0.75rem 1rem; border-radius: 6px; background: var(--success-light); border: 1px solid var(--success);">
-        ✅ Салон успешно обновлён!
+        ✅ Барбершоп успешно обновлён!
     </div>
     {% endif %}
     
@@ -177,7 +177,7 @@
     {% else %}
     <div class="empty-state">
         <div class="empty-state-icon">🏢</div>
-        <div class="empty-state-text">Салоны не найдены</div>
+        <div class="empty-state-text">Барбершопы не найдены</div>
         <div class="text-muted">Нажмите "Синхронизировать", чтобы загрузить список из YClients</div>
     </div>
     {% endif %}
