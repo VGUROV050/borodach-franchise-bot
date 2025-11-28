@@ -539,9 +539,6 @@ async def new_task_department_invalid(message: types.Message, state: FSMContext)
 @router.message(NewTaskStates.waiting_for_barbershop)
 async def new_task_barbershop(message: types.Message, state: FSMContext) -> None:
     """Шаг 2: Получили барбершоп → спрашиваем заголовок."""
-    import logging
-    logging.info(f"new_task_barbershop called with text: {message.text}")
-    
     if not message.text:
         await message.answer("Пожалуйста, выберите барбершоп из списка.")
         return
