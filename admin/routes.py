@@ -1024,21 +1024,138 @@ async def network_rating_refresh(request: Request):
 
 @router.get("/geography", response_class=HTMLResponse)
 async def geography_page(request: Request):
-    """Страница географической аналитики сети."""
+    """Страница географической аналитики сети с использованием yclients_companies."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
-    from database import get_all_network_ratings
-    from .analytics import analyze_geography
+    from sqlalchemy import select
+    from database.models import NetworkRating, YClientsCompany
+    from collections import defaultdict
     
     async with AsyncSessionLocal() as db:
-        all_ratings = await get_all_network_ratings(db)
+        # Получаем все рейтинги
+        ratings_result = await db.execute(
+            select(NetworkRating).where(NetworkRating.revenue > 0)
+        )
+        ratings = list(ratings_result.scalars().all())
+        
+        # Получаем данные о компаниях из yclients_companies (где город уже распарсен)
+        companies_result = await db.execute(select(YClientsCompany))
+        companies = {c.yclients_id: c for c in companies_result.scalars().all()}
     
-    # Фильтруем салоны с выручкой > 0
-    ratings = [r for r in all_ratings if r.revenue > 0]
+    # Собираем географию, используя данные из yclients_companies
+    geo = {
+        "total_salons": len(ratings),
+        "millionniki_count": 0,
+        "millionniki_revenue": 0,
+        "other_count": 0,
+        "other_revenue": 0,
+        "millionniki_percent": 0,
+        "other_percent": 0,
+        "millionniki": [],
+        "regions": [],
+        "unknown_cities": [],
+    }
     
-    # Анализируем географию
-    geo = analyze_geography(ratings)
+    by_city = defaultdict(lambda: {"count": 0, "revenue": 0, "avg_check": 0, "salons": []})
+    by_region = defaultdict(lambda: {"count": 0, "revenue": 0, "salons": []})
+    
+    for r in ratings:
+        company = companies.get(r.yclients_company_id)
+        
+        salon_info = {
+            "name": r.company_name,
+            "revenue": r.revenue or 0,
+            "avg_check": r.avg_check or 0,
+            "rank": r.rank,
+        }
+        
+        if company and company.city:
+            city = company.city
+            region = company.region or "Не определено"
+            is_million = company.is_million_city
+            
+            # По городам
+            by_city[city]["count"] += 1
+            by_city[city]["revenue"] += r.revenue or 0
+            by_city[city]["salons"].append(salon_info)
+            if r.avg_check:
+                current_count = by_city[city]["count"]
+                current_avg = by_city[city]["avg_check"]
+                by_city[city]["avg_check"] = (current_avg * (current_count - 1) + r.avg_check) / current_count
+            
+            # Миллионники vs остальные
+            if is_million:
+                geo["millionniki_count"] += 1
+                geo["millionniki_revenue"] += r.revenue or 0
+            else:
+                geo["other_count"] += 1
+                geo["other_revenue"] += r.revenue or 0
+                # Только НЕ-миллионники идут в регионы
+                by_region[region]["count"] += 1
+                by_region[region]["revenue"] += r.revenue or 0
+                by_region[region]["salons"].append(salon_info)
+        else:
+            # Город не определён - используем старый метод парсинга
+            from .analytics import extract_city_from_name, is_millionnik, get_region
+            city = extract_city_from_name(r.company_name)
+            
+            if city:
+                by_city[city]["count"] += 1
+                by_city[city]["revenue"] += r.revenue or 0
+                by_city[city]["salons"].append(salon_info)
+                
+                if is_millionnik(city):
+                    geo["millionniki_count"] += 1
+                    geo["millionniki_revenue"] += r.revenue or 0
+                else:
+                    geo["other_count"] += 1
+                    geo["other_revenue"] += r.revenue or 0
+                    region = get_region(city)
+                    by_region[region]["count"] += 1
+                    by_region[region]["revenue"] += r.revenue or 0
+                    by_region[region]["salons"].append(salon_info)
+            else:
+                geo["unknown_cities"].append(r.company_name)
+                geo["other_count"] += 1
+                geo["other_revenue"] += r.revenue or 0
+    
+    # Проценты
+    total = geo["total_salons"]
+    if total > 0:
+        geo["millionniki_percent"] = round(geo["millionniki_count"] / total * 100, 1)
+        geo["other_percent"] = round(geo["other_count"] / total * 100, 1)
+    
+    # Формируем список миллионников
+    millionnik_cities = ["Москва", "Санкт-Петербург", "Новосибирск", "Екатеринбург", 
+                        "Казань", "Нижний Новгород", "Красноярск", "Челябинск",
+                        "Самара", "Уфа", "Ростов-на-Дону", "Омск", "Краснодар",
+                        "Воронеж", "Пермь", "Волгоград"]
+    
+    for city in millionnik_cities:
+        if city in by_city:
+            data = by_city[city]
+            geo["millionniki"].append({
+                "name": city,
+                "count": data["count"],
+                "revenue": data["revenue"],
+                "avg_check": data["avg_check"],
+                "salons": sorted(data["salons"], key=lambda x: x["revenue"], reverse=True),
+            })
+    
+    geo["millionniki"] = sorted(geo["millionniki"], key=lambda x: x["count"], reverse=True)
+    
+    # Формируем список регионов
+    for region, data in by_region.items():
+        if region != "Не определено":
+            geo["regions"].append({
+                "name": region,
+                "count": data["count"],
+                "revenue": data["revenue"],
+                "salons": sorted(data["salons"], key=lambda x: x["revenue"], reverse=True),
+            })
+    
+    geo["regions"] = sorted(geo["regions"], key=lambda x: x["count"], reverse=True)
     
     return templates.TemplateResponse(
         "geography.html",
