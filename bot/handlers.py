@@ -28,8 +28,12 @@ from .keyboards import (
     BTN_TASKS,
     BTN_MY_BARBERSHOPS,
     BTN_STATISTICS,
+    BTN_CONTACT_OFFICE,
+    BTN_CONTACT_DEVELOPMENT,
+    BTN_CONTACT_MARKETING,
     BTN_MAIN_MENU,
     BTN_ADD_BARBERSHOP,
+    contact_office_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -378,6 +382,63 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     # Удаляем сообщение о загрузке и отправляем результат
     await loading_msg.delete()
     await message.answer(stats_text, reply_markup=main_menu_keyboard())
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Связаться с офисом
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_CONTACT_OFFICE)
+async def contact_office_handler(message: types.Message, state: FSMContext) -> None:
+    """Меню выбора отдела для связи."""
+    if not await _check_verified(message):
+        return
+    
+    await state.clear()
+    
+    await message.answer(
+        "📞 <b>Связаться с офисом</b>\n\n"
+        "Выберите отдел, с которым хотите связаться:",
+        reply_markup=contact_office_keyboard(),
+    )
+
+
+@router.message(F.text == BTN_CONTACT_DEVELOPMENT)
+async def contact_development_handler(message: types.Message, state: FSMContext) -> None:
+    """Контакт отдела развития."""
+    if not await _check_verified(message):
+        return
+    
+    await message.answer(
+        "🚀 <b>Отдел Развития</b>\n\n"
+        "Для связи с отделом развития перейдите в чат:\n\n"
+        "👉 <a href='https://t.me/borodach_development'>@borodach_development</a>\n\n"
+        "Отдел отвечает за:\n"
+        "• Открытие новых точек\n"
+        "• Вопросы по франшизе\n"
+        "• Стратегическое развитие",
+        reply_markup=contact_office_keyboard(),
+        disable_web_page_preview=True,
+    )
+
+
+@router.message(F.text == BTN_CONTACT_MARKETING)
+async def contact_marketing_handler(message: types.Message, state: FSMContext) -> None:
+    """Контакт отдела маркетинга."""
+    if not await _check_verified(message):
+        return
+    
+    await message.answer(
+        "📢 <b>Отдел Маркетинга</b>\n\n"
+        "Для связи с отделом маркетинга перейдите в чат:\n\n"
+        "👉 <a href='https://t.me/borodach_marketing'>@borodach_marketing</a>\n\n"
+        "Отдел отвечает за:\n"
+        "• Рекламные материалы\n"
+        "• Маркетинговые акции\n"
+        "• SMM и продвижение",
+        reply_markup=contact_office_keyboard(),
+        disable_web_page_preview=True,
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════

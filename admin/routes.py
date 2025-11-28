@@ -48,7 +48,8 @@ async def send_telegram_notification(
     if show_main_menu:
         payload["reply_markup"] = {
             "keyboard": [
-                [{"text": "📋 Задачи"}, {"text": "💈 Мои барбершопы"}]
+                [{"text": "📋 Задачи"}, {"text": "💈 Мои барбершопы"}],
+                [{"text": "📊 Статистика"}, {"text": "📞 Связаться с офисом"}],
             ],
             "resize_keyboard": True,
             "input_field_placeholder": "Выберите раздел",
