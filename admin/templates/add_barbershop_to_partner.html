@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить барбершоп — {{ partner.full_name }}{% endblock %}
+
+{% block content %}
+<style>
+    .search-input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-bottom: 0.75rem;
+    }
+    .company-list {
+        max-height: 400px;
+        overflow-y: auto;
+        background: var(--bg-main);
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+    .company-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: background 0.2s;
+    }
+    .company-item:hover {
+        background: var(--border);
+    }
+    .company-item input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+    }
+    .company-city {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-left: 0.5rem;
+    }
+    .company-id {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        font-family: monospace;
+    }
+</style>
+
+<a href="/" class="btn btn-secondary mb-2">&larr; Назад</a>
+
+<h1 class="mb-2">💈 Добавление барбершопа</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">👤 {{ partner.full_name }}</h2>
+    </div>
+    
+    <div class="partner-info mb-2">
+        📱 {{ partner.phone or '—' }}<br>
+        💬 @{{ partner.telegram_username or '—' }} (ID: {{ partner.telegram_id }})
+    </div>
+    
+    {% if partner.branches_text %}
+    <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <strong>📝 Запрос от партнёра:</strong>
+        <pre style="margin: 0.5rem 0 0 0; white-space: pre-wrap; font-family: inherit;">{{ partner.branches_text }}</pre>
+    </div>
+    {% endif %}
+    
+    <form method="post" action="/partners/{{ partner.id }}/add-barbershop">
+        <h3 style="margin-bottom: 1rem;">Выберите барбершоп(ы) для привязки:</h3>
+        
+        {% if companies %}
+        <input type="text" id="companySearch" class="search-input" 
+               placeholder="🔍 Поиск по названию или городу...">
+        
+        <div class="company-list" id="companyList">
+            {% for company in companies %}
+            <label class="company-item" 
+                   data-name="{{ company.name|lower }}" 
+                   data-city="{{ (company.city or '')|lower }}">
+                <input type="checkbox" name="company_ids" value="{{ company.id }}">
+                <span>
+                    <strong>{{ company.name }}</strong>
+                    {% if company.city %}
+                    <span class="company-city">{{ company.city }}</span>
+                    {% endif %}
+                    <br>
+                    <span class="company-id">ID: {{ company.yclients_id }}</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+        
+        <div class="text-muted mt-1" style="font-size: 0.85rem;">
+            Всего барбершопов: {{ companies|length }}
+            | <a href="/yclients-companies/sync" style="color: var(--accent);">🔄 Обновить список</a>
+        </div>
+        
+        <div class="flex mt-2" style="gap: 1rem;">
+            <button type="submit" class="btn btn-success">✅ Привязать выбранные</button>
+            <a href="/" class="btn btn-secondary">Отмена</a>
+        </div>
+        {% else %}
+        <div class="alert" style="background: var(--warning-light); border: 1px solid var(--warning); padding: 1rem; border-radius: 8px;">
+            ⚠️ Барбершопы ещё не загружены. 
+            <a href="/yclients-companies" style="color: var(--accent);">Синхронизировать из YClients</a>
+        </div>
+        {% endif %}
+    </form>
+</div>
+
+<script>
+// Поиск по списку барбершопов
+document.getElementById('companySearch')?.addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const items = document.querySelectorAll('.company-item');
+    
+    items.forEach(item => {
+        const name = item.dataset.name || '';
+        const city = item.dataset.city || '';
+        const matches = name.includes(query) || city.includes(query);
+        item.style.display = matches ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}
+

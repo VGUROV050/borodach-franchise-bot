@@ -97,7 +97,7 @@
                 
                 {% if partner.branches_text %}
                 <div class="partner-branches" style="margin-top: 0.5rem; background: #fff3cd; padding: 0.5rem; border-radius: 4px;">
-                    <strong>📝 Запрос на новый филиал:</strong><br>
+                    <strong>📝 Запрос на новый барбершоп:</strong><br>
                     <pre style="margin: 0; white-space: pre-wrap;">{{ partner.branches_text }}</pre>
                 </div>
                 {% endif %}
@@ -105,7 +105,7 @@
         </div>
         
         <div class="partner-actions">
-            <a href="/partners/{{ partner.id }}/add-branch" class="btn btn-success btn-sm">✅ Добавить филиал</a>
+            <a href="/partners/{{ partner.id }}/add-barbershop" class="btn btn-success btn-sm">✅ Добавить барбершоп</a>
         </div>
     </div>
     {% endfor %}

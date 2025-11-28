@@ -314,44 +314,45 @@ async def reject_partner(
     return RedirectResponse(url="/", status_code=302)
 
 
-@router.get("/partners/{partner_id}/add-branch", response_class=HTMLResponse)
-async def add_branch_to_partner_page(
+@router.get("/partners/{partner_id}/add-barbershop", response_class=HTMLResponse)
+async def add_barbershop_to_partner_page(
     request: Request,
     partner_id: int,
 ):
-    """Страница добавления филиала к партнёру."""
+    """Страница добавления барбершопа к партнёру."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
     from sqlalchemy import select
     from database.models import Partner
+    from database import get_all_yclients_companies
     
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Partner).where(Partner.id == partner_id))
         partner = result.scalar_one_or_none()
-        branches = await get_all_branches(db, only_active=True)
+        companies = await get_all_yclients_companies(db, only_active=True)
     
     if not partner:
         raise HTTPException(status_code=404, detail="Партнёр не найден")
     
-    return templates.TemplateResponse("add_branch_to_partner.html", {
+    return templates.TemplateResponse("add_barbershop_to_partner.html", {
         "request": request,
         "partner": partner,
-        "branches": branches,
+        "companies": companies,
     })
 
 
-@router.post("/partners/{partner_id}/add-branch")
-async def add_branch_to_partner(
+@router.post("/partners/{partner_id}/add-barbershop")
+async def add_barbershop_to_partner(
     request: Request,
     partner_id: int,
-    branch_ids: list[int] = Form(default=[]),
+    company_ids: list[int] = Form(default=[]),
 ):
-    """Добавить филиал(ы) к партнёру."""
+    """Добавить барбершоп(ы) к партнёру."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from database.crud import link_partner_to_branch
+    from database.crud import link_partner_to_company
     from sqlalchemy import select
     from database.models import Partner
     
@@ -366,12 +367,12 @@ async def add_branch_to_partner(
         telegram_id = partner_data.telegram_id
         partner_name = partner_data.full_name
         
-        # Привязываем к филиалам
-        for branch_id in branch_ids:
-            await link_partner_to_branch(
+        # Привязываем к барбершопам YClients
+        for company_id in company_ids:
+            await link_partner_to_company(
                 db=db,
                 partner_id=partner_id,
-                branch_id=branch_id,
+                yclients_company_id=company_id,
                 is_owner=True,
             )
         
@@ -379,16 +380,16 @@ async def add_branch_to_partner(
         await clear_partner_pending_branch(db, partner_id)
     
     # Отправляем уведомление
-    if telegram_id and branch_ids:
+    if telegram_id and company_ids:
         await send_telegram_notification(
             telegram_id,
-            f"✅ <b>Филиал добавлен!</b>\n\n"
-            f"Ваш запрос на добавление филиала одобрен.\n\n"
-            f"Перейдите в раздел «🏢 Мои филиалы» чтобы увидеть обновлённый список.",
+            f"✅ <b>Барбершоп добавлен!</b>\n\n"
+            f"Ваш запрос на добавление барбершопа одобрен.\n\n"
+            f"Перейдите в раздел «💈 Мои барбершопы» чтобы увидеть обновлённый список.",
             show_main_menu=True,
         )
     
-    logger.info(f"Added branches {branch_ids} to partner {partner_id}")
+    logger.info(f"Added barbershops {company_ids} to partner {partner_id}")
     return RedirectResponse(url="/", status_code=302)
 
 
