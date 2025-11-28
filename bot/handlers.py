@@ -998,18 +998,12 @@ def _format_tasks_list(tasks: list, title: str) -> str:
     
     lines = [f"📋 <b>{title}</b>"]
     
-    # Если только один барбершоп - не показываем группировку
-    single_barbershop = len(grouped) == 1
-    
     for barbershop, departments in grouped.items():
-        if not single_barbershop:
-            lines.append(f"\n💈 <b>{barbershop}</b>")
+        # Всегда показываем название барбершопа
+        lines.append(f"\n💈 <b>{barbershop}</b>")
         
         for dept_name, stages in departments.items():
-            if single_barbershop:
-                lines.append(f"\n<b>{dept_name}</b>")
-            else:
-                lines.append(f"  📁 <i>{dept_name}</i>")
+            lines.append(f"  📁 <i>{dept_name}</i>")
             
             # Сортируем этапы в нужном порядке
             sorted_stages = sorted(stages.keys(), key=_get_stage_sort_key)
@@ -1018,8 +1012,7 @@ def _format_tasks_list(tasks: list, title: str) -> str:
                 stage_tasks = stages[stage_name]
                 emoji = _get_stage_emoji(stage_name)
                 
-                indent = "  " if single_barbershop else "    "
-                lines.append(f"{indent}<i>{emoji} {stage_name}:</i>")
+                lines.append(f"    <i>{emoji} {stage_name}:</i>")
                 
                 for task in stage_tasks:
                     task_id = task.get("id", "?")
@@ -1030,8 +1023,7 @@ def _format_tasks_list(tasks: list, title: str) -> str:
                         title_text = title_text[:47] + "..."
                     
                     date_display = f" • {date_str}" if date_str else ""
-                    task_indent = "    " if single_barbershop else "      "
-                    lines.append(f"{task_indent}• <b>#{task_id}</b> — {title_text}{date_display}")
+                    lines.append(f"      • <b>#{task_id}</b> — {title_text}{date_display}")
     
     return "\n".join(lines)
 
