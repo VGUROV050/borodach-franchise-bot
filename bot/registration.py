@@ -131,6 +131,7 @@ async def registration_name_cancel(message: types.Message, state: FSMContext) ->
 @router.message(RegistrationStates.waiting_for_full_name, F.contact)
 async def registration_name_contact_ignored(message: types.Message, state: FSMContext) -> None:
     """Игнорируем контакт на этапе ФИО."""
+    logger.info(f"Contact ignored at waiting_for_full_name, user={message.from_user.id}")
     await message.answer(
         "⚠️ Контакт уже получен. Пожалуйста, введите ваше <b>ФИО</b>:",
         reply_markup=cancel_registration_keyboard(),
@@ -384,14 +385,39 @@ async def registration_cancel_fallback(message: types.Message, state: FSMContext
 async def registration_contact_fallback(message: types.Message, state: FSMContext) -> None:
     """
     Получили контакт без FSM состояния — начинаем регистрацию.
-    ВАЖНО: Этот хендлер должен быть ПОСЛЕДНИМ, чтобы не перехватывать
-    контакты, когда уже активно другое состояние регистрации.
+    ВАЖНО: Этот хендлер должен быть ПОСЛЕДНИМ.
     """
     current_state = await state.get_state()
     
     # Если пользователь уже в процессе регистрации, игнорируем
     if current_state is not None:
-        logger.info(f"Contact ignored, user {message.from_user.id} already in state: {current_state}")
+        logger.info(f"Contact fallback ignored, user {message.from_user.id} already in state: {current_state}")
+        await message.answer(
+            "⚠️ Контакт уже получен. Продолжайте регистрацию.",
+            reply_markup=cancel_registration_keyboard(),
+        )
+        return
+    
+    # Проверяем, может пользователь уже зарегистрирован
+    from database import get_partner_by_telegram_id
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+    
+    if partner is not None:
+        logger.info(f"Contact fallback ignored, user {message.from_user.id} already registered")
+        from .keyboards import pending_verification_keyboard, main_menu_keyboard
+        from database import PartnerStatus
+        
+        if partner.status == PartnerStatus.VERIFIED:
+            await message.answer(
+                "✅ Вы уже зарегистрированы и верифицированы!",
+                reply_markup=main_menu_keyboard(),
+            )
+        else:
+            await message.answer(
+                "⏳ Вы уже зарегистрированы. Ожидайте верификации.",
+                reply_markup=pending_verification_keyboard(),
+            )
         return
     
     logger.info(f"Contact received without state, processing as registration: {message.from_user.id}")
