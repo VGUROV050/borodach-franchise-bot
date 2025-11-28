@@ -18,6 +18,9 @@ from .models import (
     NetworkRatingHistory,
     YClientsCompany,
     PartnerCompany,
+    RequestLog,
+    RequestType,
+    RequestStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -670,5 +673,59 @@ async def get_partner_companies(
         .where(PartnerCompany.partner_id == partner_id)
         .order_by(YClientsCompany.name)
     )
+    return list(result.scalars().all())
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Request Log CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+async def create_request_log(
+    db: AsyncSession,
+    partner_id: int,
+    request_type: RequestType,
+    status: RequestStatus,
+    request_text: str | None = None,
+    result_text: str | None = None,
+    processed_by: str = "admin",
+) -> RequestLog:
+    """Создать запись в логе заявок."""
+    log = RequestLog(
+        partner_id=partner_id,
+        request_type=request_type,
+        status=status,
+        request_text=request_text,
+        result_text=result_text,
+        processed_by=processed_by,
+    )
+    db.add(log)
+    await db.commit()
+    await db.refresh(log)
+    
+    logger.info(f"Created request log: {request_type.value} - {status.value} for partner {partner_id}")
+    return log
+
+
+async def get_request_logs(
+    db: AsyncSession,
+    limit: int = 100,
+    request_type: RequestType | None = None,
+    status: RequestStatus | None = None,
+) -> list[RequestLog]:
+    """Получить лог заявок с фильтрами."""
+    query = (
+        select(RequestLog)
+        .options(selectinload(RequestLog.partner))
+        .order_by(RequestLog.created_at.desc())
+    )
+    
+    if request_type:
+        query = query.where(RequestLog.request_type == request_type)
+    if status:
+        query = query.where(RequestLog.status == status)
+    
+    query = query.limit(limit)
+    
+    result = await db.execute(query)
     return list(result.scalars().all())
 

@@ -271,6 +271,19 @@ async def verify_partner(
             show_main_menu=True,
         )
     
+    # Записываем в лог
+    async with AsyncSessionLocal() as db:
+        from database import create_request_log, RequestType, RequestStatus
+        companies_names = ", ".join([str(cid) for cid in company_ids]) if company_ids else "Без барбершопов"
+        await create_request_log(
+            db=db,
+            partner_id=partner_id,
+            request_type=RequestType.VERIFICATION,
+            status=RequestStatus.APPROVED,
+            request_text=f"Верификация партнёра {partner_name}",
+            result_text=f"Привязаны барбершопы: {companies_names}",
+        )
+    
     logger.info(f"Partner {partner_id} verified with companies: {company_ids}")
     return RedirectResponse(url="/", status_code=302)
 
@@ -286,11 +299,29 @@ async def reject_partner(
         raise HTTPException(status_code=401, detail="Unauthorized")
     
     async with AsyncSessionLocal() as db:
+        # Получаем имя партнёра для лога
+        from sqlalchemy import select
+        from database.models import Partner
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner_data = result.scalar_one_or_none()
+        partner_name = partner_data.full_name if partner_data else ""
+        
         partner = await update_partner_status(
             db=db,
             partner_id=partner_id,
             status=PartnerStatus.REJECTED,
             rejection_reason=reason or "Заявка отклонена администратором",
+        )
+        
+        # Записываем в лог
+        from database import create_request_log, RequestType, RequestStatus
+        await create_request_log(
+            db=db,
+            partner_id=partner_id,
+            request_type=RequestType.VERIFICATION,
+            status=RequestStatus.REJECTED,
+            request_text=f"Верификация партнёра {partner_name}",
+            result_text=reason or "Причина не указана",
         )
     
     if not partner:
@@ -352,6 +383,7 @@ async def add_barbershop_to_partner(
         
         telegram_id = partner_data.telegram_id
         partner_name = partner_data.full_name
+        request_text = partner_data.branches_text or ""
         
         # Привязываем к барбершопам YClients
         for company_id in company_ids:
@@ -364,6 +396,18 @@ async def add_barbershop_to_partner(
         
         # Очищаем флаг и branches_text
         await clear_partner_pending_branch(db, partner_id)
+        
+        # Записываем в лог
+        from database import create_request_log, RequestType, RequestStatus
+        companies_str = ", ".join([str(cid) for cid in company_ids])
+        await create_request_log(
+            db=db,
+            partner_id=partner_id,
+            request_type=RequestType.ADD_BARBERSHOP,
+            status=RequestStatus.APPROVED,
+            request_text=request_text,
+            result_text=f"Добавлены барбершопы: {companies_str}",
+        )
     
     # Отправляем уведомление
     if telegram_id and company_ids:
@@ -376,6 +420,57 @@ async def add_barbershop_to_partner(
         )
     
     logger.info(f"Added barbershops {company_ids} to partner {partner_id}")
+    return RedirectResponse(url="/", status_code=302)
+
+
+@router.post("/partners/{partner_id}/reject-barbershop")
+async def reject_barbershop_request(
+    request: Request,
+    partner_id: int,
+):
+    """Отклонить запрос на добавление барбершопа."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select
+    from database.models import Partner
+    
+    async with AsyncSessionLocal() as db:
+        # Получаем партнёра
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner_data = result.scalar_one_or_none()
+        
+        if not partner_data:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        telegram_id = partner_data.telegram_id
+        request_text = partner_data.branches_text or ""
+        
+        # Записываем в лог
+        from database import create_request_log, RequestType, RequestStatus
+        await create_request_log(
+            db=db,
+            partner_id=partner_id,
+            request_type=RequestType.ADD_BARBERSHOP,
+            status=RequestStatus.REJECTED,
+            request_text=request_text,
+            result_text="Запрос отклонён",
+        )
+        
+        # Очищаем флаг и branches_text
+        await clear_partner_pending_branch(db, partner_id)
+    
+    # Отправляем уведомление
+    if telegram_id:
+        await send_telegram_notification(
+            telegram_id,
+            f"❌ <b>Запрос отклонён</b>\n\n"
+            f"Ваш запрос на добавление барбершопа отклонён.\n\n"
+            f"Если это ошибка, свяжитесь с вашим менеджером.",
+            show_main_menu=True,
+        )
+    
+    logger.info(f"Rejected barbershop request for partner {partner_id}")
     return RedirectResponse(url="/", status_code=302)
 
 
@@ -1149,6 +1244,32 @@ async def geography_page(request: Request):
         {
             "request": request,
             "geo": geo,
+        },
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Лог заявок
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/request-logs", response_class=HTMLResponse)
+async def request_logs_page(request: Request):
+    """Страница с логом всех заявок."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_request_logs, RequestType, RequestStatus
+    
+    async with AsyncSessionLocal() as db:
+        logs = await get_request_logs(db, limit=100)
+    
+    return templates.TemplateResponse(
+        "request_logs.html",
+        {
+            "request": request,
+            "logs": logs,
+            "RequestType": RequestType,
+            "RequestStatus": RequestStatus,
         },
     )
 

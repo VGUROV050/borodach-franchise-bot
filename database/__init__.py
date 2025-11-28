@@ -12,6 +12,9 @@ from .models import (
     NetworkRatingHistory,
     YClientsCompany,
     PartnerCompany,
+    RequestLog,
+    RequestType,
+    RequestStatus,
 )
 from .crud import (
     get_partner_by_telegram_id,
@@ -42,6 +45,9 @@ from .crud import (
     get_yclients_company_by_id,
     link_partner_to_company,
     get_partner_companies,
+    # Request Log
+    create_request_log,
+    get_request_logs,
 )
 
 __all__ = [
@@ -89,5 +95,11 @@ __all__ = [
     "get_yclients_company_by_id",
     "link_partner_to_company",
     "get_partner_companies",
+    # Request Log
+    "RequestLog",
+    "RequestType",
+    "RequestStatus",
+    "create_request_log",
+    "get_request_logs",
 ]
 

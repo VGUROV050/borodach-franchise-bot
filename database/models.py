@@ -340,3 +340,50 @@ class NetworkRatingHistory(Base):
     def __repr__(self) -> str:
         return f"<NetworkRatingHistory {self.company_name}: {self.year}-{self.month} #{self.rank}>"
 
+
+class RequestType(str, enum.Enum):
+    """Тип заявки."""
+    VERIFICATION = "verification"     # Верификация партнёра
+    ADD_BARBERSHOP = "add_barbershop" # Добавление барбершопа
+
+
+class RequestStatus(str, enum.Enum):
+    """Статус заявки."""
+    APPROVED = "approved"   # Одобрено
+    REJECTED = "rejected"   # Отклонено
+
+
+class RequestLog(Base):
+    """Лог всех заявок (верификация, добавление барбершопов)."""
+    
+    __tablename__ = "request_logs"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Связь с партнёром
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id", ondelete="CASCADE"), index=True)
+    partner: Mapped["Partner"] = relationship("Partner", foreign_keys=[partner_id])
+    
+    # Тип и статус заявки
+    request_type: Mapped[RequestType] = mapped_column(Enum(RequestType), index=True)
+    status: Mapped[RequestStatus] = mapped_column(Enum(RequestStatus), index=True)
+    
+    # Детали заявки (текст от партнёра)
+    request_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Результат (что одобрено/причина отказа)
+    result_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Кто обработал
+    processed_by: Mapped[str] = mapped_column(String(100), default="admin")
+    
+    # Когда создано
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        index=True,
+    )
+    
+    def __repr__(self) -> str:
+        return f"<RequestLog {self.request_type.value}: {self.status.value}>"
+

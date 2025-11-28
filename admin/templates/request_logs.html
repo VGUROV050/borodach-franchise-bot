@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Лог заявок — Borodach Admin{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">📋 Лог заявок</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">История обработки заявок</h2>
+        <span class="badge">{{ logs|length }} записей</span>
+    </div>
+    
+    {% if logs %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 140px;">Дата</th>
+                <th>Партнёр</th>
+                <th style="width: 150px;">Тип</th>
+                <th style="width: 120px;">Статус</th>
+                <th>Запрос</th>
+                <th>Результат</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td class="text-muted" style="font-size: 0.85rem;">
+                    {{ log.created_at.strftime('%d.%m.%Y') }}<br>
+                    {{ log.created_at.strftime('%H:%M') }}
+                </td>
+                <td>
+                    <strong>{{ log.partner.full_name if log.partner else '—' }}</strong>
+                    {% if log.partner %}
+                    <br><span class="text-muted" style="font-size: 0.8rem;">
+                        📱 {{ log.partner.phone or '—' }}
+                    </span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if log.request_type.value == 'verification' %}
+                    <span style="color: var(--info);">👤 Верификация</span>
+                    {% elif log.request_type.value == 'add_barbershop' %}
+                    <span style="color: var(--accent);">💈 Барбершоп</span>
+                    {% else %}
+                    {{ log.request_type.value }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if log.status.value == 'approved' %}
+                    <span class="badge badge-success">✅ Одобрено</span>
+                    {% elif log.status.value == 'rejected' %}
+                    <span class="badge badge-danger">❌ Отклонено</span>
+                    {% else %}
+                    <span class="badge">{{ log.status.value }}</span>
+                    {% endif %}
+                </td>
+                <td style="max-width: 200px; font-size: 0.85rem;">
+                    {% if log.request_text %}
+                    <span title="{{ log.request_text }}">
+                        {{ log.request_text[:50] }}{% if log.request_text|length > 50 %}...{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td style="max-width: 200px; font-size: 0.85rem;">
+                    {% if log.result_text %}
+                    <span title="{{ log.result_text }}">
+                        {{ log.result_text[:50] }}{% if log.result_text|length > 50 %}...{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted">Заявок ещё не было.</p>
+    {% endif %}
+</div>
+
+<style>
+    .badge-success {
+        background: var(--success);
+        color: white;
+    }
+    .badge-danger {
+        background: var(--danger);
+        color: white;
+    }
+</style>
+{% endblock %}
+
