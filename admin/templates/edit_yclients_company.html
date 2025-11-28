@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование — {{ company.name }}{% endblock %}
+
+{% block content %}
+<h1 class="mb-2">✏️ Редактирование салона</h1>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">{{ company.name }}</h2>
+        <code style="font-size: 0.85rem; color: var(--text-muted);">YClients ID: {{ company.yclients_id }}</code>
+    </div>
+    
+    <form method="post" action="/yclients-companies/{{ company.id }}/edit">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 1.5rem;">
+            <div>
+                <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">📍 Информация</h3>
+                
+                <table style="width: 100%;">
+                    <tr>
+                        <td class="text-muted" style="width: 140px; padding: 0.5rem 0;">Название:</td>
+                        <td style="padding: 0.5rem 0;"><strong>{{ company.name }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="padding: 0.5rem 0;">Город:</td>
+                        <td style="padding: 0.5rem 0;">
+                            {% if company.city %}
+                            <span class="badge" style="background: var(--accent-light); color: var(--accent);">{{ company.city }}</span>
+                            {% else %}
+                            <span class="text-muted">Не определён</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="padding: 0.5rem 0;">Регион:</td>
+                        <td style="padding: 0.5rem 0;">{{ company.region or '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="padding: 0.5rem 0;">Миллионник:</td>
+                        <td style="padding: 0.5rem 0;">
+                            {% if company.is_million_city %}
+                            <span style="color: var(--success);">✓ Да</span>
+                            {% else %}
+                            <span class="text-muted">Нет</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted" style="padding: 0.5rem 0;">Обновлено:</td>
+                        <td style="padding: 0.5rem 0;">{{ company.synced_at.strftime('%d.%m.%Y %H:%M') if company.synced_at else '—' }}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div>
+                <h3 style="font-size: 1rem; color: var(--text-muted); margin-bottom: 1rem;">⚙️ Настройки</h3>
+                
+                <div class="form-group">
+                    <label class="form-label">Статус салона:</label>
+                    <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px; transition: all 0.2s;"
+                               class="status-option" data-status="active">
+                            <input type="radio" name="is_active" value="1" {% if company.is_active %}checked{% endif %}
+                                   style="width: 18px; height: 18px; accent-color: var(--success);">
+                            <span>
+                                <strong style="color: var(--success);">✅ Активен</strong>
+                                <br><small class="text-muted">Салон работает и участвует в статистике</small>
+                            </span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid var(--border); border-radius: 8px; transition: all 0.2s;"
+                               class="status-option" data-status="inactive">
+                            <input type="radio" name="is_active" value="0" {% if not company.is_active %}checked{% endif %}
+                                   style="width: 18px; height: 18px; accent-color: var(--danger);">
+                            <span>
+                                <strong style="color: var(--danger);">❌ Неактивен</strong>
+                                <br><small class="text-muted">Салон не работает / закрыт</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-success">💾 Сохранить изменения</button>
+            <a href="/yclients-companies" class="btn">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<style>
+    .status-option:has(input:checked) {
+        border-color: var(--accent);
+        background: var(--accent-light);
+    }
+</style>
+{% endblock %}
+

@@ -647,9 +647,37 @@ async def sync_yclients_companies_route(request: Request):
     return RedirectResponse(url="/yclients-companies?synced=1", status_code=302)
 
 
-@router.post("/yclients-companies/{company_id}/toggle-status")
-async def toggle_company_status(request: Request, company_id: int):
-    """Переключить статус активности салона."""
+@router.get("/yclients-companies/{company_id}/edit", response_class=HTMLResponse)
+async def edit_yclients_company_page(request: Request, company_id: int):
+    """Страница редактирования салона YClients."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from sqlalchemy import select
+    from database.models import YClientsCompany
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(YClientsCompany).where(YClientsCompany.id == company_id)
+        )
+        company = result.scalar()
+    
+    if not company:
+        raise HTTPException(status_code=404, detail="Салон не найден")
+    
+    return templates.TemplateResponse("edit_yclients_company.html", {
+        "request": request,
+        "company": company,
+    })
+
+
+@router.post("/yclients-companies/{company_id}/edit")
+async def edit_yclients_company(
+    request: Request,
+    company_id: int,
+    is_active: int = Form(...),
+):
+    """Сохранить изменения салона YClients."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
@@ -665,13 +693,13 @@ async def toggle_company_status(request: Request, company_id: int):
         if not company:
             raise HTTPException(status_code=404, detail="Салон не найден")
         
-        # Переключаем статус
-        company.is_active = not company.is_active
+        # Обновляем статус
+        company.is_active = bool(is_active)
         await db.commit()
         
-        logger.info(f"Company {company_id} ({company.name}) status changed to {'active' if company.is_active else 'inactive'}")
+        logger.info(f"Company {company_id} ({company.name}) updated: is_active={company.is_active}")
     
-    return {"success": True, "is_active": company.is_active}
+    return RedirectResponse(url="/yclients-companies?updated=1", status_code=302)
 
 
 # ═══════════════════════════════════════════════════════════════════
