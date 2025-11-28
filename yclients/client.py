@@ -426,7 +426,7 @@ async def sync_companies_to_db() -> tuple[int, int]:
     Returns:
         Tuple (добавлено, обновлено)
     """
-    from admin.analytics import extract_city_from_name, MILLIONNIKI, CITY_TO_REGION, get_region_by_city
+    from admin.analytics import extract_city_from_name, MILLIONNIKI, get_region
     from database import AsyncSessionLocal, sync_yclients_companies
     
     # Получаем список салонов из YClients
@@ -448,7 +448,7 @@ async def sync_companies_to_db() -> tuple[int, int]:
         city = extract_city_from_name(name)
         
         # Определяем регион
-        region = get_region_by_city(city) if city else None
+        region = get_region(city) if city else None
         
         # Является ли город-миллионник
         is_million_city = city.lower().strip() in MILLIONNIKI if city else False
