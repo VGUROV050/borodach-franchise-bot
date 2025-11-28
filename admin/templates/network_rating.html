@@ -3,7 +3,59 @@
 {% block title %}Рейтинг сети — Borodach Admin{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+<style>
+    .period-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    .period-tab {
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+        background: var(--bg-dark);
+        color: var(--text-muted);
+    }
+    .period-tab:hover {
+        background: var(--border);
+        color: var(--text);
+    }
+    .period-tab.active {
+        background: var(--accent);
+        color: white;
+    }
+    .rank-change {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.125rem 0.5rem;
+        border-radius: 4px;
+        margin-left: 0.5rem;
+    }
+    .rank-up {
+        background: var(--success-light);
+        color: #047857;
+    }
+    .rank-down {
+        background: var(--danger-light);
+        color: #dc2626;
+    }
+    .rank-same {
+        background: var(--bg-dark);
+        color: var(--text-muted);
+    }
+    .rank-new {
+        background: var(--accent-light);
+        color: var(--accent);
+    }
+</style>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
     <h1>🏆 Рейтинг сети</h1>
     <div style="display: flex; gap: 0.5rem; align-items: center;">
         {% if last_update %}
@@ -12,19 +64,29 @@
         </span>
         {% endif %}
         <a href="/network-rating/refresh" class="btn btn-primary" onclick="return confirm('Обновить рейтинг сейчас? Это займёт 3-5 минут.');">
-            🔄 Обновить сейчас
+            🔄 Обновить
         </a>
     </div>
+</div>
+
+<!-- Переключатель периода -->
+<div class="period-tabs">
+    <a href="/network-rating?period=current" class="period-tab {{ 'active' if period == 'current' else '' }}">
+        📅 Текущий месяц
+    </a>
+    <a href="/network-rating?period=previous" class="period-tab {{ 'active' if period == 'previous' else '' }}">
+        📆 Прошлый месяц
+    </a>
 </div>
 
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-value">{{ total_companies }}</div>
-        <div class="stat-label">Салонов в сети</div>
+        <div class="stat-label">Салонов в рейтинге</div>
     </div>
     <div class="stat-card">
         <div class="stat-value" style="color: var(--success);">{{ "{:,.0f}".format(total_revenue).replace(",", " ") }} ₽</div>
-        <div class="stat-label">Общая выручка сети</div>
+        <div class="stat-label">Общая выручка</div>
     </div>
     <div class="stat-card">
         <div class="stat-value" style="color: var(--warning);">{{ "{:,.0f}".format(avg_revenue).replace(",", " ") }} ₽</div>
@@ -34,14 +96,23 @@
 
 <div class="card">
     <div class="card-header">
-        <div class="card-title">Рейтинг салонов по выручке за текущий месяц</div>
+        <div class="card-title">
+            {% if period == 'current' %}
+            Рейтинг за {{ period_name }} (с начала месяца)
+            {% else %}
+            Рейтинг за {{ period_name }}
+            {% endif %}
+        </div>
+        <span class="text-muted" style="font-size: 0.875rem;">
+            Изменение относительно прошлого периода
+        </span>
     </div>
     
     {% if ratings %}
     <table>
         <thead>
             <tr>
-                <th style="width: 80px;">Место</th>
+                <th style="width: 120px;">Место</th>
                 <th>Салон</th>
                 <th style="text-align: right;">Выручка</th>
                 <th style="text-align: right;">Ср. чек</th>
@@ -60,6 +131,20 @@
                     <span style="font-size: 1.5rem;">🥉</span>
                     {% else %}
                     <span style="font-weight: 600; color: var(--text-muted);">{{ r.rank }}</span>
+                    {% endif %}
+                    
+                    <!-- Изменение позиции -->
+                    {% if r.previous_rank and r.previous_rank > 0 %}
+                        {% set change = r.previous_rank - r.rank %}
+                        {% if change > 0 %}
+                        <span class="rank-change rank-up">↑{{ change }}</span>
+                        {% elif change < 0 %}
+                        <span class="rank-change rank-down">↓{{ -change }}</span>
+                        {% else %}
+                        <span class="rank-change rank-same">=</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="rank-change rank-new">new</span>
                     {% endif %}
                 </td>
                 <td>
@@ -90,10 +175,14 @@
     {% else %}
     <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
         <div style="font-size: 3rem; margin-bottom: 1rem;">📊</div>
+        {% if period == 'previous' %}
+        <p>Данные за прошлый месяц ещё не сохранены.</p>
+        <p style="margin-top: 0.5rem;">История сохраняется автоматически 1-го числа каждого месяца.</p>
+        {% else %}
         <p>Данные рейтинга ещё не загружены.</p>
-        <p style="margin-top: 0.5rem;">Нажмите "Обновить сейчас" или дождитесь автоматического обновления в 1:00 МСК.</p>
+        <p style="margin-top: 0.5rem;">Нажмите "Обновить" или дождитесь автоматического обновления в 1:00 МСК.</p>
+        {% endif %}
     </div>
     {% endif %}
 </div>
 {% endblock %}
-

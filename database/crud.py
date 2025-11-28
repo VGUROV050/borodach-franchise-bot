@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from .models import Partner, Branch, PartnerBranch, PartnerStatus, NetworkRating
+from .models import Partner, Branch, PartnerBranch, PartnerStatus, NetworkRating, NetworkRatingHistory
 
 logger = logging.getLogger(__name__)
 
@@ -369,6 +369,7 @@ async def update_network_rating(
     rank: int,
     total_companies: int,
     avg_check: float = 0.0,
+    previous_rank: int = 0,
 ) -> NetworkRating:
     """Обновить или создать запись рейтинга салона."""
     result = await db.execute(
@@ -383,6 +384,8 @@ async def update_network_rating(
         rating.rank = rank
         rating.total_companies = total_companies
         rating.avg_check = avg_check
+        if previous_rank > 0:
+            rating.previous_rank = previous_rank
     else:
         # Создаём новую запись
         rating = NetworkRating(
@@ -392,6 +395,7 @@ async def update_network_rating(
             rank=rank,
             total_companies=total_companies,
             avg_check=avg_check,
+            previous_rank=previous_rank,
         )
         db.add(rating)
     
@@ -408,4 +412,75 @@ async def get_all_network_ratings(
         select(NetworkRating).order_by(NetworkRating.rank)
     )
     return list(result.scalars().all())
+
+
+async def save_rating_history(
+    db: AsyncSession,
+    year: int,
+    month: int,
+) -> int:
+    """
+    Сохранить текущий рейтинг в историю за указанный месяц.
+    Возвращает количество сохранённых записей.
+    """
+    # Проверяем, нет ли уже записей за этот месяц
+    existing = await db.execute(
+        select(NetworkRatingHistory).where(
+            NetworkRatingHistory.year == year,
+            NetworkRatingHistory.month == month,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        logger.info(f"Rating history for {year}-{month} already exists, skipping")
+        return 0
+    
+    # Получаем текущий рейтинг
+    ratings = await get_all_network_ratings(db)
+    
+    count = 0
+    for r in ratings:
+        history = NetworkRatingHistory(
+            yclients_company_id=r.yclients_company_id,
+            company_name=r.company_name,
+            revenue=r.revenue,
+            avg_check=r.avg_check,
+            rank=r.rank,
+            total_companies=r.total_companies,
+            year=year,
+            month=month,
+        )
+        db.add(history)
+        count += 1
+    
+    await db.commit()
+    logger.info(f"Saved {count} ratings to history for {year}-{month}")
+    return count
+
+
+async def get_rating_history(
+    db: AsyncSession,
+    year: int,
+    month: int,
+) -> list[NetworkRatingHistory]:
+    """Получить рейтинг за конкретный месяц из истории."""
+    result = await db.execute(
+        select(NetworkRatingHistory).where(
+            NetworkRatingHistory.year == year,
+            NetworkRatingHistory.month == month,
+        ).order_by(NetworkRatingHistory.rank)
+    )
+    return list(result.scalars().all())
+
+
+async def get_previous_month_ranks(
+    db: AsyncSession,
+    year: int,
+    month: int,
+) -> dict[str, int]:
+    """
+    Получить словарь company_id -> rank за указанный месяц.
+    Используется для вычисления изменения позиции.
+    """
+    history = await get_rating_history(db, year, month)
+    return {h.yclients_company_id: h.rank for h in history}
 

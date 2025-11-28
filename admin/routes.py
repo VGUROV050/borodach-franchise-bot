@@ -667,24 +667,54 @@ async def send_broadcast(
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/network-rating", response_class=HTMLResponse)
-async def network_rating_page(request: Request):
-    """Страница рейтинга сети."""
+async def network_rating_page(request: Request, period: str = "current"):
+    """Страница рейтинга сети с переключателем периода."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
-    from database import get_all_network_ratings
+    from database import get_all_network_ratings, get_rating_history
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
     
-    async with AsyncSessionLocal() as db:
-        all_ratings = await get_all_network_ratings(db)
+    today = datetime.now(ZoneInfo("Europe/Moscow"))
     
-    # Фильтруем салоны с нулевой выручкой
-    ratings = [r for r in all_ratings if r.revenue > 0]
+    # Определяем названия месяцев
+    month_names = {
+        1: "январь", 2: "февраль", 3: "март", 4: "апрель",
+        5: "май", 6: "июнь", 7: "июль", 8: "август",
+        9: "сентябрь", 10: "октябрь", 11: "ноябрь", 12: "декабрь"
+    }
     
-    # Статистика (только по активным салонам)
+    if period == "previous":
+        # Прошлый месяц из истории
+        if today.month == 1:
+            prev_year = today.year - 1
+            prev_month = 12
+        else:
+            prev_year = today.year
+            prev_month = today.month - 1
+        
+        async with AsyncSessionLocal() as db:
+            history_ratings = await get_rating_history(db, prev_year, prev_month)
+        
+        # Фильтруем салоны с выручкой > 0
+        ratings = [r for r in history_ratings if r.revenue > 0]
+        period_name = f"{month_names[prev_month]} {prev_year}"
+        last_update = ratings[0].created_at if ratings else None
+    else:
+        # Текущий месяц
+        async with AsyncSessionLocal() as db:
+            all_ratings = await get_all_network_ratings(db)
+        
+        # Фильтруем салоны с выручкой > 0
+        ratings = [r for r in all_ratings if r.revenue > 0]
+        period_name = f"{month_names[today.month]} {today.year}"
+        last_update = ratings[0].updated_at if ratings else None
+    
+    # Статистика
     total_companies = len(ratings)
     total_revenue = sum(r.revenue for r in ratings) if ratings else 0
     avg_revenue = total_revenue / total_companies if total_companies > 0 else 0
-    last_update = ratings[0].updated_at if ratings else None
     
     return templates.TemplateResponse(
         "network_rating.html",
@@ -695,6 +725,8 @@ async def network_rating_page(request: Request):
             "total_revenue": total_revenue,
             "avg_revenue": avg_revenue,
             "last_update": last_update,
+            "period": period,
+            "period_name": period_name,
         },
     )
 

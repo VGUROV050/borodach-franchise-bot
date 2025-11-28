@@ -202,6 +202,9 @@ class NetworkRating(Base):
     # Место в рейтинге (1 = лидер)
     rank: Mapped[int] = mapped_column(Integer, default=0, index=True)
     
+    # Место в рейтинге в прошлом месяце (для показа изменения)
+    previous_rank: Mapped[int] = mapped_column(Integer, default=0)
+    
     # Всего салонов в сети (с выручкой > 0)
     total_companies: Mapped[int] = mapped_column(Integer, default=0)
     
@@ -212,6 +215,46 @@ class NetworkRating(Base):
         onupdate=func.now(),
     )
     
+    @property
+    def rank_change(self) -> int:
+        """Изменение позиции (положительное = улучшение)."""
+        if self.previous_rank == 0:
+            return 0
+        return self.previous_rank - self.rank
+    
     def __repr__(self) -> str:
         return f"<NetworkRating {self.company_name}: #{self.rank}>"
+
+
+class NetworkRatingHistory(Base):
+    """История рейтингов за прошлые месяцы."""
+    
+    __tablename__ = "network_rating_history"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # YClients ID салона
+    yclients_company_id: Mapped[str] = mapped_column(String(50), index=True)
+    
+    # Название салона
+    company_name: Mapped[str] = mapped_column(String(255))
+    
+    # Данные за месяц
+    revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    avg_check: Mapped[float] = mapped_column(Float, default=0.0)
+    rank: Mapped[int] = mapped_column(Integer, default=0)
+    total_companies: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Период (год и месяц)
+    year: Mapped[int] = mapped_column(Integer, index=True)
+    month: Mapped[int] = mapped_column(Integer, index=True)
+    
+    # Когда сохранено
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<NetworkRatingHistory {self.company_name}: {self.year}-{self.month} #{self.rank}>"
 

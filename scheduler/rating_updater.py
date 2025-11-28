@@ -26,6 +26,39 @@ async def update_network_rating_job():
     start_time = datetime.now()
     
     try:
+        # Проверяем, первый ли это день месяца - если да, сохраняем историю
+        today = datetime.now(ZoneInfo("Europe/Moscow"))
+        if today.day == 1:
+            # Первый день месяца - сохраняем рейтинг прошлого месяца в историю
+            from database import save_rating_history
+            
+            # Определяем прошлый месяц
+            if today.month == 1:
+                prev_year = today.year - 1
+                prev_month = 12
+            else:
+                prev_year = today.year
+                prev_month = today.month - 1
+            
+            async with AsyncSessionLocal() as db:
+                saved = await save_rating_history(db, prev_year, prev_month)
+                if saved > 0:
+                    logger.info(f"Saved rating history for {prev_year}-{prev_month}")
+        
+        # Получаем previous_rank из истории прошлого месяца
+        from database import get_previous_month_ranks
+        
+        # Определяем прошлый месяц для previous_rank
+        if today.month == 1:
+            prev_year = today.year - 1
+            prev_month = 12
+        else:
+            prev_year = today.year
+            prev_month = today.month - 1
+        
+        async with AsyncSessionLocal() as db:
+            previous_ranks = await get_previous_month_ranks(db, prev_year, prev_month)
+        
         # Получаем рейтинг всех салонов
         ranking = await calculate_network_ranking()
         
@@ -33,17 +66,21 @@ async def update_network_rating_job():
             logger.error("Failed to calculate network ranking - no data received")
             return
         
-        # Сохраняем в БД
+        # Сохраняем в БД с previous_rank
         async with AsyncSessionLocal() as db:
             for company in ranking:
+                company_id = company["company_id"]
+                prev_rank = previous_ranks.get(company_id, 0)
+                
                 await update_network_rating(
                     db=db,
-                    yclients_company_id=company["company_id"],
+                    yclients_company_id=company_id,
                     company_name=company["company_name"],
                     revenue=company["revenue"],
                     rank=company["rank"],
                     total_companies=company["total_companies"],
                     avg_check=company.get("avg_check", 0.0),
+                    previous_rank=prev_rank,
                 )
         
         duration = (datetime.now() - start_time).total_seconds()

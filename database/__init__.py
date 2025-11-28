@@ -1,7 +1,7 @@
 # Database module
 
 from .connection import get_db, init_db, close_db, AsyncSessionLocal
-from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory, NetworkRating
+from .models import Base, Partner, Branch, PartnerBranch, PartnerStatus, BroadcastHistory, NetworkRating, NetworkRatingHistory
 from .crud import (
     get_partner_by_telegram_id,
     get_partner_by_phone,
@@ -22,6 +22,9 @@ from .crud import (
     get_network_rating_by_company,
     update_network_rating,
     get_all_network_ratings,
+    save_rating_history,
+    get_rating_history,
+    get_previous_month_ranks,
 )
 
 __all__ = [
