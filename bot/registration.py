@@ -54,6 +54,11 @@ async def registration_start(message: types.Message, state: FSMContext) -> None:
 @router.message(RegistrationStates.waiting_for_contact, F.contact)
 async def registration_contact(message: types.Message, state: FSMContext) -> None:
     """Получили контакт → запрашиваем ФИО."""
+    await _process_contact(message, state)
+
+
+async def _process_contact(message: types.Message, state: FSMContext) -> None:
+    """Обработка контакта (общая логика)."""
     contact = message.contact
     
     # Проверяем, что это контакт самого пользователя
@@ -69,6 +74,11 @@ async def registration_contact(message: types.Message, state: FSMContext) -> Non
     if not phone.startswith("+"):
         phone = "+" + phone
     
+    # Инициализируем данные если их нет (после перезапуска бота)
+    data = await state.get_data()
+    if not data.get("branches"):
+        await state.update_data(branches=[])
+    
     await state.update_data(phone=phone)
     await state.set_state(RegistrationStates.waiting_for_full_name)
     
@@ -77,6 +87,14 @@ async def registration_contact(message: types.Message, state: FSMContext) -> Non
         "👤 Введите ваше <b>ФИО</b> (как в договоре франшизы):",
         reply_markup=cancel_registration_keyboard(),
     )
+
+
+# Fallback: контакт без состояния (после перезапуска бота)
+@router.message(F.contact)
+async def registration_contact_fallback(message: types.Message, state: FSMContext) -> None:
+    """Получили контакт без FSM состояния — начинаем регистрацию."""
+    logger.info(f"Contact received without state, processing as registration: {message.from_user.id}")
+    await _process_contact(message, state)
 
 
 @router.message(RegistrationStates.waiting_for_contact, F.text == BTN_CANCEL_REGISTRATION)
@@ -263,4 +281,19 @@ async def registration_more_invalid(message: types.Message, state: FSMContext) -
     await message.answer(
         "⚠️ Выберите действие из кнопок ниже:",
         reply_markup=add_more_branches_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Fallback: кнопка отмены без состояния
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_CANCEL_REGISTRATION)
+async def registration_cancel_fallback(message: types.Message, state: FSMContext) -> None:
+    """Отмена без FSM состояния (после перезапуска бота)."""
+    await state.clear()
+    await message.answer(
+        "❌ Регистрация отменена.\n\n"
+        "Для доступа к боту необходимо пройти регистрацию.",
+        reply_markup=registration_start_keyboard(),
     )
