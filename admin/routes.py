@@ -254,7 +254,7 @@ async def verify_partner(
             await link_partner_to_company(
                 db=db,
                 partner_id=partner_id,
-                yclients_company_id=company_id,
+                company_id=company_id,
                 is_owner=True,
             )
     
@@ -390,7 +390,7 @@ async def add_barbershop_to_partner(
             await link_partner_to_company(
                 db=db,
                 partner_id=partner_id,
-                yclients_company_id=company_id,
+                company_id=company_id,
                 is_owner=True,
             )
         
