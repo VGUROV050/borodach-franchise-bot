@@ -411,7 +411,7 @@ async def contact_development_handler(message: types.Message, state: FSMContext)
     
     await message.answer(
         "🚀 <b>Отдел Развития</b>\n\n"
-        "Для связи с отделом развития перейдите в чат:\n\n"
+        "Для связи перейдите в чат:\n\n"
         "👉 <a href='https://t.me/borodach_development'>@borodach_development</a>\n\n"
         "Отдел отвечает за:\n"
         "• Открытие новых точек\n"
@@ -430,7 +430,7 @@ async def contact_marketing_handler(message: types.Message, state: FSMContext) -
     
     await message.answer(
         "📢 <b>Отдел Маркетинга</b>\n\n"
-        "Для связи с отделом маркетинга перейдите в чат:\n\n"
+        "Для связи перейдите в чат:\n\n"
         "👉 <a href='https://t.me/borodach_marketing'>@borodach_marketing</a>\n\n"
         "Отдел отвечает за:\n"
         "• Рекламные материалы\n"
