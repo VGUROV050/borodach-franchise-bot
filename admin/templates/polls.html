@@ -63,12 +63,6 @@
                     📤 Отправить
                 </button>
             </form>
-            <form action="/polls/{{ poll.id }}/delete" method="post" style="display: inline;">
-                <button type="submit" class="btn btn-sm btn-danger" 
-                        onclick="return confirm('Удалить голосование?')">
-                    🗑 Удалить
-                </button>
-            </form>
             {% elif poll.status.value == 'sent' %}
             <form action="/polls/{{ poll.id }}/close" method="post" style="display: inline;">
                 <button type="submit" class="btn btn-sm btn-warning" 
@@ -77,6 +71,13 @@
                 </button>
             </form>
             {% endif %}
+            
+            <form action="/polls/{{ poll.id }}/delete" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-sm btn-danger" 
+                        onclick="return confirm('Удалить голосование? Это действие нельзя отменить.')">
+                    🗑
+                </button>
+            </form>
         </div>
     </div>
     {% endfor %}

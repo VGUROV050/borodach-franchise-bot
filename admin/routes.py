@@ -1176,7 +1176,6 @@ async def create_poll_action(
     request: Request,
     question: str = Form(...),
     options: str = Form(...),  # Варианты через перевод строки
-    is_anonymous: str = Form("1"),
     allows_multiple: str = Form("0"),
 ):
     """Создать голосование."""
@@ -1199,7 +1198,7 @@ async def create_poll_action(
             db,
             question=question,
             options=options_list,
-            is_anonymous=is_anonymous == "1",
+            is_anonymous=False,  # Всегда не анонимное для получения ответов
             allows_multiple=allows_multiple == "1",
         )
     
@@ -1371,20 +1370,23 @@ async def close_poll(request: Request, poll_id: int):
 
 @router.post("/polls/{poll_id}/delete")
 async def delete_poll_action(request: Request, poll_id: int):
-    """Удалить черновик голосования."""
+    """Удалить голосование (любое)."""
     if not verify_session(request):
         raise HTTPException(status_code=401, detail="Unauthorized")
     
-    from database import delete_poll
+    from database import get_poll_by_id
+    from database.models import Poll
+    from sqlalchemy import delete
     
     async with AsyncSessionLocal() as db:
-        success = await delete_poll(db, poll_id)
+        poll = await get_poll_by_id(db, poll_id)
         
-        if not success:
-            raise HTTPException(
-                status_code=400, 
-                detail="Можно удалить только черновик"
-            )
+        if not poll:
+            raise HTTPException(status_code=404, detail="Голосование не найдено")
+        
+        # Удаляем голосование (каскадно удалятся options, responses, messages)
+        await db.delete(poll)
+        await db.commit()
     
     logger.info(f"Poll {poll_id} deleted")
     return RedirectResponse(url="/polls", status_code=302)
