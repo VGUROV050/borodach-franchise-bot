@@ -155,12 +155,11 @@ def extract_city_from_name(salon_name: str) -> Optional[str]:
     # Убираем лишние пробелы
     name = salon_name.strip()
     
-    # Вариант 1: "Москва — м. Преображенская" (длинное тире)
-    if " — " in name:
-        city = name.split(" — ")[0].strip()
-        return city
+    # Нормализуем все виды тире к одному
+    # U+2014 (—) em dash, U+2013 (–) en dash, U+002D (-) hyphen-minus
+    name = name.replace("—", "-").replace("–", "-")
     
-    # Вариант 2: "Москва - метро" (короткое тире с пробелами)
+    # Вариант 1: "Москва - метро" (тире с пробелами)
     if " - " in name:
         city = name.split(" - ")[0].strip()
         return city
@@ -210,7 +209,22 @@ def is_millionnik(city: str) -> bool:
     """Проверить является ли город миллионником."""
     if not city:
         return False
-    return city.lower().strip() in MILLIONNIKI
+    
+    city_lower = city.lower().strip()
+    
+    # Прямое совпадение
+    if city_lower in MILLIONNIKI:
+        return True
+    
+    # Проверяем начало названия (для случаев "Москва Север" и т.п.)
+    for m in MILLIONNIKI:
+        if city_lower.startswith(m + " ") or city_lower.startswith(m + "-"):
+            return True
+        # Также проверяем если миллионник содержится в начале
+        if m in city_lower.split()[0] if city_lower.split() else False:
+            return True
+    
+    return False
 
 
 def get_region(city: str) -> str:
@@ -330,8 +344,10 @@ def analyze_geography(ratings: list) -> dict:
     result["millionniki"] = sorted(result["millionniki"], key=lambda x: x["count"], reverse=True)
     
     # Формируем список регионов (области)
+    # Исключаем Москву и СПб - они уже в миллионниках
+    excluded_regions = {"Москва", "Санкт-Петербург", "Не определено"}
     for region, data in result["by_region"].items():
-        if region != "Не определено":
+        if region not in excluded_regions:
             result["regions"].append({
                 "name": region,
                 "count": data["count"],
