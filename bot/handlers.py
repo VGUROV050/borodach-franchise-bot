@@ -465,7 +465,19 @@ async def useful_department_selected(message: types.Message, state: FSMContext) 
     """Выбран отдел — показываем действия."""
     dept_key = USEFUL_DEPT_MAP[message.text]
     
-    await state.update_data(selected_department=dept_key)
+    # Получаем кастомные кнопки из БД
+    from database import get_department_buttons, DepartmentType
+    
+    async with AsyncSessionLocal() as db:
+        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
+    
+    # Сохраняем тексты кнопок в состоянии для обработки кликов
+    button_texts = [btn.button_text for btn in custom_buttons]
+    
+    await state.update_data(
+        selected_department=dept_key,
+        custom_button_texts=button_texts,
+    )
     await state.set_state(UsefulStates.in_department)
     
     dept_name = DEPT_NAMES.get(dept_key, message.text)
@@ -473,7 +485,7 @@ async def useful_department_selected(message: types.Message, state: FSMContext) 
     await message.answer(
         f"{dept_name}\n\n"
         "Выберите действие:",
-        reply_markup=useful_actions_keyboard(),
+        reply_markup=useful_actions_keyboard(custom_buttons),
     )
 
 
@@ -489,7 +501,7 @@ async def useful_important_info(message: types.Message, state: FSMContext) -> No
         return
     
     # Получаем текст из БД
-    from database import get_department_info, DepartmentType, DepartmentInfoType
+    from database import get_department_info, get_department_buttons, DepartmentType, DepartmentInfoType
     
     async with AsyncSessionLocal() as db:
         info = await get_department_info(
@@ -497,6 +509,7 @@ async def useful_important_info(message: types.Message, state: FSMContext) -> No
             DepartmentType(dept_key),
             DepartmentInfoType.IMPORTANT_INFO,
         )
+        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
     
     if info and info.text:
         text = clean_html_for_telegram(info.text)
@@ -506,7 +519,7 @@ async def useful_important_info(message: types.Message, state: FSMContext) -> No
     
     await message.answer(
         text,
-        reply_markup=useful_actions_keyboard(),
+        reply_markup=useful_actions_keyboard(custom_buttons),
         disable_web_page_preview=True,
     )
 
@@ -523,7 +536,7 @@ async def useful_contact_department(message: types.Message, state: FSMContext) -
         return
     
     # Получаем текст из БД
-    from database import get_department_info, DepartmentType, DepartmentInfoType
+    from database import get_department_info, get_department_buttons, DepartmentType, DepartmentInfoType
     
     async with AsyncSessionLocal() as db:
         info = await get_department_info(
@@ -531,6 +544,7 @@ async def useful_contact_department(message: types.Message, state: FSMContext) -
             DepartmentType(dept_key),
             DepartmentInfoType.CONTACT_INFO,
         )
+        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
     
     if info and info.text:
         text = clean_html_for_telegram(info.text)
@@ -540,7 +554,47 @@ async def useful_contact_department(message: types.Message, state: FSMContext) -
     
     await message.answer(
         text,
-        reply_markup=useful_actions_keyboard(),
+        reply_markup=useful_actions_keyboard(custom_buttons),
+        disable_web_page_preview=True,
+    )
+
+
+@router.message(UsefulStates.in_department)
+async def useful_custom_button_handler(message: types.Message, state: FSMContext) -> None:
+    """Обработчик кастомных кнопок из БД."""
+    data = await state.get_data()
+    dept_key = data.get("selected_department")
+    custom_button_texts = data.get("custom_button_texts", [])
+    
+    if not dept_key:
+        await state.clear()
+        await message.answer("Ошибка. Вернитесь в главное меню.", reply_markup=main_menu_keyboard())
+        return
+    
+    # Проверяем, является ли это кастомной кнопкой
+    if message.text not in custom_button_texts:
+        # Не наша кнопка - игнорируем или показываем подсказку
+        return
+    
+    # Получаем кнопку из БД
+    from database import get_department_button_by_text, get_department_buttons, DepartmentType
+    
+    async with AsyncSessionLocal() as db:
+        button = await get_department_button_by_text(
+            db,
+            DepartmentType(dept_key),
+            message.text,
+        )
+        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
+    
+    if button and button.message_text:
+        text = clean_html_for_telegram(button.message_text)
+    else:
+        text = "Информация временно недоступна."
+    
+    await message.answer(
+        text,
+        reply_markup=useful_actions_keyboard(custom_buttons),
         disable_web_page_preview=True,
     )
 

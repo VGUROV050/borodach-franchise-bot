@@ -23,6 +23,7 @@ from .models import (
     DepartmentInfo,
     DepartmentType,
     DepartmentInfoType,
+    DepartmentButton,
 )
 from .crud import (
     get_partner_by_telegram_id,
@@ -73,6 +74,14 @@ from .crud import (
     get_all_department_info,
     upsert_department_info,
     init_default_department_info,
+    # Department Buttons (Кнопки для Полезное)
+    get_department_buttons,
+    get_all_department_buttons,
+    get_department_button_by_id,
+    get_department_button_by_text,
+    create_department_button,
+    update_department_button,
+    delete_department_button,
 )
 
 __all__ = [
@@ -151,5 +160,14 @@ __all__ = [
     "get_all_department_info",
     "upsert_department_info",
     "init_default_department_info",
+    # Department Buttons (Кнопки для Полезное)
+    "DepartmentButton",
+    "get_department_buttons",
+    "get_all_department_buttons",
+    "get_department_button_by_id",
+    "get_department_button_by_text",
+    "create_department_button",
+    "update_department_button",
+    "delete_department_button",
 ]
 

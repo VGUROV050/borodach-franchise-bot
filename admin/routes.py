@@ -1582,6 +1582,181 @@ async def save_useful_info(
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Кнопки отделов (для раздела "Полезное")
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/useful-info/buttons", response_class=HTMLResponse)
+async def department_buttons_page(request: Request, department: str = None):
+    """Страница управления кнопками отделов."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_department_buttons, DepartmentType
+    
+    async with AsyncSessionLocal() as db:
+        all_buttons = await get_all_department_buttons(db)
+    
+    # Группируем по отделам
+    grouped = {}
+    for dept in DepartmentType:
+        grouped[dept] = [b for b in all_buttons if b.department == dept]
+    
+    return templates.TemplateResponse(
+        "department_buttons.html",
+        {
+            "request": request,
+            "grouped": grouped,
+            "DepartmentType": DepartmentType,
+            "current_department": department,
+        },
+    )
+
+
+@router.get("/useful-info/buttons/create", response_class=HTMLResponse)
+async def create_button_page(request: Request, department: str = None):
+    """Страница создания кнопки."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import DepartmentType
+    
+    return templates.TemplateResponse(
+        "edit_department_button.html",
+        {
+            "request": request,
+            "button": None,
+            "DepartmentType": DepartmentType,
+            "selected_department": department,
+            "is_new": True,
+        },
+    )
+
+
+@router.post("/useful-info/buttons/create")
+async def create_button(
+    request: Request,
+    department: str = Form(...),
+    button_text: str = Form(...),
+    message_text: str = Form(...),
+    order: int = Form(0),
+):
+    """Создать новую кнопку."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import create_department_button, DepartmentType
+    
+    try:
+        dept = DepartmentType(department)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверный отдел")
+    
+    async with AsyncSessionLocal() as db:
+        await create_department_button(db, dept, button_text, message_text, order)
+    
+    logger.info(f"Created department button: {department} - {button_text}")
+    return RedirectResponse(url="/useful-info/buttons", status_code=302)
+
+
+@router.get("/useful-info/buttons/{button_id}/edit", response_class=HTMLResponse)
+async def edit_button_page(request: Request, button_id: int):
+    """Страница редактирования кнопки."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_department_button_by_id, DepartmentType
+    
+    async with AsyncSessionLocal() as db:
+        button = await get_department_button_by_id(db, button_id)
+    
+    if not button:
+        raise HTTPException(status_code=404, detail="Кнопка не найдена")
+    
+    return templates.TemplateResponse(
+        "edit_department_button.html",
+        {
+            "request": request,
+            "button": button,
+            "DepartmentType": DepartmentType,
+            "selected_department": button.department.value,
+            "is_new": False,
+        },
+    )
+
+
+@router.post("/useful-info/buttons/{button_id}/edit")
+async def save_button(
+    request: Request,
+    button_id: int,
+    department: str = Form(...),
+    button_text: str = Form(...),
+    message_text: str = Form(...),
+    order: int = Form(0),
+    is_active: bool = Form(True),
+):
+    """Сохранить изменения кнопки."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import update_department_button, get_department_button_by_id, DepartmentType
+    
+    async with AsyncSessionLocal() as db:
+        button = await get_department_button_by_id(db, button_id)
+        if not button:
+            raise HTTPException(status_code=404, detail="Кнопка не найдена")
+        
+        # Обновляем все поля
+        try:
+            dept = DepartmentType(department)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный отдел")
+        
+        button.department = dept
+        button.button_text = button_text
+        button.message_text = message_text
+        button.order = order
+        button.is_active = is_active
+        
+        await db.commit()
+    
+    logger.info(f"Updated department button {button_id}: {button_text}")
+    return RedirectResponse(url="/useful-info/buttons", status_code=302)
+
+
+@router.post("/useful-info/buttons/{button_id}/delete")
+async def delete_button(request: Request, button_id: int):
+    """Удалить кнопку."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import delete_department_button
+    
+    async with AsyncSessionLocal() as db:
+        await delete_department_button(db, button_id)
+    
+    logger.info(f"Deleted department button {button_id}")
+    return RedirectResponse(url="/useful-info/buttons", status_code=302)
+
+
+@router.post("/useful-info/buttons/{button_id}/toggle")
+async def toggle_button(request: Request, button_id: int):
+    """Включить/выключить кнопку."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import get_department_button_by_id
+    
+    async with AsyncSessionLocal() as db:
+        button = await get_department_button_by_id(db, button_id)
+        if button:
+            button.is_active = not button.is_active
+            await db.commit()
+            logger.info(f"Toggled button {button_id}: active={button.is_active}")
+    
+    return RedirectResponse(url="/useful-info/buttons", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Диагностика системы
 # ═══════════════════════════════════════════════════════════════════
 

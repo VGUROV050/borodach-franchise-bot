@@ -1151,3 +1151,143 @@ async def init_default_department_info(db: AsyncSession) -> None:
         if not existing:
             await upsert_department_info(db, dept, info_type, text)
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Department Buttons (Кастомные кнопки для "Полезное")
+# ═══════════════════════════════════════════════════════════════════
+
+async def get_department_buttons(
+    db: AsyncSession,
+    department: DepartmentType,
+    only_active: bool = True,
+) -> list["DepartmentButton"]:
+    """Получить все кнопки для отдела."""
+    from database.models import DepartmentButton
+    
+    query = select(DepartmentButton).where(
+        DepartmentButton.department == department
+    ).order_by(DepartmentButton.order, DepartmentButton.id)
+    
+    if only_active:
+        query = query.where(DepartmentButton.is_active == True)
+    
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def get_all_department_buttons(
+    db: AsyncSession,
+) -> list["DepartmentButton"]:
+    """Получить все кнопки всех отделов."""
+    from database.models import DepartmentButton
+    
+    result = await db.execute(
+        select(DepartmentButton).order_by(
+            DepartmentButton.department,
+            DepartmentButton.order,
+            DepartmentButton.id,
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def get_department_button_by_id(
+    db: AsyncSession,
+    button_id: int,
+) -> Optional["DepartmentButton"]:
+    """Получить кнопку по ID."""
+    from database.models import DepartmentButton
+    
+    result = await db.execute(
+        select(DepartmentButton).where(DepartmentButton.id == button_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_department_button_by_text(
+    db: AsyncSession,
+    department: DepartmentType,
+    button_text: str,
+) -> Optional["DepartmentButton"]:
+    """Получить кнопку по тексту (для обработки нажатий)."""
+    from database.models import DepartmentButton
+    
+    result = await db.execute(
+        select(DepartmentButton).where(
+            DepartmentButton.department == department,
+            DepartmentButton.button_text == button_text,
+            DepartmentButton.is_active == True,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def create_department_button(
+    db: AsyncSession,
+    department: DepartmentType,
+    button_text: str,
+    message_text: str,
+    order: int = 0,
+) -> "DepartmentButton":
+    """Создать новую кнопку."""
+    from database.models import DepartmentButton
+    
+    button = DepartmentButton(
+        department=department,
+        button_text=button_text,
+        message_text=message_text,
+        order=order,
+        is_active=True,
+    )
+    db.add(button)
+    await db.commit()
+    await db.refresh(button)
+    
+    logger.info(f"Created department button: {department.value} - {button_text}")
+    return button
+
+
+async def update_department_button(
+    db: AsyncSession,
+    button_id: int,
+    button_text: Optional[str] = None,
+    message_text: Optional[str] = None,
+    order: Optional[int] = None,
+    is_active: Optional[bool] = None,
+) -> Optional["DepartmentButton"]:
+    """Обновить кнопку."""
+    button = await get_department_button_by_id(db, button_id)
+    if not button:
+        return None
+    
+    if button_text is not None:
+        button.button_text = button_text
+    if message_text is not None:
+        button.message_text = message_text
+    if order is not None:
+        button.order = order
+    if is_active is not None:
+        button.is_active = is_active
+    
+    await db.commit()
+    await db.refresh(button)
+    
+    logger.info(f"Updated department button {button_id}: {button.button_text}")
+    return button
+
+
+async def delete_department_button(
+    db: AsyncSession,
+    button_id: int,
+) -> bool:
+    """Удалить кнопку."""
+    button = await get_department_button_by_id(db, button_id)
+    if not button:
+        return False
+    
+    await db.delete(button)
+    await db.commit()
+    
+    logger.info(f"Deleted department button {button_id}")
+    return True
+

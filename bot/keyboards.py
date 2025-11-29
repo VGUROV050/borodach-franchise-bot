@@ -99,14 +99,27 @@ def useful_departments_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def useful_actions_keyboard() -> ReplyKeyboardMarkup:
-    """Меню действий внутри отдела (Полезное)."""
+def useful_actions_keyboard(custom_buttons: list = None) -> ReplyKeyboardMarkup:
+    """
+    Меню действий внутри отдела (Полезное).
+    
+    Args:
+        custom_buttons: Список кастомных кнопок из БД (каждая кнопка - объект с button_text)
+    """
+    rows = []
+    
+    # Добавляем кастомные кнопки из БД
+    if custom_buttons:
+        for btn in custom_buttons:
+            rows.append([KeyboardButton(text=btn.button_text)])
+    
+    # Стандартные кнопки
+    rows.append([KeyboardButton(text=BTN_IMPORTANT_INFO)])
+    rows.append([KeyboardButton(text=BTN_CONTACT_DEPARTMENT)])
+    rows.append([KeyboardButton(text=BTN_BACK)])
+    
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_IMPORTANT_INFO)],
-            [KeyboardButton(text=BTN_CONTACT_DEPARTMENT)],
-            [KeyboardButton(text=BTN_BACK)],
-        ],
+        keyboard=rows,
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
     )

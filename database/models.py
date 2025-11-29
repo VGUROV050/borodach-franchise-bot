@@ -555,6 +555,46 @@ class DepartmentInfo(Base):
         return f"<DepartmentInfo {self.department.value}/{self.info_type.value}>"
 
 
+class DepartmentButton(Base):
+    """Кастомные кнопки для раздела 'Полезное' по отделам."""
+    
+    __tablename__ = "department_buttons"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Отдел
+    department: Mapped[DepartmentType] = mapped_column(
+        Enum(DepartmentType),
+        index=True,
+    )
+    
+    # Текст кнопки (что видит пользователь)
+    button_text: Mapped[str] = mapped_column(String(100))
+    
+    # Сообщение при нажатии (HTML разрешён)
+    message_text: Mapped[str] = mapped_column(Text)
+    
+    # Порядок отображения (меньше = выше)
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Активна ли кнопка
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Когда создано/обновлено
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<DepartmentButton {self.department.value}: {self.button_text}>"
+
+
 class PollMessage(Base):
     """Связь голосования с сообщением в Telegram (для закрытия)."""
     

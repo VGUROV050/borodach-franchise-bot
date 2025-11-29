@@ -3,12 +3,14 @@
 {% block title %}Полезное — Настройка текстов{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
     <h1>📚 Полезное — Настройка текстов</h1>
+    <a href="/useful-info/buttons" class="btn btn-success">🔘 Управление кнопками</a>
 </div>
 
 <p class="description">
-    Здесь можно настроить тексты, которые бот отправляет партнёрам в разделе «Полезное».
+    Здесь можно настроить базовые тексты для раздела «Полезное».
+    <a href="/useful-info/buttons" style="color: var(--primary);">Для добавления кнопок перейдите сюда →</a>
     Поддерживается HTML-разметка: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;a href="..."&gt;</code>.
 </p>
 

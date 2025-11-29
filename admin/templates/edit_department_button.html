@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}Новая кнопка{% else %}Редактирование кнопки{% endif %} — Админка{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        {% if is_new %}➕ Новая кнопка{% else %}✏️ Редактирование кнопки{% endif %}
+    </h1>
+    <a href="/useful-info/buttons" class="btn">← Назад к списку</a>
+</div>
+
+<div class="card">
+    <form method="post" action="{% if is_new %}/useful-info/buttons/create{% else %}/useful-info/buttons/{{ button.id }}/edit{% endif %}">
+        <div style="padding: 1.5rem; display: grid; gap: 1.5rem;">
+            
+            <!-- Отдел -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Отдел</label>
+                <select name="department" required 
+                        style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                    {% for dept in DepartmentType %}
+                    <option value="{{ dept.value }}" 
+                            {% if selected_department == dept.value or (button and button.department == dept) %}selected{% endif %}>
+                        {% if dept.value == 'development' %}🚀 Отдел Развития
+                        {% elif dept.value == 'marketing' %}📢 Отдел Маркетинга  
+                        {% elif dept.value == 'design' %}🎨 Отдел Дизайна
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Текст кнопки -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Текст кнопки</label>
+                <input type="text" name="button_text" required maxlength="100"
+                       value="{% if button %}{{ button.button_text }}{% endif %}"
+                       placeholder="Например: 📋 Инструкция по открытию"
+                       style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                <small style="color: var(--text-muted);">Текст, который увидит пользователь на кнопке (до 100 символов)</small>
+            </div>
+            
+            <!-- Порядок -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Порядок отображения</label>
+                <input type="number" name="order" min="0" max="999"
+                       value="{% if button %}{{ button.order }}{% else %}0{% endif %}"
+                       style="width: 100px; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem;">
+                <small style="color: var(--text-muted); display: block; margin-top: 0.25rem;">Меньше число = выше в списке</small>
+            </div>
+            
+            {% if not is_new %}
+            <!-- Статус -->
+            <div>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="is_active" value="true"
+                           {% if button.is_active %}checked{% endif %}
+                           style="width: 20px; height: 20px;">
+                    <span style="font-weight: 600;">Кнопка активна</span>
+                </label>
+                <small style="color: var(--text-muted);">Неактивные кнопки не отображаются в боте</small>
+            </div>
+            {% endif %}
+            
+            <!-- Сообщение -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Сообщение при нажатии</label>
+                
+                <!-- Toolbar -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" onclick="wrapText('b')" class="format-btn" title="Жирный">
+                        <b>B</b>
+                    </button>
+                    <button type="button" onclick="wrapText('i')" class="format-btn" title="Курсив">
+                        <i>I</i>
+                    </button>
+                    <button type="button" onclick="wrapText('u')" class="format-btn" title="Подчёркнутый">
+                        <u>U</u>
+                    </button>
+                    <button type="button" onclick="wrapText('s')" class="format-btn" title="Зачёркнутый">
+                        <s>S</s>
+                    </button>
+                    <button type="button" onclick="wrapText('code')" class="format-btn" title="Код">
+                        &lt;/&gt;
+                    </button>
+                    <button type="button" onclick="insertLink()" class="format-btn" title="Ссылка">
+                        🔗
+                    </button>
+                    <button type="button" onclick="insertNewline()" class="format-btn" title="Новая строка">
+                        ↵
+                    </button>
+                </div>
+                
+                <textarea id="message_text" name="message_text" required
+                          rows="8" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; font-family: monospace; resize: vertical;">{% if button %}{{ button.message_text }}{% endif %}</textarea>
+                
+                <small style="color: var(--text-muted);">Поддерживается HTML: &lt;b&gt;, &lt;i&gt;, &lt;u&gt;, &lt;s&gt;, &lt;code&gt;, &lt;a href=""&gt;</small>
+            </div>
+            
+            <!-- Предпросмотр -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Предпросмотр</label>
+                <div id="preview" style="background: #e5ddd5; padding: 1rem; border-radius: 12px; min-height: 60px;">
+                    <div style="background: #dcf8c6; padding: 0.75rem 1rem; border-radius: 8px; max-width: 80%; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.1);">
+                        <div id="preview-content" style="white-space: pre-wrap; line-height: 1.5;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Кнопки -->
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <a href="/useful-info/buttons" class="btn" style="background: var(--card-bg); border: 1px solid var(--border);">
+                    Отмена
+                </a>
+                <button type="submit" class="btn btn-success">
+                    {% if is_new %}Создать кнопку{% else %}Сохранить{% endif %}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.format-btn {
+    padding: 0.5rem 0.75rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    min-width: 36px;
+    transition: all 0.2s;
+}
+.format-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+</style>
+
+<script>
+const textarea = document.getElementById('message_text');
+const preview = document.getElementById('preview-content');
+
+function updatePreview() {
+    let text = textarea.value;
+    preview.innerHTML = text || '<span style="color: #999;">Введите текст...</span>';
+}
+
+textarea.addEventListener('input', updatePreview);
+updatePreview();
+
+function wrapText(tag) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    const replacement = `<${tag}>${selectedText}</${tag}>`;
+    
+    textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + tag.length + 2, start + tag.length + 2 + selectedText.length);
+    updatePreview();
+}
+
+function insertLink() {
+    const url = prompt('Введите URL (например: https://t.me/username):');
+    if (!url) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end) || 'текст ссылки';
+    const replacement = `<a href="${url}">${selectedText}</a>`;
+    
+    textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    textarea.focus();
+    updatePreview();
+}
+
+function insertNewline() {
+    const start = textarea.selectionStart;
+    textarea.value = textarea.value.substring(0, start) + '\n' + textarea.value.substring(start);
+    textarea.focus();
+    textarea.setSelectionRange(start + 1, start + 1);
+    updatePreview();
+}
+</script>
+{% endblock %}
+
