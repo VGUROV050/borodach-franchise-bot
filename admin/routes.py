@@ -1133,3 +1133,258 @@ async def request_logs_page(request: Request):
         },
     )
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Голосования
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/polls", response_class=HTMLResponse)
+async def polls_list(request: Request):
+    """Список всех голосований."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_polls, PollStatus
+    
+    async with AsyncSessionLocal() as db:
+        polls = await get_all_polls(db)
+    
+    return templates.TemplateResponse(
+        "polls.html",
+        {
+            "request": request,
+            "polls": polls,
+            "PollStatus": PollStatus,
+        },
+    )
+
+
+@router.get("/polls/create", response_class=HTMLResponse)
+async def create_poll_page(request: Request):
+    """Страница создания голосования."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    return templates.TemplateResponse(
+        "poll_create.html",
+        {"request": request},
+    )
+
+
+@router.post("/polls/create")
+async def create_poll_action(
+    request: Request,
+    question: str = Form(...),
+    options: str = Form(...),  # Варианты через перевод строки
+    is_anonymous: str = Form("1"),
+    allows_multiple: str = Form("0"),
+):
+    """Создать голосование."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import create_poll
+    
+    # Парсим варианты
+    options_list = [opt.strip() for opt in options.split("\n") if opt.strip()]
+    
+    if len(options_list) < 2:
+        raise HTTPException(status_code=400, detail="Минимум 2 варианта ответа")
+    
+    if len(options_list) > 10:
+        raise HTTPException(status_code=400, detail="Максимум 10 вариантов ответа")
+    
+    async with AsyncSessionLocal() as db:
+        poll = await create_poll(
+            db,
+            question=question,
+            options=options_list,
+            is_anonymous=is_anonymous == "1",
+            allows_multiple=allows_multiple == "1",
+        )
+    
+    logger.info(f"Poll created: {poll.id}")
+    return RedirectResponse(url="/polls", status_code=302)
+
+
+@router.get("/polls/{poll_id}", response_class=HTMLResponse)
+async def poll_details(request: Request, poll_id: int):
+    """Детали и результаты голосования."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_poll_by_id, get_poll_results, PollStatus
+    
+    async with AsyncSessionLocal() as db:
+        poll = await get_poll_by_id(db, poll_id)
+        
+        if not poll:
+            raise HTTPException(status_code=404, detail="Голосование не найдено")
+        
+        results = await get_poll_results(db, poll_id)
+    
+    return templates.TemplateResponse(
+        "poll_details.html",
+        {
+            "request": request,
+            "poll": poll,
+            "results": results,
+            "PollStatus": PollStatus,
+        },
+    )
+
+
+@router.post("/polls/{poll_id}/send")
+async def send_poll(request: Request, poll_id: int):
+    """Отправить голосование всем верифицированным партнёрам."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import (
+        get_poll_by_id, 
+        update_poll_status, 
+        save_poll_message,
+        PollStatus,
+    )
+    
+    async with AsyncSessionLocal() as db:
+        poll = await get_poll_by_id(db, poll_id)
+        
+        if not poll:
+            raise HTTPException(status_code=404, detail="Голосование не найдено")
+        
+        if poll.status != PollStatus.DRAFT:
+            raise HTTPException(status_code=400, detail="Можно отправить только черновик")
+        
+        # Получаем верифицированных партнёров
+        partners = await get_all_partners(db, status=PartnerStatus.VERIFIED)
+        
+        if not partners:
+            raise HTTPException(status_code=400, detail="Нет верифицированных партнёров")
+        
+        # Подготавливаем варианты ответов
+        options = [opt.text for opt in poll.options]
+        
+        # Отправляем каждому партнёру
+        success_count = 0
+        fail_count = 0
+        
+        async with httpx.AsyncClient() as client:
+            for partner in partners:
+                try:
+                    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPoll"
+                    
+                    payload = {
+                        "chat_id": partner.telegram_id,
+                        "question": poll.question,
+                        "options": options,
+                        "is_anonymous": poll.is_anonymous,
+                        "allows_multiple_answers": poll.allows_multiple,
+                    }
+                    
+                    response = await client.post(url, json=payload, timeout=10)
+                    result = response.json()
+                    
+                    if result.get("ok"):
+                        # Сохраняем информацию о сообщении
+                        msg_data = result["result"]
+                        await save_poll_message(
+                            db,
+                            poll_id=poll.id,
+                            partner_id=partner.id,
+                            telegram_chat_id=msg_data["chat"]["id"],
+                            telegram_message_id=msg_data["message_id"],
+                            telegram_poll_id=msg_data["poll"]["id"],
+                        )
+                        success_count += 1
+                    else:
+                        logger.error(f"Failed to send poll to {partner.telegram_id}: {result}")
+                        fail_count += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error sending poll to {partner.telegram_id}: {e}")
+                    fail_count += 1
+        
+        # Обновляем статус голосования
+        await update_poll_status(db, poll_id, PollStatus.SENT)
+    
+    logger.info(f"Poll {poll_id} sent: {success_count} success, {fail_count} failed")
+    return RedirectResponse(url=f"/polls/{poll_id}", status_code=302)
+
+
+@router.post("/polls/{poll_id}/close")
+async def close_poll(request: Request, poll_id: int):
+    """Закрыть голосование (остановить опросы в Telegram)."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import (
+        get_poll_by_id, 
+        update_poll_status, 
+        get_poll_messages,
+        mark_poll_message_stopped,
+        PollStatus,
+    )
+    
+    async with AsyncSessionLocal() as db:
+        poll = await get_poll_by_id(db, poll_id)
+        
+        if not poll:
+            raise HTTPException(status_code=404, detail="Голосование не найдено")
+        
+        if poll.status != PollStatus.SENT:
+            raise HTTPException(status_code=400, detail="Можно закрыть только отправленное голосование")
+        
+        # Получаем все сообщения с опросами
+        messages = await get_poll_messages(db, poll_id)
+        
+        stopped_count = 0
+        
+        async with httpx.AsyncClient() as client:
+            for msg in messages:
+                try:
+                    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/stopPoll"
+                    
+                    payload = {
+                        "chat_id": msg.telegram_chat_id,
+                        "message_id": msg.telegram_message_id,
+                    }
+                    
+                    response = await client.post(url, json=payload, timeout=10)
+                    result = response.json()
+                    
+                    if result.get("ok"):
+                        await mark_poll_message_stopped(db, msg.id)
+                        stopped_count += 1
+                    else:
+                        logger.warning(f"Failed to stop poll message {msg.id}: {result}")
+                        
+                except Exception as e:
+                    logger.error(f"Error stopping poll message {msg.id}: {e}")
+        
+        # Обновляем статус голосования
+        await update_poll_status(db, poll_id, PollStatus.CLOSED)
+    
+    logger.info(f"Poll {poll_id} closed: {stopped_count} polls stopped")
+    return RedirectResponse(url=f"/polls/{poll_id}", status_code=302)
+
+
+@router.post("/polls/{poll_id}/delete")
+async def delete_poll_action(request: Request, poll_id: int):
+    """Удалить черновик голосования."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import delete_poll
+    
+    async with AsyncSessionLocal() as db:
+        success = await delete_poll(db, poll_id)
+        
+        if not success:
+            raise HTTPException(
+                status_code=400, 
+                detail="Можно удалить только черновик"
+            )
+    
+    logger.info(f"Poll {poll_id} deleted")
+    return RedirectResponse(url="/polls", status_code=302)

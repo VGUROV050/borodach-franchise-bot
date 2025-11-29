@@ -387,3 +387,146 @@ class RequestLog(Base):
     def __repr__(self) -> str:
         return f"<RequestLog {self.request_type.value}: {self.status.value}>"
 
+
+class PollStatus(str, enum.Enum):
+    """Статус голосования."""
+    DRAFT = "draft"       # Черновик
+    SENT = "sent"         # Отправлено
+    CLOSED = "closed"     # Закрыто
+
+
+class Poll(Base):
+    """Голосование."""
+    
+    __tablename__ = "polls"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Вопрос
+    question: Mapped[str] = mapped_column(Text)
+    
+    # Настройки
+    is_anonymous: Mapped[bool] = mapped_column(Boolean, default=True)
+    allows_multiple: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Статус
+    status: Mapped[PollStatus] = mapped_column(
+        Enum(PollStatus),
+        default=PollStatus.DRAFT,
+        index=True,
+    )
+    
+    # Временные метки
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    sent_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    closed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    
+    # Кто создал
+    created_by: Mapped[str] = mapped_column(String(100), default="admin")
+    
+    # Связи
+    options: Mapped[list["PollOption"]] = relationship(
+        back_populates="poll",
+        cascade="all, delete-orphan",
+        order_by="PollOption.position",
+    )
+    responses: Mapped[list["PollResponse"]] = relationship(
+        back_populates="poll",
+        cascade="all, delete-orphan",
+    )
+    sent_messages: Mapped[list["PollMessage"]] = relationship(
+        back_populates="poll",
+        cascade="all, delete-orphan",
+    )
+    
+    @property
+    def total_votes(self) -> int:
+        """Общее количество проголосовавших."""
+        return len(self.responses)
+    
+    def __repr__(self) -> str:
+        return f"<Poll {self.id}: {self.question[:30]}...>"
+
+
+class PollOption(Base):
+    """Вариант ответа в голосовании."""
+    
+    __tablename__ = "poll_options"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    poll_id: Mapped[int] = mapped_column(ForeignKey("polls.id", ondelete="CASCADE"))
+    
+    # Текст варианта
+    text: Mapped[str] = mapped_column(String(255))
+    
+    # Порядок отображения
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Связи
+    poll: Mapped["Poll"] = relationship(back_populates="options")
+    
+    def __repr__(self) -> str:
+        return f"<PollOption {self.id}: {self.text[:20]}...>"
+
+
+class PollResponse(Base):
+    """Ответ пользователя на голосование."""
+    
+    __tablename__ = "poll_responses"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    poll_id: Mapped[int] = mapped_column(ForeignKey("polls.id", ondelete="CASCADE"), index=True)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id", ondelete="CASCADE"), index=True)
+    
+    # Выбранные варианты (JSON: [1, 3])
+    option_ids: Mapped[str] = mapped_column(Text)
+    
+    # Когда ответил
+    answered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    # Связи
+    poll: Mapped["Poll"] = relationship(back_populates="responses")
+    partner: Mapped["Partner"] = relationship()
+    
+    def __repr__(self) -> str:
+        return f"<PollResponse poll={self.poll_id} partner={self.partner_id}>"
+
+
+class PollMessage(Base):
+    """Связь голосования с сообщением в Telegram (для закрытия)."""
+    
+    __tablename__ = "poll_messages"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    poll_id: Mapped[int] = mapped_column(ForeignKey("polls.id", ondelete="CASCADE"), index=True)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id", ondelete="CASCADE"))
+    
+    # Telegram данные для закрытия опроса
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger)
+    telegram_message_id: Mapped[int] = mapped_column(BigInteger)
+    telegram_poll_id: Mapped[str] = mapped_column(String(100))
+    
+    # Статус
+    is_stopped: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Связи
+    poll: Mapped["Poll"] = relationship(back_populates="sent_messages")
+    
+    def __repr__(self) -> str:
+        return f"<PollMessage poll={self.poll_id} msg={self.telegram_message_id}>"
+

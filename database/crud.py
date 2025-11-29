@@ -727,3 +727,297 @@ async def get_request_logs(
     result = await db.execute(query)
     return list(result.scalars().all())
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Poll CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+from .models import Poll, PollOption, PollResponse, PollMessage, PollStatus
+import json
+
+
+async def create_poll(
+    db: AsyncSession,
+    question: str,
+    options: list[str],
+    is_anonymous: bool = True,
+    allows_multiple: bool = False,
+    created_by: str = "admin",
+) -> Poll:
+    """Создать новое голосование."""
+    poll = Poll(
+        question=question,
+        is_anonymous=is_anonymous,
+        allows_multiple=allows_multiple,
+        status=PollStatus.DRAFT,
+        created_by=created_by,
+    )
+    db.add(poll)
+    await db.flush()  # Чтобы получить poll.id
+    
+    # Добавляем варианты ответов
+    for i, option_text in enumerate(options):
+        option = PollOption(
+            poll_id=poll.id,
+            text=option_text,
+            position=i,
+        )
+        db.add(option)
+    
+    await db.commit()
+    await db.refresh(poll)
+    
+    logger.info(f"Created poll {poll.id}: {question[:50]}...")
+    return poll
+
+
+async def get_poll_by_id(
+    db: AsyncSession,
+    poll_id: int,
+) -> Optional[Poll]:
+    """Получить голосование по ID с опциями и ответами."""
+    result = await db.execute(
+        select(Poll)
+        .options(
+            selectinload(Poll.options),
+            selectinload(Poll.responses).selectinload(PollResponse.partner),
+            selectinload(Poll.sent_messages),
+        )
+        .where(Poll.id == poll_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_all_polls(
+    db: AsyncSession,
+    status: PollStatus | None = None,
+) -> list[Poll]:
+    """Получить все голосования."""
+    query = (
+        select(Poll)
+        .options(
+            selectinload(Poll.options),
+            selectinload(Poll.responses),
+        )
+        .order_by(Poll.created_at.desc())
+    )
+    
+    if status:
+        query = query.where(Poll.status == status)
+    
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def update_poll_status(
+    db: AsyncSession,
+    poll_id: int,
+    status: PollStatus,
+) -> Optional[Poll]:
+    """Обновить статус голосования."""
+    result = await db.execute(
+        select(Poll).where(Poll.id == poll_id)
+    )
+    poll = result.scalar_one_or_none()
+    
+    if not poll:
+        return None
+    
+    poll.status = status
+    
+    if status == PollStatus.SENT:
+        poll.sent_at = datetime.now(ZoneInfo("Europe/Moscow"))
+    elif status == PollStatus.CLOSED:
+        poll.closed_at = datetime.now(ZoneInfo("Europe/Moscow"))
+    
+    await db.commit()
+    await db.refresh(poll)
+    
+    logger.info(f"Updated poll {poll_id} status to {status.value}")
+    return poll
+
+
+async def save_poll_message(
+    db: AsyncSession,
+    poll_id: int,
+    partner_id: int,
+    telegram_chat_id: int,
+    telegram_message_id: int,
+    telegram_poll_id: str,
+) -> PollMessage:
+    """Сохранить информацию об отправленном опросе."""
+    msg = PollMessage(
+        poll_id=poll_id,
+        partner_id=partner_id,
+        telegram_chat_id=telegram_chat_id,
+        telegram_message_id=telegram_message_id,
+        telegram_poll_id=telegram_poll_id,
+    )
+    db.add(msg)
+    await db.commit()
+    await db.refresh(msg)
+    
+    return msg
+
+
+async def save_poll_response(
+    db: AsyncSession,
+    poll_id: int,
+    partner_id: int,
+    option_ids: list[int],
+) -> PollResponse:
+    """Сохранить ответ пользователя на голосование."""
+    # Проверяем, не отвечал ли уже
+    result = await db.execute(
+        select(PollResponse).where(
+            PollResponse.poll_id == poll_id,
+            PollResponse.partner_id == partner_id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    
+    if existing:
+        # Обновляем ответ
+        existing.option_ids = json.dumps(option_ids)
+        existing.answered_at = datetime.now(ZoneInfo("Europe/Moscow"))
+        await db.commit()
+        await db.refresh(existing)
+        return existing
+    
+    # Создаём новый ответ
+    response = PollResponse(
+        poll_id=poll_id,
+        partner_id=partner_id,
+        option_ids=json.dumps(option_ids),
+    )
+    db.add(response)
+    await db.commit()
+    await db.refresh(response)
+    
+    logger.info(f"Saved poll response: poll={poll_id}, partner={partner_id}, options={option_ids}")
+    return response
+
+
+async def get_poll_messages(
+    db: AsyncSession,
+    poll_id: int,
+) -> list[PollMessage]:
+    """Получить все сообщения голосования (для закрытия)."""
+    result = await db.execute(
+        select(PollMessage).where(
+            PollMessage.poll_id == poll_id,
+            PollMessage.is_stopped == False,
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def mark_poll_message_stopped(
+    db: AsyncSession,
+    message_id: int,
+) -> None:
+    """Пометить сообщение как закрытое."""
+    result = await db.execute(
+        select(PollMessage).where(PollMessage.id == message_id)
+    )
+    msg = result.scalar_one_or_none()
+    
+    if msg:
+        msg.is_stopped = True
+        await db.commit()
+
+
+async def delete_poll(
+    db: AsyncSession,
+    poll_id: int,
+) -> bool:
+    """Удалить голосование (только черновик)."""
+    result = await db.execute(
+        select(Poll).where(
+            Poll.id == poll_id,
+            Poll.status == PollStatus.DRAFT,
+        )
+    )
+    poll = result.scalar_one_or_none()
+    
+    if not poll:
+        return False
+    
+    await db.delete(poll)
+    await db.commit()
+    
+    logger.info(f"Deleted poll {poll_id}")
+    return True
+
+
+async def get_poll_results(
+    db: AsyncSession,
+    poll_id: int,
+) -> dict:
+    """
+    Получить результаты голосования.
+    
+    Returns:
+        {
+            "question": "...",
+            "total_votes": 45,
+            "options": [
+                {"id": 1, "text": "Вариант 1", "votes": 20, "percent": 44.4},
+                {"id": 2, "text": "Вариант 2", "votes": 25, "percent": 55.6},
+            ],
+            "responses": [
+                {"partner_name": "Иван", "options": ["Вариант 1"], "answered_at": "..."},
+            ]
+        }
+    """
+    poll = await get_poll_by_id(db, poll_id)
+    
+    if not poll:
+        return {}
+    
+    # Подсчитываем голоса
+    option_votes: dict[int, int] = {opt.id: 0 for opt in poll.options}
+    
+    for response in poll.responses:
+        selected_ids = json.loads(response.option_ids)
+        for opt_id in selected_ids:
+            if opt_id in option_votes:
+                option_votes[opt_id] += 1
+    
+    total_votes = len(poll.responses)
+    
+    # Формируем результаты по опциям
+    options_result = []
+    for opt in poll.options:
+        votes = option_votes[opt.id]
+        percent = (votes / total_votes * 100) if total_votes > 0 else 0
+        options_result.append({
+            "id": opt.id,
+            "text": opt.text,
+            "votes": votes,
+            "percent": round(percent, 1),
+        })
+    
+    # Формируем список ответов (если не анонимное)
+    responses_list = []
+    if not poll.is_anonymous:
+        for response in poll.responses:
+            selected_ids = json.loads(response.option_ids)
+            selected_texts = [
+                opt.text for opt in poll.options 
+                if opt.id in selected_ids
+            ]
+            responses_list.append({
+                "partner_name": response.partner.full_name if response.partner else "Неизвестно",
+                "options": selected_texts,
+                "answered_at": response.answered_at.strftime("%d.%m.%Y %H:%M"),
+            })
+    
+    return {
+        "question": poll.question,
+        "total_votes": total_votes,
+        "is_anonymous": poll.is_anonymous,
+        "options": options_result,
+        "responses": responses_list,
+    }
+

@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}Результаты голосования{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="/polls" class="btn btn-secondary">&larr; Назад</a>
+    <h1>📊 Результаты голосования</h1>
+</div>
+
+<div class="poll-container">
+    <!-- Информация о голосовании -->
+    <div class="poll-info card">
+        <div class="poll-question">
+            <h2>{{ poll.question }}</h2>
+            <span class="poll-status poll-status-{{ poll.status.value }}">
+                {% if poll.status.value == 'draft' %}
+                    📝 Черновик
+                {% elif poll.status.value == 'sent' %}
+                    ✅ Отправлено
+                {% elif poll.status.value == 'closed' %}
+                    🔒 Закрыто
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="poll-meta">
+            <span>📅 Создано: {{ poll.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% if poll.sent_at %}
+            <span>📤 Отправлено: {{ poll.sent_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% endif %}
+            {% if poll.closed_at %}
+            <span>🔒 Закрыто: {{ poll.closed_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="poll-settings">
+            {% if poll.is_anonymous %}
+            <span class="setting">🔒 Анонимное</span>
+            {% else %}
+            <span class="setting">👤 Открытое</span>
+            {% endif %}
+            {% if poll.allows_multiple %}
+            <span class="setting">☑️ Несколько вариантов</span>
+            {% endif %}
+        </div>
+        
+        <div class="poll-actions">
+            {% if poll.status.value == 'draft' %}
+            <form action="/polls/{{ poll.id }}/send" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-primary" 
+                        onclick="return confirm('Отправить голосование всем партнёрам?')">
+                    📤 Отправить всем партнёрам
+                </button>
+            </form>
+            <form action="/polls/{{ poll.id }}/delete" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-danger" 
+                        onclick="return confirm('Удалить голосование?')">
+                    🗑 Удалить
+                </button>
+            </form>
+            {% elif poll.status.value == 'sent' %}
+            <form action="/polls/{{ poll.id }}/close" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-warning" 
+                        onclick="return confirm('Закрыть голосование? Пользователи больше не смогут голосовать.')">
+                    🔒 Закрыть голосование
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Результаты -->
+    <div class="results-section card">
+        <h3>📊 Результаты</h3>
+        
+        <div class="total-votes">
+            <span class="votes-count">{{ results.total_votes }}</span>
+            <span class="votes-label">{{ 'голос' if results.total_votes == 1 else ('голоса' if results.total_votes in [2,3,4] else 'голосов') }}</span>
+        </div>
+        
+        {% if results.options %}
+        <div class="options-results">
+            {% for option in results.options %}
+            <div class="option-result">
+                <div class="option-header">
+                    <span class="option-text">{{ option.text }}</span>
+                    <span class="option-votes">{{ option.votes }} ({{ option.percent }}%)</span>
+                </div>
+                <div class="option-bar">
+                    <div class="option-bar-fill" style="width: {{ option.percent }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-votes">
+            <p>Пока нет голосов</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Список ответов (если не анонимное) -->
+    {% if not results.is_anonymous and results.responses %}
+    <div class="responses-section card">
+        <h3>👥 Кто как голосовал</h3>
+        
+        <table class="responses-table">
+            <thead>
+                <tr>
+                    <th>Партнёр</th>
+                    <th>Выбранные варианты</th>
+                    <th>Время</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for response in results.responses %}
+                <tr>
+                    <td>{{ response.partner_name }}</td>
+                    <td>
+                        {% for opt in response.options %}
+                        <span class="option-tag">{{ opt }}</span>
+                        {% endfor %}
+                    </td>
+                    <td>{{ response.answered_at }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.poll-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    max-width: 800px;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.poll-question {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.poll-question h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.poll-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.poll-status-draft { background: #f0f0f0; color: #666; }
+.poll-status-sent { background: #d4edda; color: #155724; }
+.poll-status-closed { background: #e2e3e5; color: #383d41; }
+
+.poll-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.poll-settings {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.setting {
+    background: #f5f5f5;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.85rem;
+}
+
+.poll-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
+.results-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.total-votes {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.votes-count {
+    display: block;
+    font-size: 3rem;
+    font-weight: 700;
+    color: #4a90a4;
+}
+
+.votes-label {
+    color: #666;
+}
+
+.options-results {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.option-result {
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.option-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.option-text {
+    font-weight: 500;
+}
+
+.option-votes {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.option-bar {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.option-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a90a4, #68b5c9);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.no-votes {
+    text-align: center;
+    padding: 2rem;
+    color: #888;
+}
+
+.responses-section h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.responses-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.responses-table th,
+.responses-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.responses-table th {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9rem;
+}
+
+.option-tag {
+    display: inline-block;
+    background: #e3f2fd;
+    color: #1565c0;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+</style>
+{% endblock %}
+

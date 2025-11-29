@@ -15,6 +15,11 @@ from .models import (
     RequestLog,
     RequestType,
     RequestStatus,
+    Poll,
+    PollOption,
+    PollResponse,
+    PollMessage,
+    PollStatus,
 )
 from .crud import (
     get_partner_by_telegram_id,
@@ -48,6 +53,17 @@ from .crud import (
     # Request Log
     create_request_log,
     get_request_logs,
+    # Polls
+    create_poll,
+    get_poll_by_id,
+    get_all_polls,
+    update_poll_status,
+    save_poll_message,
+    save_poll_response,
+    get_poll_messages,
+    mark_poll_message_stopped,
+    delete_poll,
+    get_poll_results,
 )
 
 __all__ = [
@@ -66,6 +82,11 @@ __all__ = [
     "NetworkRatingHistory",
     "YClientsCompany",
     "PartnerCompany",
+    "Poll",
+    "PollOption",
+    "PollResponse",
+    "PollMessage",
+    "PollStatus",
     # CRUD
     "get_partner_by_telegram_id",
     "get_partner_by_phone",
@@ -101,5 +122,16 @@ __all__ = [
     "RequestStatus",
     "create_request_log",
     "get_request_logs",
+    # Polls
+    "create_poll",
+    "get_poll_by_id",
+    "get_all_polls",
+    "update_poll_status",
+    "save_poll_message",
+    "save_poll_response",
+    "get_poll_messages",
+    "mark_poll_message_stopped",
+    "delete_poll",
+    "get_poll_results",
 ]
 

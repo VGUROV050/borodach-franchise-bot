@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Голосования{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🗳 Голосования</h1>
+    <a href="/polls/create" class="btn btn-primary">+ Создать голосование</a>
+</div>
+
+{% if polls %}
+<div class="polls-list">
+    {% for poll in polls %}
+    <div class="poll-card">
+        <div class="poll-header">
+            <h3>{{ poll.question }}</h3>
+            <span class="poll-status poll-status-{{ poll.status.value }}">
+                {% if poll.status.value == 'draft' %}
+                    📝 Черновик
+                {% elif poll.status.value == 'sent' %}
+                    ✅ Отправлено
+                {% elif poll.status.value == 'closed' %}
+                    🔒 Закрыто
+                {% endif %}
+            </span>
+        </div>
+        
+        <div class="poll-meta">
+            <span>📅 Создано: {{ poll.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% if poll.sent_at %}
+            <span>📤 Отправлено: {{ poll.sent_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% endif %}
+            {% if poll.closed_at %}
+            <span>🔒 Закрыто: {{ poll.closed_at.strftime('%d.%m.%Y %H:%M') }}</span>
+            {% endif %}
+        </div>
+        
+        <div class="poll-options">
+            {% for option in poll.options %}
+            <span class="poll-option-tag">{{ option.text }}</span>
+            {% endfor %}
+        </div>
+        
+        <div class="poll-stats">
+            <span>👥 Ответов: {{ poll.responses | length }}</span>
+            {% if poll.is_anonymous %}
+            <span>🔒 Анонимное</span>
+            {% else %}
+            <span>👤 Открытое</span>
+            {% endif %}
+            {% if poll.allows_multiple %}
+            <span>☑️ Несколько вариантов</span>
+            {% endif %}
+        </div>
+        
+        <div class="poll-actions">
+            <a href="/polls/{{ poll.id }}" class="btn btn-sm">📊 Результаты</a>
+            
+            {% if poll.status.value == 'draft' %}
+            <form action="/polls/{{ poll.id }}/send" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-sm btn-primary" 
+                        onclick="return confirm('Отправить голосование всем партнёрам?')">
+                    📤 Отправить
+                </button>
+            </form>
+            <form action="/polls/{{ poll.id }}/delete" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-sm btn-danger" 
+                        onclick="return confirm('Удалить голосование?')">
+                    🗑 Удалить
+                </button>
+            </form>
+            {% elif poll.status.value == 'sent' %}
+            <form action="/polls/{{ poll.id }}/close" method="post" style="display: inline;">
+                <button type="submit" class="btn btn-sm btn-warning" 
+                        onclick="return confirm('Закрыть голосование? Пользователи больше не смогут голосовать.')">
+                    🔒 Закрыть
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>Голосований пока нет</p>
+    <a href="/polls/create" class="btn btn-primary">Создать первое голосование</a>
+</div>
+{% endif %}
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.polls-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.poll-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.poll-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.poll-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    flex: 1;
+    margin-right: 1rem;
+}
+
+.poll-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.poll-status-draft {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.poll-status-sent {
+    background: #d4edda;
+    color: #155724;
+}
+
+.poll-status-closed {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+.poll-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.85rem;
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.poll-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.poll-option-tag {
+    background: #f5f5f5;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.85rem;
+}
+
+.poll-stats {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    color: #555;
+    margin-bottom: 1rem;
+}
+
+.poll-actions {
+    display: flex;
+    gap: 0.5rem;
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background: #e0a800;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 12px;
+}
+
+.empty-state p {
+    color: #666;
+    margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
