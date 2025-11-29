@@ -82,8 +82,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_STATISTICS)],
-            [KeyboardButton(text=BTN_USEFUL), KeyboardButton(text=BTN_ACCOUNT)],
+            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_USEFUL)],
+            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_ACCOUNT)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
