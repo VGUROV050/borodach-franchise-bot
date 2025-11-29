@@ -13,80 +13,77 @@
     <span class="type-badge">{{ type_name }}</span>
 </div>
 
-<div class="form-container">
+<div class="editor-container">
     <form action="/useful-info/{{ department.value }}/{{ info_type.value }}/edit" method="post" id="infoForm">
-        <div class="form-group">
-            <label class="form-label">Текст сообщения</label>
-            
-            <!-- Панель инструментов -->
-            <div class="editor-toolbar">
-                <button type="button" onclick="formatText('bold')" title="Жирный (Ctrl+B)">
-                    <strong>B</strong>
-                </button>
-                <button type="button" onclick="formatText('italic')" title="Курсив (Ctrl+I)">
-                    <em>I</em>
-                </button>
-                <button type="button" onclick="formatText('underline')" title="Подчёркнутый (Ctrl+U)">
-                    <u>U</u>
-                </button>
-                <button type="button" onclick="formatText('code')" title="Код">
-                    &lt;/&gt;
-                </button>
-                <div class="toolbar-divider"></div>
-                <button type="button" onclick="toggleEmojiPicker()" title="Эмодзи" id="emojiBtn">
-                    😊
-                </button>
-            </div>
-            
-            <!-- Пикер эмодзи -->
-            <div id="emojiPicker" class="emoji-picker" style="display: none;">
-                <div class="emoji-grid">
-                    <span onclick="insertEmoji('😊')">😊</span>
-                    <span onclick="insertEmoji('😃')">😃</span>
-                    <span onclick="insertEmoji('👍')">👍</span>
-                    <span onclick="insertEmoji('👏')">👏</span>
-                    <span onclick="insertEmoji('💪')">💪</span>
-                    <span onclick="insertEmoji('✅')">✅</span>
-                    <span onclick="insertEmoji('❌')">❌</span>
-                    <span onclick="insertEmoji('⚠️')">⚠️</span>
-                    <span onclick="insertEmoji('📢')">📢</span>
-                    <span onclick="insertEmoji('🔔')">🔔</span>
-                    <span onclick="insertEmoji('📌')">📌</span>
-                    <span onclick="insertEmoji('💡')">💡</span>
-                    <span onclick="insertEmoji('⭐')">⭐</span>
-                    <span onclick="insertEmoji('✨')">✨</span>
-                    <span onclick="insertEmoji('🎉')">🎉</span>
-                    <span onclick="insertEmoji('🏆')">🏆</span>
-                    <span onclick="insertEmoji('💰')">💰</span>
-                    <span onclick="insertEmoji('📈')">📈</span>
-                    <span onclick="insertEmoji('📊')">📊</span>
-                    <span onclick="insertEmoji('🗓')">🗓</span>
-                    <span onclick="insertEmoji('⏰')">⏰</span>
-                    <span onclick="insertEmoji('📱')">📱</span>
-                    <span onclick="insertEmoji('📧')">📧</span>
-                    <span onclick="insertEmoji('📞')">📞</span>
-                    <span onclick="insertEmoji('🏢')">🏢</span>
-                    <span onclick="insertEmoji('🚀')">🚀</span>
-                    <span onclick="insertEmoji('📢')">📢</span>
-                    <span onclick="insertEmoji('🎨')">🎨</span>
-                    <span onclick="insertEmoji('❤️')">❤️</span>
-                    <span onclick="insertEmoji('🔗')">🔗</span>
+        
+        <!-- Левая часть: редактор -->
+        <div class="editor-panel">
+            <div class="panel-header">
+                <span>📝 Текст сообщения</span>
+                
+                <!-- Панель инструментов -->
+                <div class="toolbar">
+                    <button type="button" onclick="insertTag('b')" title="Жирный">
+                        <strong>B</strong>
+                    </button>
+                    <button type="button" onclick="insertTag('i')" title="Курсив">
+                        <em>I</em>
+                    </button>
+                    <button type="button" onclick="insertTag('u')" title="Подчёркнутый">
+                        <u>U</u>
+                    </button>
+                    <button type="button" onclick="insertTag('code')" title="Код">
+                        &lt;/&gt;
+                    </button>
+                    <button type="button" onclick="insertLink()" title="Ссылка">
+                        🔗
+                    </button>
+                    <div class="toolbar-divider"></div>
+                    <div class="emoji-dropdown">
+                        <button type="button" onclick="toggleEmoji()" id="emojiBtn">😊</button>
+                        <div class="emoji-panel" id="emojiPanel">
+                            <span onclick="insertEmoji('😊')">😊</span>
+                            <span onclick="insertEmoji('👍')">👍</span>
+                            <span onclick="insertEmoji('✅')">✅</span>
+                            <span onclick="insertEmoji('❌')">❌</span>
+                            <span onclick="insertEmoji('⚠️')">⚠️</span>
+                            <span onclick="insertEmoji('📢')">📢</span>
+                            <span onclick="insertEmoji('🔔')">🔔</span>
+                            <span onclick="insertEmoji('📌')">📌</span>
+                            <span onclick="insertEmoji('💡')">💡</span>
+                            <span onclick="insertEmoji('⭐')">⭐</span>
+                            <span onclick="insertEmoji('🎉')">🎉</span>
+                            <span onclick="insertEmoji('🏆')">🏆</span>
+                            <span onclick="insertEmoji('💰')">💰</span>
+                            <span onclick="insertEmoji('📈')">📈</span>
+                            <span onclick="insertEmoji('📞')">📞</span>
+                            <span onclick="insertEmoji('🚀')">🚀</span>
+                            <span onclick="insertEmoji('🎨')">🎨</span>
+                            <span onclick="insertEmoji('❤️')">❤️</span>
+                            <span onclick="insertEmoji('🔗')">🔗</span>
+                            <span onclick="insertEmoji('📋')">📋</span>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Редактор -->
-            <div id="textEditor" class="text-editor" contenteditable="true" 
-                 placeholder="Введите текст сообщения..."></div>
+            <textarea id="textArea" name="text" placeholder="Введите текст сообщения...">{{ info.text if info else '' }}</textarea>
             
-            <!-- Скрытое поле для отправки -->
-            <input type="hidden" name="text" id="textInput">
-            
-            <small class="editor-hint">
-                Выделите текст и нажмите кнопку форматирования. 
-                Для ссылок используйте: выделите текст → Ctrl+K или введите вручную &lt;a href="URL"&gt;текст&lt;/a&gt;
-            </small>
+            <div class="editor-hint">
+                Выделите текст → нажмите кнопку форматирования.
+                Или пишите теги вручную: &lt;b&gt;жирный&lt;/b&gt;
+            </div>
         </div>
         
+        <!-- Правая часть: превью -->
+        <div class="preview-panel">
+            <div class="panel-header">
+                <span>👁 Превью (как в Telegram)</span>
+            </div>
+            <div class="preview-content" id="preview"></div>
+        </div>
+        
+        <!-- Кнопки внизу -->
         <div class="form-actions">
             <a href="/useful-info" class="btn btn-secondary">Отмена</a>
             <button type="submit" class="btn btn-primary">💾 Сохранить</button>
@@ -129,263 +126,293 @@
     color: var(--text);
 }
 
-.form-container {
+.editor-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    max-width: 1200px;
+}
+
+.editor-container form {
+    display: contents;
+}
+
+.editor-panel, .preview-panel {
     background: var(--bg-card);
     border-radius: 16px;
-    padding: 2rem;
-    max-width: 800px;
     border: 1px solid var(--border);
     box-shadow: var(--shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-label {
-    display: block;
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: var(--bg-main);
+    border-bottom: 1px solid var(--border);
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
 }
 
-.editor-toolbar {
+.toolbar {
     display: flex;
     gap: 0.25rem;
-    padding: 0.5rem;
-    background: var(--bg-main);
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 10px 10px 0 0;
+    align-items: center;
 }
 
-.editor-toolbar button {
-    width: 36px;
-    height: 36px;
+.toolbar button {
+    width: 32px;
+    height: 32px;
     border: none;
     background: var(--bg-card);
     border-radius: 6px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.15s;
 }
 
-.editor-toolbar button:hover {
+.toolbar button:hover {
     background: var(--accent-light);
     color: var(--accent);
 }
 
 .toolbar-divider {
     width: 1px;
+    height: 24px;
     background: var(--border);
     margin: 0 0.5rem;
 }
 
-.text-editor {
-    min-height: 200px;
-    padding: 1rem;
+.emoji-dropdown {
+    position: relative;
+}
+
+.emoji-panel {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 0.25rem;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 0 0 10px 10px;
-    font-size: 0.9375rem;
+    border-radius: 8px;
+    padding: 0.5rem;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    width: 200px;
+}
+
+.emoji-panel.show {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.emoji-panel span {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.emoji-panel span:hover {
+    background: var(--accent-light);
+}
+
+#textArea {
+    flex: 1;
+    min-height: 300px;
+    padding: 1rem;
+    border: none;
+    font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+    font-size: 0.9rem;
     line-height: 1.6;
+    resize: none;
     outline: none;
 }
 
-.text-editor:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-light);
+#textArea:focus {
+    background: #fafbfc;
 }
 
-.text-editor:empty:before {
-    content: attr(placeholder);
+.editor-hint {
+    padding: 0.5rem 1rem;
+    background: var(--bg-main);
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
     color: var(--text-muted);
 }
 
-.text-editor b, .text-editor strong { font-weight: 700; }
-.text-editor i, .text-editor em { font-style: italic; }
-.text-editor u { text-decoration: underline; }
-.text-editor code { 
-    background: var(--bg-main); 
-    padding: 0.125rem 0.375rem; 
-    border-radius: 4px;
-    font-family: monospace;
+.preview-content {
+    flex: 1;
+    padding: 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-y: auto;
+    min-height: 300px;
 }
-.text-editor a {
+
+.preview-content:empty::before {
+    content: 'Превью появится здесь...';
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.preview-content b { font-weight: 700; }
+.preview-content i { font-style: italic; }
+.preview-content u { text-decoration: underline; }
+.preview-content code { 
+    background: var(--bg-main); 
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+.preview-content a {
     color: var(--accent);
     text-decoration: underline;
 }
 
-.emoji-picker {
-    display: inline-block;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    margin-top: 0.25rem;
-    margin-bottom: 0.5rem;
-}
-
-.emoji-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
-    max-width: 270px;
-}
-
-.emoji-grid span {
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.125rem;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.1s;
-}
-
-.emoji-grid span:hover {
-    background: var(--accent-light);
-}
-
-.editor-hint {
-    display: block;
-    margin-top: 0.5rem;
-    color: var(--text-muted);
-    font-size: 0.8rem;
-}
-
 .form-actions {
+    grid-column: 1 / -1;
     display: flex;
     gap: 1rem;
     justify-content: flex-end;
     padding-top: 1rem;
-    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 900px) {
+    .editor-container {
+        grid-template-columns: 1fr;
+    }
 }
 </style>
 
 <script>
-// Инициализация редактора с существующим текстом
-document.addEventListener('DOMContentLoaded', function() {
-    const editor = document.getElementById('textEditor');
-    const existingText = `{{ info.text|safe if info else '' }}`;
-    if (existingText) {
-        editor.innerHTML = existingText;
+const textarea = document.getElementById('textArea');
+const preview = document.getElementById('preview');
+
+// Обновление превью
+function updatePreview() {
+    let html = textarea.value;
+    
+    // Экранируем HTML кроме разрешённых тегов
+    // (в реальности Telegram сам это сделает)
+    
+    preview.innerHTML = html || '';
+}
+
+textarea.addEventListener('input', updatePreview);
+updatePreview();
+
+// Вставка тега вокруг выделенного текста
+function insertTag(tag) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const selected = text.substring(start, end);
+    
+    if (selected) {
+        // Оборачиваем выделенный текст
+        const newText = text.substring(0, start) + 
+                       `<${tag}>${selected}</${tag}>` + 
+                       text.substring(end);
+        textarea.value = newText;
+        
+        // Ставим курсор после вставленного
+        const newPos = start + tag.length + 2 + selected.length + tag.length + 3;
+        textarea.setSelectionRange(newPos, newPos);
+    } else {
+        // Вставляем пустой тег и ставим курсор внутрь
+        const newText = text.substring(0, start) + 
+                       `<${tag}></${tag}>` + 
+                       text.substring(end);
+        textarea.value = newText;
+        
+        const newPos = start + tag.length + 2;
+        textarea.setSelectionRange(newPos, newPos);
+    }
+    
+    textarea.focus();
+    updatePreview();
+}
+
+// Вставка ссылки
+function insertLink() {
+    const url = prompt('Введите URL:', 'https://');
+    if (!url) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const selected = text.substring(start, end) || 'ссылка';
+    
+    const newText = text.substring(0, start) + 
+                   `<a href="${url}">${selected}</a>` + 
+                   text.substring(end);
+    textarea.value = newText;
+    
+    textarea.focus();
+    updatePreview();
+}
+
+// Эмодзи
+function toggleEmoji() {
+    document.getElementById('emojiPanel').classList.toggle('show');
+}
+
+function insertEmoji(emoji) {
+    const start = textarea.selectionStart;
+    const text = textarea.value;
+    
+    textarea.value = text.substring(0, start) + emoji + text.substring(start);
+    textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+    
+    textarea.focus();
+    document.getElementById('emojiPanel').classList.remove('show');
+    updatePreview();
+}
+
+// Закрыть эмодзи при клике вне
+document.addEventListener('click', function(e) {
+    const panel = document.getElementById('emojiPanel');
+    const btn = document.getElementById('emojiBtn');
+    if (!panel.contains(e.target) && e.target !== btn) {
+        panel.classList.remove('show');
     }
 });
 
-// Форматирование текста
-function formatText(type) {
-    const editor = document.getElementById('textEditor');
-    editor.focus();
-    
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
-    
-    const range = selection.getRangeAt(0);
-    const selectedText = range.toString();
-    
-    if (!selectedText) return;
-    
-    let tag;
-    switch(type) {
-        case 'bold': tag = 'b'; break;
-        case 'italic': tag = 'i'; break;
-        case 'underline': tag = 'u'; break;
-        case 'code': tag = 'code'; break;
-        default: return;
-    }
-    
-    const wrapper = document.createElement(tag);
-    range.surroundContents(wrapper);
-    
-    selection.removeAllRanges();
-}
-
 // Горячие клавиши
-document.addEventListener('keydown', function(e) {
-    if (e.target.id !== 'textEditor') return;
-    
+textarea.addEventListener('keydown', function(e) {
     if (e.ctrlKey || e.metaKey) {
         switch(e.key.toLowerCase()) {
             case 'b':
                 e.preventDefault();
-                formatText('bold');
+                insertTag('b');
                 break;
             case 'i':
                 e.preventDefault();
-                formatText('italic');
+                insertTag('i');
                 break;
             case 'u':
                 e.preventDefault();
-                formatText('underline');
+                insertTag('u');
                 break;
         }
     }
-});
-
-// Эмодзи пикер
-function toggleEmojiPicker() {
-    const picker = document.getElementById('emojiPicker');
-    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-}
-
-function insertEmoji(emoji) {
-    const editor = document.getElementById('textEditor');
-    editor.focus();
-    
-    const selection = window.getSelection();
-    const range = selection.getRangeAt(0);
-    
-    const textNode = document.createTextNode(emoji);
-    range.insertNode(textNode);
-    range.setStartAfter(textNode);
-    range.setEndAfter(textNode);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    
-    document.getElementById('emojiPicker').style.display = 'none';
-}
-
-// Закрыть эмодзи пикер при клике вне
-document.addEventListener('click', function(e) {
-    const picker = document.getElementById('emojiPicker');
-    const btn = document.getElementById('emojiBtn');
-    if (picker && !picker.contains(e.target) && e.target !== btn) {
-        picker.style.display = 'none';
-    }
-});
-
-// Конвертация в HTML перед отправкой
-document.getElementById('infoForm').addEventListener('submit', function(e) {
-    const editor = document.getElementById('textEditor');
-    const input = document.getElementById('textInput');
-    
-    // Получаем HTML и конвертируем теги
-    let html = editor.innerHTML;
-    
-    // Убираем лишние div/br от contenteditable
-    html = html.replace(/<div>/gi, '\n').replace(/<\/div>/gi, '');
-    html = html.replace(/<br\s*\/?>/gi, '\n');
-    
-    // Заменяем strong на b, em на i
-    html = html.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
-    html = html.replace(/<em>/gi, '<i>').replace(/<\/em>/gi, '</i>');
-    
-    // Убираем пустой контент
-    html = html.trim();
-    
-    if (!html) {
-        e.preventDefault();
-        alert('Введите текст сообщения');
-        return;
-    }
-    
-    input.value = html;
 });
 </script>
 {% endblock %}
