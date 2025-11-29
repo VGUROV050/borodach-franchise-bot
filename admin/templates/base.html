@@ -26,6 +26,7 @@
             --border: #e2e8f0;
             --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
             --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
+            --sidebar-width: 220px;
         }
         
         * {
@@ -42,21 +43,28 @@
             line-height: 1.5;
         }
         
-        .navbar {
-            background: var(--bg-card);
-            padding: 0.875rem 2rem;
+        /* Sidebar layout */
+        .layout {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            position: sticky;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            position: fixed;
             top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
             z-index: 100;
         }
         
-        .navbar-brand {
-            font-size: 1.25rem;
+        .sidebar-brand {
+            padding: 1.25rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.125rem;
             font-weight: 700;
             color: var(--text);
             text-decoration: none;
@@ -65,41 +73,92 @@
             gap: 0.5rem;
         }
         
-        .navbar-brand span {
+        .sidebar-brand span {
             background: linear-gradient(135deg, var(--accent), #7c3aed);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         
-        .navbar-nav {
-            display: flex;
-            gap: 0.5rem;
+        .sidebar-section {
+            padding: 1rem 0.75rem 0.5rem;
+        }
+        
+        .sidebar-section-title {
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .sidebar-nav {
             list-style: none;
         }
         
-        .navbar-nav a {
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.625rem 0.75rem;
             color: var(--text-muted);
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-weight: 500;
             font-size: 0.875rem;
-            transition: all 0.2s;
+            font-weight: 500;
+            border-radius: 8px;
+            margin-bottom: 2px;
+            transition: all 0.15s;
         }
         
-        .navbar-nav a:hover {
+        .sidebar-nav a:hover {
             background: var(--bg-main);
             color: var(--text);
         }
         
-        .navbar-nav a.active {
+        .sidebar-nav a.active {
             background: var(--accent-light);
             color: var(--accent);
         }
         
+        .sidebar-nav .nav-icon {
+            font-size: 1rem;
+            width: 1.25rem;
+            text-align: center;
+        }
+        
+        .sidebar-footer {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+        
+        .sidebar-footer a {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            transition: all 0.15s;
+        }
+        
+        .sidebar-footer a:hover {
+            background: var(--danger-light);
+            color: var(--danger);
+        }
+        
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+        
         .container {
-            max-width: 1200px;
+            max-width: 1100px;
             margin: 0 auto;
             padding: 2rem;
         }
@@ -427,29 +486,106 @@
             color: #dc2626;
             border: 1px solid #fecaca;
         }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
     </style>
 </head>
 <body>
-    {% block navbar %}
-    <nav class="navbar">
-        <a href="/" class="navbar-brand">🧔 <span>Borodach</span> Admin</a>
-        <ul class="navbar-nav">
-            <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Главная</a></li>
-            <li><a href="/partners" class="{% if '/partners' in request.url.path %}active{% endif %}">Партнёры</a></li>
-            <li><a href="/yclients-companies" class="{% if '/yclients-companies' in request.url.path %}active{% endif %}">💈 Барбершопы</a></li>
-            <li><a href="/network-rating" class="{% if '/network-rating' in request.url.path %}active{% endif %}">🏆 Рейтинг</a></li>
-            <li><a href="/geography" class="{% if '/geography' in request.url.path %}active{% endif %}">🗺 География</a></li>
-            <li><a href="/broadcast" class="{% if '/broadcast' in request.url.path %}active{% endif %}">📢 Рассылка</a></li>
-            <li><a href="/polls" class="{% if '/polls' in request.url.path %}active{% endif %}">🗳 Голосования</a></li>
-            <li><a href="/useful-info" class="{% if '/useful-info' in request.url.path %}active{% endif %}">📚 Полезное</a></li>
-            <li><a href="/request-logs" class="{% if '/request-logs' in request.url.path %}active{% endif %}">📋 Лог</a></li>
-            <li><a href="/logout">Выход</a></li>
-        </ul>
-    </nav>
-    {% endblock %}
-    
-    <div class="container">
-        {% block content %}{% endblock %}
+    {% block body %}
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <a href="/" class="sidebar-brand">🧔 <span>Borodach</span></a>
+            
+            <!-- Партнёры -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">👥 Партнёры</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">
+                            <span class="nav-icon">📊</span> Дашборд
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/partners" class="{% if '/partners' in request.url.path and '/edit' not in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">👤</span> Все партнёры
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/request-logs" class="{% if '/request-logs' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">📜</span> Лог заявок
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Сеть -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">🏢 Сеть</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/yclients-companies" class="{% if '/yclients-companies' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">💈</span> Барбершопы
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/network-rating" class="{% if '/network-rating' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">🏆</span> Рейтинг
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/geography" class="{% if '/geography' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">🗺</span> География
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Бот -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">🤖 Бот</div>
+                <ul class="sidebar-nav">
+                    <li>
+                        <a href="/broadcast" class="{% if '/broadcast' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">📢</span> Рассылки
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/polls" class="{% if '/polls' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">🗳</span> Голосования
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/useful-info" class="{% if '/useful-info' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">📚</span> Полезное
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            
+            <!-- Footer -->
+            <div class="sidebar-footer">
+                <a href="/logout">
+                    <span>🚪</span> Выход
+                </a>
+            </div>
+        </aside>
+        
+        <!-- Main content -->
+        <main class="main-content">
+            <div class="container">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
     </div>
+    {% endblock %}
 </body>
 </html>
