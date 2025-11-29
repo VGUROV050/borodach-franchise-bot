@@ -1,7 +1,6 @@
 # Main entry point for Borodach Franchise Bot
 
 import asyncio
-import logging
 import signal
 import sys
 from typing import Optional
@@ -11,17 +10,16 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config.settings import TELEGRAM_BOT_TOKEN
+from config.logging import setup_logging, get_logger
 from bot import main_router
 from database import init_db, close_db
+from cache import init_cache, close_cache
 from scheduler import start_scheduler, stop_scheduler, update_network_rating_now
 
+# Инициализируем структурированное логирование
+setup_logging(json_logs=False, log_level="INFO")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
-
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Глобальные переменные для graceful shutdown
 _bot: Optional[Bot] = None
@@ -50,7 +48,11 @@ async def shutdown(sig: Optional[signal.Signals] = None):
     logger.info("Stopping scheduler...")
     stop_scheduler()
     
-    # 4. Закрываем соединения с БД
+    # 4. Закрываем Redis
+    logger.info("Closing Redis cache...")
+    await close_cache()
+    
+    # 5. Закрываем соединения с БД
     logger.info("Closing database connections...")
     await close_db()
     
@@ -91,6 +93,12 @@ async def main():
     logger.info("Connecting to database...")
     await init_db()
     
+    # Инициализация Redis кэша (опционально - работает и без него)
+    logger.info("Connecting to Redis cache...")
+    cache_available = await init_cache()
+    if not cache_available:
+        logger.warning("Redis unavailable, running without cache")
+    
     # Запускаем планировщик для обновления рейтинга сети
     logger.info("Starting scheduler...")
     start_scheduler()
@@ -106,6 +114,12 @@ async def main():
     
     # MemoryStorage для FSM (состояния сбросятся при перезапуске)
     _dp = Dispatcher(storage=MemoryStorage())
+    
+    # Регистрируем middleware
+    from bot.middleware import RateLimitMiddleware, LoggingMiddleware
+    _dp.message.middleware(RateLimitMiddleware(rate_limit=0.5))  # 2 сообщения/сек макс
+    _dp.message.middleware(LoggingMiddleware())
+    
     _dp.include_router(main_router)
 
     try:

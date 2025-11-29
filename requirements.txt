@@ -23,3 +23,12 @@ tenacity==8.2.3
 
 # HTML parsing
 beautifulsoup4==4.12.3
+
+# Structured logging
+structlog==24.1.0
+
+# Redis caching
+redis==5.0.1
+
+# Rate limiting
+aiogram-throttling==0.1.4

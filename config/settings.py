@@ -28,6 +28,9 @@ YCLIENTS_PARTNER_TOKEN = os.getenv("YCLIENTS_PARTNER_TOKEN", "")
 YCLIENTS_USER_TOKEN = os.getenv("YCLIENTS_USER_TOKEN", "")
 YCLIENTS_CHAIN_ID = os.getenv("YCLIENTS_CHAIN_ID", "318")  # ID сети салонов
 
+# Redis (для кэширования)
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
 # ID проектов/групп в Bitrix24 для каждого отдела
 BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # Отдел Развития
 BITRIX_GROUP_ID_MARKETING = os.getenv("BITRIX_GROUP_ID_MARKETING", "")      # Отдел Маркетинга
