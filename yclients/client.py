@@ -6,6 +6,7 @@ from typing import Optional
 import httpx
 
 from config.settings import YCLIENTS_PARTNER_TOKEN, YCLIENTS_USER_TOKEN, YCLIENTS_CHAIN_ID
+from utils.retry import api_retry
 
 logger = logging.getLogger(__name__)
 
@@ -33,26 +34,24 @@ class YClientsAPI:
         }
     
     
+    @api_retry(max_attempts=3, min_wait=1, max_wait=10)
     async def get_company_info(self, company_id: str) -> Optional[dict]:
         """Получить информацию о компании/филиале."""
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{BASE_URL}/company/{company_id}",
-                    headers=self.headers,
-                    timeout=30.0,
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("data")
-                else:
-                    logger.error(f"YClients API error: {response.status_code} - {response.text}")
-                    return None
-        except Exception as e:
-            logger.error(f"YClients API exception: {e}")
-            return None
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BASE_URL}/company/{company_id}",
+                headers=self.headers,
+                timeout=30.0,
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data")
+            else:
+                logger.error(f"YClients API error: {response.status_code} - {response.text}")
+                return None
     
+    @api_retry(max_attempts=3, min_wait=1, max_wait=10)
     async def get_finance_transactions(
         self, 
         company_id: str,
@@ -60,30 +59,27 @@ class YClientsAPI:
         end_date: datetime,
     ) -> Optional[list]:
         """Получить финансовые транзакции за период."""
-        try:
-            params = {
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-            }
+        params = {
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BASE_URL}/company/{company_id}/finance/transactions",
+                headers=self.headers,
+                params=params,
+                timeout=30.0,
+            )
             
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{BASE_URL}/company/{company_id}/finance/transactions",
-                    headers=self.headers,
-                    params=params,
-                    timeout=30.0,
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("data", [])
-                else:
-                    logger.error(f"YClients finance API error: {response.status_code} - {response.text}")
-                    return None
-        except Exception as e:
-            logger.error(f"YClients finance API exception: {e}")
-            return None
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", [])
+            else:
+                logger.error(f"YClients finance API error: {response.status_code} - {response.text}")
+                return None
     
+    @api_retry(max_attempts=3, min_wait=1, max_wait=10)
     async def get_records(
         self,
         company_id: str,
@@ -91,31 +87,28 @@ class YClientsAPI:
         end_date: datetime,
     ) -> Optional[list]:
         """Получить записи (визиты) за период."""
-        try:
-            params = {
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-            }
+        params = {
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "end_date": end_date.strftime("%Y-%m-%d"),
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BASE_URL}/records/{company_id}",
+                headers=self.headers,
+                params=params,
+                timeout=30.0,
+            )
             
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    f"{BASE_URL}/records/{company_id}",
-                    headers=self.headers,
-                    params=params,
-                    timeout=30.0,
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    return data.get("data", [])
-                else:
-                    logger.error(f"YClients records API error: {response.status_code} - {response.text}")
-                    return None
-        except Exception as e:
-            logger.error(f"YClients records API exception: {e}")
-            return None
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data", [])
+            else:
+                logger.error(f"YClients records API error: {response.status_code} - {response.text}")
+                return None
 
 
+@api_retry(max_attempts=3, min_wait=1, max_wait=10)
 async def get_monthly_revenue(company_id: str, year: int = None, month: int = None) -> dict:
     """
     Получить выручку за указанный месяц для филиала.
@@ -222,6 +215,7 @@ async def get_monthly_revenue(company_id: str, year: int = None, month: int = No
         }
 
 
+@api_retry(max_attempts=3, min_wait=2, max_wait=15)
 async def get_chain_companies(chain_id: str = None) -> list[dict]:
     """
     Получить список всех салонов в сети.

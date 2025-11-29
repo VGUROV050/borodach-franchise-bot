@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 
 from config.settings import BITRIX_WEBHOOK_URL
+from utils.retry import api_retry
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,11 @@ class BitrixClientError(Exception):
     pass
 
 
+@api_retry(max_attempts=3, min_wait=1, max_wait=10)
 async def call_method(method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """
     Вызвать метод Bitrix24 REST API.
+    Автоматически повторяет запрос при сетевых ошибках (до 3 раз).
     """
     if not BITRIX_WEBHOOK_URL:
         raise BitrixClientError("BITRIX_WEBHOOK_URL не настроен")
@@ -31,28 +34,23 @@ async def call_method(method: str, params: dict[str, Any] | None = None) -> dict
     
     logger.info(f"Bitrix API call: {method}")
     
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-            response = await client.post(url, json=params or {})
-            
-            logger.info(f"Bitrix response: {response.status_code}")
-            
-            if response.status_code != 200:
-                logger.error(f"Bitrix HTTP error: {response.status_code} - {response.text[:200]}")
-                raise BitrixClientError(f"HTTP {response.status_code}")
-            
-            data = response.json()
-            
-            if "error" in data:
-                error_msg = data.get("error_description", data["error"])
-                logger.error(f"Bitrix API error: {error_msg}")
-                raise BitrixClientError(error_msg)
-            
-            return data
-            
-    except httpx.RequestError as e:
-        logger.error(f"Bitrix network error: {e}")
-        raise BitrixClientError(f"Ошибка сети: {e}") from e
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        response = await client.post(url, json=params or {})
+        
+        logger.info(f"Bitrix response: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"Bitrix HTTP error: {response.status_code} - {response.text[:200]}")
+            raise BitrixClientError(f"HTTP {response.status_code}")
+        
+        data = response.json()
+        
+        if "error" in data:
+            error_msg = data.get("error_description", data["error"])
+            logger.error(f"Bitrix API error: {error_msg}")
+            raise BitrixClientError(error_msg)
+        
+        return data
 
 
 async def upload_file_to_task(task_id: int, file_content: bytes, file_name: str) -> int | None:

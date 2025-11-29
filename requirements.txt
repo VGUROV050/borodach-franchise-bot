@@ -17,3 +17,9 @@ python-multipart==0.0.12
 
 # Scheduler
 apscheduler==3.10.4
+
+# Retry logic
+tenacity==8.2.3
+
+# HTML parsing
+beautifulsoup4==4.12.3
