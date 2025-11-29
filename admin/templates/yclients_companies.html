@@ -4,19 +4,35 @@
 
 {% block content %}
 <style>
-    .status-badge {
-        padding: 0.25rem 0.5rem;
+    /* Единый стиль для всех бейджей */
+    .tag {
+        display: inline-block;
+        padding: 3px 10px;
         border-radius: 4px;
-        font-size: 0.8rem;
-        font-weight: 500;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
     }
-    .status-badge.active {
-        background: var(--success-light);
-        color: #047857;
+    .tag-city {
+        background: rgba(59, 130, 246, 0.1);
+        color: #2563eb;
+        border: 1px solid rgba(59, 130, 246, 0.2);
     }
-    .status-badge.inactive {
-        background: var(--danger-light);
+    .tag-million {
+        background: rgba(245, 158, 11, 0.1);
+        color: #d97706;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .tag-active {
+        background: rgba(34, 197, 94, 0.1);
+        color: #16a34a;
+        border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+    .tag-inactive {
+        background: rgba(239, 68, 68, 0.1);
         color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.2);
     }
     .filter-tabs {
         display: flex;
@@ -141,14 +157,12 @@
                 <td>
                     <div style="font-weight: 500;">{{ company.name }}</div>
                     {% if company.is_million_city %}
-                    <span class="badge" style="font-size: 0.7rem; background: var(--warning-light); color: #d97706;">миллионник</span>
+                    <span class="tag tag-million">миллионник</span>
                     {% endif %}
                 </td>
                 <td>
                     {% if company.city %}
-                    <span class="badge" style="background: var(--accent-light); color: var(--accent);">
-                        {{ company.city }}
-                    </span>
+                    <span class="tag tag-city">{{ company.city }}</span>
                     {% else %}
                     <span class="text-muted">—</span>
                     {% endif %}
@@ -161,8 +175,8 @@
                     {% endif %}
                 </td>
                 <td style="text-align: center;">
-                    <span class="status-badge {% if company.is_active %}active{% else %}inactive{% endif %}">
-                        {% if company.is_active %}✅ Активен{% else %}❌ Неактивен{% endif %}
+                    <span class="tag {% if company.is_active %}tag-active{% else %}tag-inactive{% endif %}">
+                        {% if company.is_active %}Активен{% else %}Неактивен{% endif %}
                     </span>
                 </td>
                 <td style="text-align: center;">
