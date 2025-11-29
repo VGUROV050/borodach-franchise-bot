@@ -37,7 +37,10 @@
             
             <div class="info-preview">
                 {% if grouped[dept][info_type] %}
-                <div class="preview-text">{{ grouped[dept][info_type].text[:150] }}{% if grouped[dept][info_type].text|length > 150 %}...{% endif %}</div>
+                <!-- Превью как в Telegram -->
+                <div class="telegram-bubble">
+                    <div class="bubble-content">{{ grouped[dept][info_type].text|safe }}</div>
+                </div>
                 <div class="preview-meta">
                     Обновлено: {{ grouped[dept][info_type].updated_at.strftime('%d.%m.%Y %H:%M') }}
                 </div>
@@ -116,23 +119,68 @@
     font-size: 0.85rem;
 }
 
-.preview-text {
-    color: var(--text);
+/* Telegram-style bubble */
+.telegram-bubble {
+    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
+    border-radius: 12px 12px 12px 4px;
+    padding: 0.75rem 1rem;
+    max-height: 120px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.telegram-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(transparent, #e3f0ff);
+    pointer-events: none;
+}
+
+.bubble-content {
+    color: #1a1a1a;
+    font-size: 0.875rem;
+    line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
-    line-height: 1.5;
+}
+
+.bubble-content b { font-weight: 700; }
+.bubble-content i { font-style: italic; }
+.bubble-content u { text-decoration: underline; }
+.bubble-content code {
+    background: rgba(0,0,0,0.06);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+.bubble-content a {
+    color: #2481cc;
+    text-decoration: none;
+}
+.bubble-content a:hover {
+    text-decoration: underline;
 }
 
 .preview-meta {
     margin-top: 0.5rem;
     color: var(--text-muted);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
 }
 
 .preview-empty {
     color: var(--text-muted);
     font-style: italic;
+    padding: 1rem;
+    text-align: center;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px dashed var(--border);
 }
 </style>
 {% endblock %}
-
