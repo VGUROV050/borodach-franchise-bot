@@ -183,9 +183,17 @@ def extract_city_from_name(salon_name: str) -> Optional[str]:
     # Убираем лишние пробелы
     name = salon_name.strip()
     
-    # Нормализуем все виды тире к одному
-    # U+2014 (—) em dash, U+2013 (–) en dash, U+002D (-) hyphen-minus
-    name = name.replace("—", "-").replace("–", "-")
+    # Агрессивная нормализация всех видов тире и дефисов
+    # U+2014 (—) em dash, U+2013 (–) en dash, U+2012 (‒) figure dash
+    # U+2010 (‐) hyphen, U+2011 (‑) non-breaking hyphen, U+002D (-) hyphen-minus
+    # Также \u2015 (―) horizontal bar, \u2212 (−) minus sign
+    dash_chars = ['—', '–', '‒', '‐', '‑', '―', '−']
+    for dash in dash_chars:
+        name = name.replace(dash, '-')
+    
+    # Нормализуем пробелы (включая неразрывные)
+    name = name.replace('\u00a0', ' ')  # non-breaking space
+    name = ' '.join(name.split())  # убираем лишние пробелы
     
     # Специальные случаи
     name_lower = name.lower()
