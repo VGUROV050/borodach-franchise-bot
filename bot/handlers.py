@@ -428,27 +428,45 @@ async def _show_statistics(
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
             
-            # Рейтинг показываем только для текущего месяца
-            if period_type == "current_month":
+            # Рейтинг показываем для текущего и прошлого месяца
+            if period_type in ("current_month", "prev_month"):
                 async with AsyncSessionLocal() as db:
-                    rating = await get_network_rating_by_company(db, yclients_id)
-                
-                if rating and rating.rank > 0:
-                    rank_text = f"   🏆 Рейтинг в сети: <b>{rating.rank}</b> из {rating.total_companies}"
-                    
-                    if rating.previous_rank and rating.previous_rank > 0:
-                        change = rating.previous_rank - rating.rank
-                        if change > 0:
-                            rank_text += f" <b>↑{change}</b> 📈"
-                        elif change < 0:
-                            rank_text += f" <b>↓{abs(change)}</b> 📉"
-                        else:
-                            rank_text += " ➡️"
-                    
-                    stats_text += rank_text + "\n"
-                    
-                    if rating.avg_check > 0:
-                        stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
+                    if period_type == "current_month":
+                        # Текущий рейтинг
+                        rating = await get_network_rating_by_company(db, yclients_id)
+                        if rating and rating.rank > 0:
+                            rank_text = f"   🏆 Рейтинг в сети: <b>{rating.rank}</b> из {rating.total_companies}"
+                            
+                            if rating.previous_rank and rating.previous_rank > 0:
+                                change = rating.previous_rank - rating.rank
+                                if change > 0:
+                                    rank_text += f" <b>↑{change}</b> 📈"
+                                elif change < 0:
+                                    rank_text += f" <b>↓{abs(change)}</b> 📉"
+                                else:
+                                    rank_text += " ➡️"
+                            
+                            stats_text += rank_text + "\n"
+                            
+                            if rating.avg_check > 0:
+                                stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
+                    else:
+                        # Рейтинг за прошлый месяц из истории
+                        from database import get_rating_history
+                        
+                        prev_month_date = date_from
+                        history = await get_rating_history(db, prev_month_date.year, prev_month_date.month)
+                        
+                        # Ищем рейтинг для этого барбершопа
+                        rating_entry = next((h for h in history if h.yclients_company_id == yclients_id), None)
+                        
+                        if rating_entry and rating_entry.rank > 0:
+                            total_in_history = len(history)
+                            rank_text = f"   🏆 Рейтинг в сети: <b>{rating_entry.rank}</b> из {total_in_history}"
+                            stats_text += rank_text + "\n"
+                            
+                            if rating_entry.avg_check and rating_entry.avg_check > 0:
+                                stats_text += f"   💵 Средний чек: <b>{rating_entry.avg_check:,.0f} ₽</b>\n"
         else:
             stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"
