@@ -506,6 +506,55 @@ class PollResponse(Base):
         return f"<PollResponse poll={self.poll_id} partner={self.partner_id}>"
 
 
+class DepartmentType(str, enum.Enum):
+    """Типы отделов."""
+    DEVELOPMENT = "development"
+    MARKETING = "marketing"
+    DESIGN = "design"
+
+
+class DepartmentInfoType(str, enum.Enum):
+    """Типы информации по отделу."""
+    IMPORTANT_INFO = "important_info"   # Важная информация
+    CONTACT_INFO = "contact_info"       # Связаться с отделом
+
+
+class DepartmentInfo(Base):
+    """Настраиваемые тексты для раздела 'Полезное' по отделам."""
+    
+    __tablename__ = "department_info"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Отдел
+    department: Mapped[DepartmentType] = mapped_column(
+        Enum(DepartmentType),
+        index=True,
+    )
+    
+    # Тип информации
+    info_type: Mapped[DepartmentInfoType] = mapped_column(
+        Enum(DepartmentInfoType),
+        index=True,
+    )
+    
+    # Текст сообщения (HTML разрешён)
+    text: Mapped[str] = mapped_column(Text)
+    
+    # Когда обновлено
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    
+    # Кто обновил
+    updated_by: Mapped[str] = mapped_column(String(100), default="admin")
+    
+    def __repr__(self) -> str:
+        return f"<DepartmentInfo {self.department.value}/{self.info_type.value}>"
+
+
 class PollMessage(Base):
     """Связь голосования с сообщением в Telegram (для закрытия)."""
     

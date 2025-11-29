@@ -6,13 +6,21 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 BTN_TASKS = "📋 Задачи"
 BTN_MY_BARBERSHOPS = "💈 Мои барбершопы"
 BTN_STATISTICS = "📊 Статистика"
-BTN_CONTACT_OFFICE = "📞 Связаться с офисом"
+BTN_USEFUL = "📚 Полезное"
 BTN_BACK = "⬅️ Назад"
 BTN_MAIN_MENU = "🏠 Главное меню"
 
-# Контакты отделов (для связи)
-BTN_CONTACT_DEVELOPMENT = "📞 Связаться с Развитием"
-BTN_CONTACT_MARKETING = "📞 Связаться с Маркетингом"
+# Полезное — отделы
+BTN_USEFUL_DEVELOPMENT = "🚀 Развитие"
+BTN_USEFUL_MARKETING = "📢 Маркетинг"
+BTN_USEFUL_DESIGN = "🎨 Дизайн"
+
+# Полезное — действия
+BTN_IMPORTANT_INFO = "📋 Важная информация"
+BTN_CONTACT_DEPARTMENT = "📞 Связаться с отделом"
+
+# Для обратной совместимости
+BTN_CONTACT_OFFICE = BTN_USEFUL
 
 # Подменю задач
 BTN_NEW_TASK = "🆕 Новая задача"
@@ -68,7 +76,7 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BARBERSHOPS)],
-            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_CONTACT_OFFICE)],
+            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_USEFUL)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
@@ -76,18 +84,39 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def contact_office_keyboard() -> ReplyKeyboardMarkup:
-    """Меню выбора отдела для связи."""
+def useful_departments_keyboard() -> ReplyKeyboardMarkup:
+    """Меню выбора отдела в разделе Полезное."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_CONTACT_DEVELOPMENT)],
-            [KeyboardButton(text=BTN_CONTACT_MARKETING)],
+            [KeyboardButton(text=BTN_USEFUL_DEVELOPMENT)],
+            [KeyboardButton(text=BTN_USEFUL_MARKETING)],
+            [KeyboardButton(text=BTN_USEFUL_DESIGN)],
             [KeyboardButton(text=BTN_MAIN_MENU)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите отдел",
     )
     return keyboard
+
+
+def useful_actions_keyboard() -> ReplyKeyboardMarkup:
+    """Меню действий внутри отдела (Полезное)."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_IMPORTANT_INFO)],
+            [KeyboardButton(text=BTN_CONTACT_DEPARTMENT)],
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+# Для обратной совместимости
+def contact_office_keyboard() -> ReplyKeyboardMarkup:
+    """Устаревшее меню - перенаправляет на useful_departments_keyboard."""
+    return useful_departments_keyboard()
 
 
 def tasks_menu_keyboard() -> ReplyKeyboardMarkup:

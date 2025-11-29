@@ -1390,3 +1390,117 @@ async def delete_poll_action(request: Request, poll_id: int):
     
     logger.info(f"Poll {poll_id} deleted")
     return RedirectResponse(url="/polls", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Полезное (тексты для отделов)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/useful-info", response_class=HTMLResponse)
+async def useful_info_page(request: Request):
+    """Страница настройки текстов 'Полезное'."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import (
+        get_all_department_info, 
+        init_default_department_info,
+        DepartmentType,
+        DepartmentInfoType,
+    )
+    
+    async with AsyncSessionLocal() as db:
+        # Инициализируем дефолтные значения если пусто
+        await init_default_department_info(db)
+        infos = await get_all_department_info(db)
+    
+    # Группируем по отделам
+    grouped = {}
+    for dept in DepartmentType:
+        grouped[dept] = {}
+        for info_type in DepartmentInfoType:
+            grouped[dept][info_type] = None
+    
+    for info in infos:
+        grouped[info.department][info.info_type] = info
+    
+    return templates.TemplateResponse(
+        "useful_info.html",
+        {
+            "request": request,
+            "grouped": grouped,
+            "DepartmentType": DepartmentType,
+            "DepartmentInfoType": DepartmentInfoType,
+        },
+    )
+
+
+@router.get("/useful-info/{department}/{info_type}/edit", response_class=HTMLResponse)
+async def edit_useful_info_page(
+    request: Request, 
+    department: str,
+    info_type: str,
+):
+    """Страница редактирования текста."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_department_info, DepartmentType, DepartmentInfoType
+    
+    try:
+        dept = DepartmentType(department)
+        itype = DepartmentInfoType(info_type)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Неверные параметры")
+    
+    async with AsyncSessionLocal() as db:
+        info = await get_department_info(db, dept, itype)
+    
+    dept_names = {
+        DepartmentType.DEVELOPMENT: "🚀 Отдел Развития",
+        DepartmentType.MARKETING: "📢 Отдел Маркетинга",
+        DepartmentType.DESIGN: "🎨 Отдел Дизайна",
+    }
+    
+    type_names = {
+        DepartmentInfoType.IMPORTANT_INFO: "Важная информация",
+        DepartmentInfoType.CONTACT_INFO: "Связаться с отделом",
+    }
+    
+    return templates.TemplateResponse(
+        "edit_useful_info.html",
+        {
+            "request": request,
+            "info": info,
+            "department": dept,
+            "info_type": itype,
+            "dept_name": dept_names.get(dept, department),
+            "type_name": type_names.get(itype, info_type),
+        },
+    )
+
+
+@router.post("/useful-info/{department}/{info_type}/edit")
+async def save_useful_info(
+    request: Request,
+    department: str,
+    info_type: str,
+    text: str = Form(...),
+):
+    """Сохранить текст."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import upsert_department_info, DepartmentType, DepartmentInfoType
+    
+    try:
+        dept = DepartmentType(department)
+        itype = DepartmentInfoType(info_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Неверные параметры")
+    
+    async with AsyncSessionLocal() as db:
+        await upsert_department_info(db, dept, itype, text)
+    
+    logger.info(f"Updated useful info: {department}/{info_type}")
+    return RedirectResponse(url="/useful-info", status_code=302)

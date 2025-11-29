@@ -1021,3 +1021,125 @@ async def get_poll_results(
         "responses": responses_list,
     }
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Department Info CRUD (Полезное)
+# ═══════════════════════════════════════════════════════════════════
+
+from .models import DepartmentInfo, DepartmentType, DepartmentInfoType
+
+
+async def get_department_info(
+    db: AsyncSession,
+    department: DepartmentType,
+    info_type: DepartmentInfoType,
+) -> Optional[DepartmentInfo]:
+    """Получить текст для отдела и типа информации."""
+    result = await db.execute(
+        select(DepartmentInfo).where(
+            DepartmentInfo.department == department,
+            DepartmentInfo.info_type == info_type,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_all_department_info(
+    db: AsyncSession,
+) -> list[DepartmentInfo]:
+    """Получить все настройки текстов."""
+    result = await db.execute(
+        select(DepartmentInfo).order_by(
+            DepartmentInfo.department,
+            DepartmentInfo.info_type,
+        )
+    )
+    return list(result.scalars().all())
+
+
+async def upsert_department_info(
+    db: AsyncSession,
+    department: DepartmentType,
+    info_type: DepartmentInfoType,
+    text: str,
+    updated_by: str = "admin",
+) -> DepartmentInfo:
+    """Создать или обновить текст для отдела."""
+    # Проверяем существует ли
+    result = await db.execute(
+        select(DepartmentInfo).where(
+            DepartmentInfo.department == department,
+            DepartmentInfo.info_type == info_type,
+        )
+    )
+    info = result.scalar_one_or_none()
+    
+    if info:
+        # Обновляем
+        info.text = text
+        info.updated_by = updated_by
+    else:
+        # Создаём
+        info = DepartmentInfo(
+            department=department,
+            info_type=info_type,
+            text=text,
+            updated_by=updated_by,
+        )
+        db.add(info)
+    
+    await db.commit()
+    await db.refresh(info)
+    
+    logger.info(f"Updated department info: {department.value}/{info_type.value}")
+    return info
+
+
+async def init_default_department_info(db: AsyncSession) -> None:
+    """Инициализировать тексты по умолчанию (если пустые)."""
+    defaults = {
+        (DepartmentType.DEVELOPMENT, DepartmentInfoType.IMPORTANT_INFO): 
+            "🚀 <b>Отдел Развития</b>\n\n"
+            "Здесь будет важная информация от отдела развития.\n\n"
+            "<i>Текст можно изменить в админке.</i>",
+        
+        (DepartmentType.DEVELOPMENT, DepartmentInfoType.CONTACT_INFO): 
+            "🚀 <b>Связаться с Отделом Развития</b>\n\n"
+            "👉 <a href='https://t.me/borodach_development'>@borodach_development</a>\n\n"
+            "Отдел отвечает за:\n"
+            "• Открытие новых точек\n"
+            "• Вопросы по франшизе\n"
+            "• Стратегическое развитие",
+        
+        (DepartmentType.MARKETING, DepartmentInfoType.IMPORTANT_INFO): 
+            "📢 <b>Отдел Маркетинга</b>\n\n"
+            "Здесь будет важная информация от отдела маркетинга.\n\n"
+            "<i>Текст можно изменить в админке.</i>",
+        
+        (DepartmentType.MARKETING, DepartmentInfoType.CONTACT_INFO): 
+            "📢 <b>Связаться с Отделом Маркетинга</b>\n\n"
+            "👉 <a href='https://t.me/borodach_marketing'>@borodach_marketing</a>\n\n"
+            "Отдел отвечает за:\n"
+            "• Рекламные материалы\n"
+            "• Маркетинговые акции\n"
+            "• SMM и продвижение",
+        
+        (DepartmentType.DESIGN, DepartmentInfoType.IMPORTANT_INFO): 
+            "🎨 <b>Отдел Дизайна</b>\n\n"
+            "Здесь будет важная информация от отдела дизайна.\n\n"
+            "<i>Текст можно изменить в админке.</i>",
+        
+        (DepartmentType.DESIGN, DepartmentInfoType.CONTACT_INFO): 
+            "🎨 <b>Связаться с Отделом Дизайна</b>\n\n"
+            "Напишите в чат поддержки для связи с дизайнерами.\n\n"
+            "Отдел отвечает за:\n"
+            "• Дизайн материалов\n"
+            "• Оформление точек\n"
+            "• Брендинг",
+    }
+    
+    for (dept, info_type), text in defaults.items():
+        existing = await get_department_info(db, dept, info_type)
+        if not existing:
+            await upsert_department_info(db, dept, info_type, text)
+

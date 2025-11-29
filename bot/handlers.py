@@ -25,15 +25,20 @@ from .keyboards import (
     confirm_cancel_keyboard,
     registration_start_keyboard,
     pending_verification_keyboard,
+    useful_departments_keyboard,
+    useful_actions_keyboard,
     BTN_TASKS,
     BTN_MY_BARBERSHOPS,
     BTN_STATISTICS,
-    BTN_CONTACT_OFFICE,
-    BTN_CONTACT_DEVELOPMENT,
-    BTN_CONTACT_MARKETING,
+    BTN_USEFUL,
+    BTN_USEFUL_DEVELOPMENT,
+    BTN_USEFUL_MARKETING,
+    BTN_USEFUL_DESIGN,
+    BTN_IMPORTANT_INFO,
+    BTN_CONTACT_DEPARTMENT,
     BTN_MAIN_MENU,
+    BTN_BACK,
     BTN_ADD_BARBERSHOP,
-    contact_office_keyboard,
     BTN_NEW_TASK, 
     BTN_MY_TASKS,
     BTN_CANCEL,
@@ -385,59 +390,146 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Связаться с офисом
+# Полезное
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(F.text == BTN_CONTACT_OFFICE)
-async def contact_office_handler(message: types.Message, state: FSMContext) -> None:
-    """Меню выбора отдела для связи."""
+class UsefulStates(StatesGroup):
+    """Состояния для раздела Полезное."""
+    selecting_department = State()
+    in_department = State()
+
+
+# Маппинг кнопок на типы отделов
+USEFUL_DEPT_MAP = {
+    BTN_USEFUL_DEVELOPMENT: "development",
+    BTN_USEFUL_MARKETING: "marketing",
+    BTN_USEFUL_DESIGN: "design",
+}
+
+DEPT_NAMES = {
+    "development": "🚀 Отдел Развития",
+    "marketing": "📢 Отдел Маркетинга",
+    "design": "🎨 Отдел Дизайна",
+}
+
+
+@router.message(F.text == BTN_USEFUL)
+async def useful_handler(message: types.Message, state: FSMContext) -> None:
+    """Раздел Полезное — выбор отдела."""
     if not await _check_verified(message):
         return
     
     await state.clear()
+    await state.set_state(UsefulStates.selecting_department)
     
     await message.answer(
-        "📞 <b>Связаться с офисом</b>\n\n"
-        "Выберите отдел, с которым хотите связаться:",
-        reply_markup=contact_office_keyboard(),
+        "📚 <b>Полезное</b>\n\n"
+        "Выберите отдел:",
+        reply_markup=useful_departments_keyboard(),
     )
 
 
-@router.message(F.text == BTN_CONTACT_DEVELOPMENT)
-async def contact_development_handler(message: types.Message, state: FSMContext) -> None:
-    """Контакт отдела развития."""
-    if not await _check_verified(message):
-        return
+@router.message(UsefulStates.selecting_department, F.text.in_(USEFUL_DEPT_MAP.keys()))
+async def useful_department_selected(message: types.Message, state: FSMContext) -> None:
+    """Выбран отдел — показываем действия."""
+    dept_key = USEFUL_DEPT_MAP[message.text]
+    
+    await state.update_data(selected_department=dept_key)
+    await state.set_state(UsefulStates.in_department)
+    
+    dept_name = DEPT_NAMES.get(dept_key, message.text)
     
     await message.answer(
-        "🚀 <b>Отдел Развития</b>\n\n"
-        "Для связи перейдите в чат:\n\n"
-        "👉 <a href='https://t.me/borodach_development'>@borodach_development</a>\n\n"
-        "Отдел отвечает за:\n"
-        "• Открытие новых точек\n"
-        "• Вопросы по франшизе\n"
-        "• Стратегическое развитие",
-        reply_markup=main_menu_keyboard(),
+        f"{dept_name}\n\n"
+        "Выберите действие:",
+        reply_markup=useful_actions_keyboard(),
+    )
+
+
+@router.message(UsefulStates.in_department, F.text == BTN_IMPORTANT_INFO)
+async def useful_important_info(message: types.Message, state: FSMContext) -> None:
+    """Важная информация по отделу."""
+    data = await state.get_data()
+    dept_key = data.get("selected_department")
+    
+    if not dept_key:
+        await state.clear()
+        await message.answer("Ошибка. Вернитесь в главное меню.", reply_markup=main_menu_keyboard())
+        return
+    
+    # Получаем текст из БД
+    from database import get_department_info, DepartmentType, DepartmentInfoType
+    
+    async with AsyncSessionLocal() as db:
+        info = await get_department_info(
+            db,
+            DepartmentType(dept_key),
+            DepartmentInfoType.IMPORTANT_INFO,
+        )
+    
+    if info and info.text:
+        text = info.text
+    else:
+        dept_name = DEPT_NAMES.get(dept_key, dept_key)
+        text = f"{dept_name}\n\nВажная информация пока не добавлена."
+    
+    await message.answer(
+        text,
+        reply_markup=useful_actions_keyboard(),
         disable_web_page_preview=True,
     )
 
 
-@router.message(F.text == BTN_CONTACT_MARKETING)
-async def contact_marketing_handler(message: types.Message, state: FSMContext) -> None:
-    """Контакт отдела маркетинга."""
-    if not await _check_verified(message):
+@router.message(UsefulStates.in_department, F.text == BTN_CONTACT_DEPARTMENT)
+async def useful_contact_department(message: types.Message, state: FSMContext) -> None:
+    """Связаться с отделом."""
+    data = await state.get_data()
+    dept_key = data.get("selected_department")
+    
+    if not dept_key:
+        await state.clear()
+        await message.answer("Ошибка. Вернитесь в главное меню.", reply_markup=main_menu_keyboard())
         return
     
+    # Получаем текст из БД
+    from database import get_department_info, DepartmentType, DepartmentInfoType
+    
+    async with AsyncSessionLocal() as db:
+        info = await get_department_info(
+            db,
+            DepartmentType(dept_key),
+            DepartmentInfoType.CONTACT_INFO,
+        )
+    
+    if info and info.text:
+        text = info.text
+    else:
+        dept_name = DEPT_NAMES.get(dept_key, dept_key)
+        text = f"{dept_name}\n\nКонтактная информация пока не добавлена."
+    
     await message.answer(
-        "📢 <b>Отдел Маркетинга</b>\n\n"
-        "Для связи перейдите в чат:\n\n"
-        "👉 <a href='https://t.me/borodach_marketing'>@borodach_marketing</a>\n\n"
-        "Отдел отвечает за:\n"
-        "• Рекламные материалы\n"
-        "• Маркетинговые акции\n"
-        "• SMM и продвижение",
-        reply_markup=main_menu_keyboard(),
+        text,
+        reply_markup=useful_actions_keyboard(),
         disable_web_page_preview=True,
+    )
+
+
+@router.message(UsefulStates.selecting_department, F.text == BTN_MAIN_MENU)
+@router.message(UsefulStates.in_department, F.text == BTN_MAIN_MENU)
+async def useful_back_to_main(message: types.Message, state: FSMContext) -> None:
+    """Возврат в главное меню из Полезное."""
+    await state.clear()
+    await message.answer("🏠 Главное меню", reply_markup=main_menu_keyboard())
+
+
+@router.message(UsefulStates.in_department, F.text == BTN_BACK)
+async def useful_back_to_departments(message: types.Message, state: FSMContext) -> None:
+    """Возврат к выбору отдела."""
+    await state.set_state(UsefulStates.selecting_department)
+    await message.answer(
+        "📚 <b>Полезное</b>\n\n"
+        "Выберите отдел:",
+        reply_markup=useful_departments_keyboard(),
     )
 
 

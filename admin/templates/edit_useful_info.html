@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Редактировать — {{ dept_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="/useful-info" class="btn btn-secondary">&larr; Назад</a>
+    <h1>✏️ Редактирование текста</h1>
+</div>
+
+<div class="edit-info">
+    <span class="dept-badge">{{ dept_name }}</span>
+    <span class="type-badge">{{ type_name }}</span>
+</div>
+
+<div class="form-container">
+    <form action="/useful-info/{{ department.value }}/{{ info_type.value }}/edit" method="post">
+        <div class="form-group">
+            <label for="text">Текст сообщения</label>
+            <textarea id="text" name="text" rows="12" placeholder="Введите текст...">{{ info.text if info else '' }}</textarea>
+            <small>
+                Поддерживается HTML: 
+                <code>&lt;b&gt;жирный&lt;/b&gt;</code>, 
+                <code>&lt;i&gt;курсив&lt;/i&gt;</code>, 
+                <code>&lt;a href="url"&gt;ссылка&lt;/a&gt;</code>,
+                <code>&lt;code&gt;код&lt;/code&gt;</code>
+            </small>
+        </div>
+        
+        <div class="preview-section">
+            <h3>👁 Предпросмотр</h3>
+            <div class="preview-box" id="preview"></div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="/useful-info" class="btn btn-secondary">Отмена</a>
+            <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+        </div>
+    </form>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.page-header h1 {
+    margin: 0;
+}
+
+.edit-info {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.dept-badge, .type-badge {
+    padding: 0.35rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.dept-badge {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.type-badge {
+    background: var(--bg-dark);
+    color: var(--text);
+}
+
+.form-container {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 800px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.form-group textarea {
+    width: 100%;
+    padding: 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 0.9rem;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.form-group small code {
+    background: var(--bg-dark);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.75rem;
+}
+
+.preview-section {
+    margin-bottom: 1.5rem;
+}
+
+.preview-section h3 {
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.preview-box {
+    padding: 1rem;
+    background: var(--bg-main);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    min-height: 100px;
+    white-space: pre-wrap;
+    line-height: 1.6;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+</style>
+
+<script>
+const textarea = document.getElementById('text');
+const preview = document.getElementById('preview');
+
+function updatePreview() {
+    // Простая замена HTML тегов для предпросмотра
+    let html = textarea.value
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/&lt;b&gt;/g, '<b>')
+        .replace(/&lt;\/b&gt;/g, '</b>')
+        .replace(/&lt;i&gt;/g, '<i>')
+        .replace(/&lt;\/i&gt;/g, '</i>')
+        .replace(/&lt;code&gt;/g, '<code>')
+        .replace(/&lt;\/code&gt;/g, '</code>')
+        .replace(/&lt;a href=['"]([^'"]+)['"]&gt;/g, '<a href="$1" target="_blank">')
+        .replace(/&lt;\/a&gt;/g, '</a>');
+    
+    preview.innerHTML = html || '<span style="color: var(--text-muted)">Текст пока пустой</span>';
+}
+
+textarea.addEventListener('input', updatePreview);
+updatePreview();
+</script>
+{% endblock %}
+

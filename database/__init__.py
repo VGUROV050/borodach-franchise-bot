@@ -20,6 +20,9 @@ from .models import (
     PollResponse,
     PollMessage,
     PollStatus,
+    DepartmentInfo,
+    DepartmentType,
+    DepartmentInfoType,
 )
 from .crud import (
     get_partner_by_telegram_id,
@@ -64,6 +67,11 @@ from .crud import (
     mark_poll_message_stopped,
     delete_poll,
     get_poll_results,
+    # Department Info (Полезное)
+    get_department_info,
+    get_all_department_info,
+    upsert_department_info,
+    init_default_department_info,
 )
 
 __all__ = [
@@ -133,5 +141,13 @@ __all__ = [
     "mark_poll_message_stopped",
     "delete_poll",
     "get_poll_results",
+    # Department Info (Полезное)
+    "DepartmentInfo",
+    "DepartmentType",
+    "DepartmentInfoType",
+    "get_department_info",
+    "get_all_department_info",
+    "upsert_department_info",
+    "init_default_department_info",
 ]
 

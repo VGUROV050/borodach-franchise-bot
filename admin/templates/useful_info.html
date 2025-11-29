@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Полезное — Настройка текстов{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📚 Полезное — Настройка текстов</h1>
+</div>
+
+<p class="description">
+    Здесь можно настроить тексты, которые бот отправляет партнёрам в разделе «Полезное».
+    Поддерживается HTML-разметка: <code>&lt;b&gt;</code>, <code>&lt;i&gt;</code>, <code>&lt;a href="..."&gt;</code>.
+</p>
+
+<div class="departments-grid">
+    {% for dept in DepartmentType %}
+    <div class="department-card">
+        <h2>
+            {% if dept.value == 'development' %}🚀 Отдел Развития
+            {% elif dept.value == 'marketing' %}📢 Отдел Маркетинга
+            {% elif dept.value == 'design' %}🎨 Отдел Дизайна
+            {% endif %}
+        </h2>
+        
+        {% for info_type in DepartmentInfoType %}
+        <div class="info-block">
+            <div class="info-header">
+                <span class="info-type">
+                    {% if info_type.value == 'important_info' %}📋 Важная информация
+                    {% elif info_type.value == 'contact_info' %}📞 Связаться с отделом
+                    {% endif %}
+                </span>
+                <a href="/useful-info/{{ dept.value }}/{{ info_type.value }}/edit" class="btn btn-sm">
+                    ✏️ Редактировать
+                </a>
+            </div>
+            
+            <div class="info-preview">
+                {% if grouped[dept][info_type] %}
+                <div class="preview-text">{{ grouped[dept][info_type].text[:150] }}{% if grouped[dept][info_type].text|length > 150 %}...{% endif %}</div>
+                <div class="preview-meta">
+                    Обновлено: {{ grouped[dept][info_type].updated_at.strftime('%d.%m.%Y %H:%M') }}
+                </div>
+                {% else %}
+                <div class="preview-empty">Текст не задан</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+.page-header {
+    margin-bottom: 1rem;
+}
+
+.description {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.description code {
+    background: var(--bg-dark);
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+.departments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.department-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.department-card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.info-block {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+    background: var(--bg-main);
+    border-radius: 10px;
+}
+
+.info-block:last-child {
+    margin-bottom: 0;
+}
+
+.info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.info-type {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.info-preview {
+    font-size: 0.85rem;
+}
+
+.preview-text {
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+.preview-meta {
+    margin-top: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.preview-empty {
+    color: var(--text-muted);
+    font-style: italic;
+}
+</style>
+{% endblock %}
+
