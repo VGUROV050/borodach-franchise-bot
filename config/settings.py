@@ -31,6 +31,9 @@ YCLIENTS_CHAIN_ID = os.getenv("YCLIENTS_CHAIN_ID", "318")  # ID сети сал�
 # Redis (для кэширования)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+# OpenAI API (для AI-ассистента)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
 # ID проектов/групп в Bitrix24 для каждого отдела
 BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # Отдел Развития
 BITRIX_GROUP_ID_MARKETING = os.getenv("BITRIX_GROUP_ID_MARKETING", "")      # Отдел Маркетинга

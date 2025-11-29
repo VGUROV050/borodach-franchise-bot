@@ -1607,3 +1607,53 @@ async def cancel_task_reject(message: types.Message, state: FSMContext) -> None:
         "Выберите действие:",
         reply_markup=main_menu_keyboard(),
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Fallback handler — обработка неожиданных сообщений
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text)
+async def fallback_handler(message: types.Message, state: FSMContext) -> None:
+    """
+    Обработка любых текстовых сообщений, которые не попали в другие хэндлеры.
+    Использует AI для понимания намерения пользователя.
+    """
+    # Проверяем, верифицирован ли пользователь
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+    
+    if not partner or partner.status != PartnerStatus.VERIFIED:
+        # Для неверифицированных — просто предлагаем регистрацию
+        await message.answer(
+            "👋 Для использования бота необходимо пройти регистрацию.\n\n"
+            "Нажмите кнопку «📝 Пройти регистрацию».",
+            reply_markup=registration_start_keyboard(),
+        )
+        return
+    
+    # Для верифицированных — используем AI
+    user_text = message.text.strip()
+    
+    # Игнорируем слишком короткие сообщения
+    if len(user_text) < 2:
+        await message.answer(
+            "🤔 Используйте кнопки меню для навигации.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+    
+    # Пробуем получить AI-подсказку
+    from .ai_assistant import get_ai_suggestion, get_fallback_suggestion
+    
+    suggestion = await get_ai_suggestion(user_text)
+    
+    if suggestion:
+        await message.answer(
+            f"💡 {suggestion}",
+            reply_markup=main_menu_keyboard(),
+        )
+    else:
+        # Если AI недоступен — используем ключевые слова
+        fallback = get_fallback_suggestion(user_text)
+        await message.answer(fallback, reply_markup=main_menu_keyboard())

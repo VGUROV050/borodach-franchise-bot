@@ -32,3 +32,6 @@ redis==5.0.1
 
 # Rate limiting
 aiogram-throttling==0.1.4
+
+# AI Assistant
+openai==1.12.0
