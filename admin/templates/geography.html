@@ -199,10 +199,55 @@
     </div>
 </div>
 
+{% if geo.undefined_region %}
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="section-header" style="background: var(--warning-light); color: #b45309;">
+        ⚠️ Регион не определён
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Регион</th>
+                <th style="text-align: center;">Салонов</th>
+                <th style="text-align: right;">Выручка</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="region-row" onclick="toggleSalons('undefined-salons', this)">
+                <td style="width: 30px;">
+                    <span class="expand-icon">▶</span>
+                </td>
+                <td><strong>Не определено</strong></td>
+                <td style="text-align: center;">
+                    <span class="badge badge-warning">{{ geo.undefined_region.count }}</span>
+                </td>
+                <td style="text-align: right; color: var(--warning); font-weight: 600;">
+                    {{ "{:,.0f}".format(geo.undefined_region.revenue).replace(",", " ") }} ₽
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" style="padding: 0;">
+                    <div id="undefined-salons" class="salon-list">
+                        {% for salon in geo.undefined_region.salons %}
+                        <div class="salon-item">
+                            <span class="salon-rank">#{{ salon.rank }}</span>
+                            <span class="salon-name">{{ salon.name }}</span>
+                            <span class="salon-revenue">{{ "{:,.0f}".format(salon.revenue).replace(",", " ") }} ₽</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
 {% if geo.unknown_cities %}
 <div class="card" style="margin-top: 1.5rem;">
     <div class="card-header">
-        <div class="card-title">⚠️ Не удалось определить город ({{ geo.unknown_cities|length }})</div>
+        <div class="card-title">❓ Не удалось определить город ({{ geo.unknown_cities|length }})</div>
     </div>
     <div style="padding: 1rem; color: var(--text-muted); font-size: 0.875rem;">
         {% for name in geo.unknown_cities[:10] %}

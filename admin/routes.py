@@ -660,7 +660,7 @@ async def delete_partner(
 # ═══════════════════════════════════════════════════════════════════
 
 @router.get("/yclients-companies", response_class=HTMLResponse)
-async def yclients_companies_page(request: Request, status: str = None):
+async def yclients_companies_page(request: Request, status: str = None, show_closed: str = None):
     """Страница списка салонов YClients с фильтрацией по статусу."""
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
@@ -673,6 +673,13 @@ async def yclients_companies_page(request: Request, status: str = None):
         # Получаем все компании для статистики
         all_result = await db.execute(select(YClientsCompany).order_by(YClientsCompany.name))
         all_companies = list(all_result.scalars().all())
+        
+        # Фильтруем закрытые (содержат "закрыт" в названии)
+        # Показываем их только если явно запрошено
+        if show_closed != "1":
+            all_companies = [c for c in all_companies if "закрыт" not in c.name.lower()]
+        
+        closed_count = sum(1 for c in all_companies if "закрыт" in c.name.lower()) if show_closed == "1" else 0
         
         # Считаем статистику
         active_count = sum(1 for c in all_companies if c.is_active)
@@ -704,9 +711,11 @@ async def yclients_companies_page(request: Request, status: str = None):
         "total_count": len(all_companies),
         "active_count": active_count,
         "inactive_count": inactive_count,
+        "closed_count": closed_count,
         "cities_count": len(cities),
         "cities": sorted(cities.items(), key=lambda x: x[1], reverse=True),
         "current_filter": current_filter,
+        "show_closed": show_closed == "1",
     })
 
 
@@ -933,7 +942,8 @@ async def network_rating_page(request: Request, period: str = "current"):
         # Добавляем previous_rank к каждому рейтингу
         ratings_with_change = []
         for r in history_ratings:
-            if r.revenue > 0:
+            # Пропускаем закрытые и с нулевой выручкой
+            if r.revenue > 0 and "закрыт" not in r.company_name.lower():
                 # Создаём объект с дополнительным полем
                 r.previous_rank = prev_ranks.get(r.yclients_company_id, 0)
                 ratings_with_change.append(r)
@@ -960,7 +970,8 @@ async def network_rating_page(request: Request, period: str = "current"):
         # Добавляем previous_rank к каждому рейтингу
         ratings_with_change = []
         for r in all_ratings:
-            if r.revenue > 0:
+            # Пропускаем закрытые и с нулевой выручкой
+            if r.revenue > 0 and "закрыт" not in r.company_name.lower():
                 r.previous_rank = prev_ranks.get(r.yclients_company_id, 0)
                 ratings_with_change.append(r)
         
@@ -1051,6 +1062,11 @@ async def geography_page(request: Request):
     by_region = defaultdict(lambda: {"count": 0, "revenue": 0, "salons": []})
     
     for r in ratings:
+        # Пропускаем закрытые барбершопы
+        if "закрыт" in r.company_name.lower():
+            geo["total_salons"] -= 1
+            continue
+            
         company = companies.get(r.yclients_company_id)
         
         salon_info = {
@@ -1146,6 +1162,14 @@ async def geography_page(request: Request):
             })
     
     geo["regions"] = sorted(geo["regions"], key=lambda x: x["count"], reverse=True)
+    
+    # Добавляем "Не определено" отдельно
+    if "Не определено" in by_region:
+        geo["undefined_region"] = {
+            "count": by_region["Не определено"]["count"],
+            "revenue": by_region["Не определено"]["revenue"],
+            "salons": sorted(by_region["Не определено"]["salons"], key=lambda x: x["revenue"], reverse=True),
+        }
     
     return templates.TemplateResponse(
         "geography.html",
