@@ -10,11 +10,16 @@ from config.settings import DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
-# Создаём асинхронный движок
+# Создаём асинхронный движок с connection pooling
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,  # Поставь True для отладки SQL-запросов
-    pool_pre_ping=True,
+    # Connection pooling настройки
+    pool_size=10,           # Базовый размер пула соединений
+    max_overflow=20,        # Максимум дополнительных соединений сверх pool_size
+    pool_recycle=3600,      # Переподключение каждый час (избегаем протухших соединений)
+    pool_pre_ping=True,     # Проверка соединения перед использованием
+    pool_timeout=30,        # Таймаут ожидания соединения из пула
 )
 
 # Фабрика сессий

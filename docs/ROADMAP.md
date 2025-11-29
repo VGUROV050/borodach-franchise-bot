@@ -28,7 +28,7 @@ async def api_call():
 ---
 
 ### 2. Connection pooling для БД
-**Статус:** ⏳ Запланировано  
+**Статус:** ✅ Выполнено  
 **Оценка:** 30 мин
 
 Настроить пул соединений для PostgreSQL:
@@ -67,7 +67,7 @@ async def on_shutdown(dp: Dispatcher):
 ---
 
 ### 4. Health check endpoint
-**Статус:** ⏳ Запланировано  
+**Статус:** ✅ Выполнено  
 **Оценка:** 30 мин
 
 Эндпоинт для мониторинга состояния сервиса:
@@ -233,7 +233,8 @@ api_latency = Histogram('api_duration_seconds', 'API latency')
 
 ## ✅ Выполнено
 
-*(Пока пусто — сюда переносить выполненные пункты)*
+- **Connection pooling для БД** (29.11.2025) — настроен пул соединений PostgreSQL
+- **Health check endpoint** (29.11.2025) — добавлен `/health` для мониторинга
 
 ---
 

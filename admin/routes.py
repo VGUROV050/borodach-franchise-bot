@@ -1,12 +1,14 @@
 # Admin panel routes
 
 import logging
+from datetime import datetime
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Request, Depends, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import text
 
 from config.settings import BASE_DIR, ADMIN_USERNAME, ADMIN_PASSWORD, TELEGRAM_BOT_TOKEN
 from database import (
@@ -79,6 +81,52 @@ async def send_telegram_notification(
 
 router = APIRouter()
 templates = Jinja2Templates(directory=f"{BASE_DIR}/admin/templates")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Health Check (публичный эндпоинт для мониторинга)
+# ═══════════════════════════════════════════════════════════════════
+
+# Время запуска сервиса
+_start_time = datetime.now()
+
+
+@router.get("/health", response_class=JSONResponse)
+async def health_check():
+    """
+    Health check эндпоинт для мониторинга состояния сервиса.
+    Не требует авторизации.
+    """
+    # Проверяем подключение к БД
+    db_status = "ok"
+    db_error = None
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = "error"
+        db_error = str(e)
+    
+    # Вычисляем uptime
+    uptime = datetime.now() - _start_time
+    uptime_str = str(uptime).split('.')[0]  # Убираем микросекунды
+    
+    status = "healthy" if db_status == "ok" else "unhealthy"
+    
+    response = {
+        "status": status,
+        "timestamp": datetime.now().isoformat(),
+        "uptime": uptime_str,
+        "components": {
+            "database": {
+                "status": db_status,
+                "error": db_error,
+            }
+        }
+    }
+    
+    status_code = 200 if status == "healthy" else 503
+    return JSONResponse(content=response, status_code=status_code)
 
 
 # ═══════════════════════════════════════════════════════════════════
