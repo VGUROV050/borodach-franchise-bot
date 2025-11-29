@@ -1552,3 +1552,260 @@ async def save_useful_info(
     
     logger.info(f"Updated useful info: {department}/{info_type}")
     return RedirectResponse(url="/useful-info", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Диагностика системы
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/diagnostics", response_class=HTMLResponse)
+async def diagnostics_page(request: Request):
+    """Страница диагностики системы."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    return templates.TemplateResponse("diagnostics.html", {"request": request})
+
+
+@router.get("/diagnostics/run", response_class=JSONResponse)
+async def run_diagnostics(request: Request):
+    """Запуск диагностики всех компонентов."""
+    if not verify_session(request):
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    
+    from datetime import datetime
+    import httpx
+    from config.settings import (
+        DATABASE_URL, 
+        TELEGRAM_BOT_TOKEN, 
+        BITRIX_WEBHOOK_URL,
+        YCLIENTS_PARTNER_TOKEN,
+        YCLIENTS_USER_TOKEN,
+        REDIS_URL,
+    )
+    
+    checks = {}
+    
+    # 1. PostgreSQL
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(text("SELECT version()"))
+            version = result.scalar()
+            checks["database"] = {
+                "name": "PostgreSQL",
+                "status": "ok",
+                "message": "Подключено",
+                "details": version.split(",")[0] if version else None,
+            }
+    except Exception as e:
+        checks["database"] = {
+            "name": "PostgreSQL",
+            "status": "error",
+            "message": f"Ошибка: {str(e)[:50]}",
+        }
+    
+    # 2. Redis
+    try:
+        from cache import init_cache, is_cache_available, close_cache
+        if REDIS_URL:
+            # Пробуем подключиться
+            import redis.asyncio as redis_client
+            r = redis_client.from_url(REDIS_URL, socket_connect_timeout=3)
+            await r.ping()
+            await r.close()
+            checks["redis"] = {
+                "name": "Redis",
+                "status": "ok",
+                "message": "Подключено",
+                "details": REDIS_URL.split("@")[-1] if "@" in REDIS_URL else REDIS_URL,
+            }
+        else:
+            checks["redis"] = {
+                "name": "Redis",
+                "status": "warning",
+                "message": "Не настроен",
+                "details": "REDIS_URL не задан в .env",
+            }
+    except Exception as e:
+        checks["redis"] = {
+            "name": "Redis",
+            "status": "warning",
+            "message": "Недоступен",
+            "details": str(e)[:50],
+        }
+    
+    # 3. Telegram Bot
+    try:
+        if TELEGRAM_BOT_TOKEN:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("ok"):
+                        bot_info = data.get("result", {})
+                        checks["telegram"] = {
+                            "name": "Telegram Bot",
+                            "status": "ok",
+                            "message": f"@{bot_info.get('username', 'bot')}",
+                            "details": f"ID: {bot_info.get('id')}",
+                        }
+                    else:
+                        checks["telegram"] = {
+                            "name": "Telegram Bot",
+                            "status": "error",
+                            "message": "Неверный токен",
+                        }
+                else:
+                    checks["telegram"] = {
+                        "name": "Telegram Bot",
+                        "status": "error",
+                        "message": f"HTTP {resp.status_code}",
+                    }
+        else:
+            checks["telegram"] = {
+                "name": "Telegram Bot",
+                "status": "error",
+                "message": "Токен не задан",
+            }
+    except Exception as e:
+        checks["telegram"] = {
+            "name": "Telegram Bot",
+            "status": "error",
+            "message": str(e)[:50],
+        }
+    
+    # 4. YClients API
+    try:
+        if YCLIENTS_PARTNER_TOKEN:
+            async with httpx.AsyncClient(timeout=10) as client:
+                headers = {
+                    "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
+                    "Accept": "application/vnd.api.v2+json",
+                }
+                resp = await client.get(
+                    "https://api.yclients.com/api/v1/groups",
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("success"):
+                        groups = data.get("data", [])
+                        company_count = sum(len(g.get("companies", [])) for g in groups)
+                        checks["yclients"] = {
+                            "name": "YClients API",
+                            "status": "ok",
+                            "message": "Подключено",
+                            "details": f"{company_count} салонов в сети",
+                        }
+                    else:
+                        checks["yclients"] = {
+                            "name": "YClients API",
+                            "status": "error",
+                            "message": "API вернул ошибку",
+                        }
+                else:
+                    checks["yclients"] = {
+                        "name": "YClients API",
+                        "status": "error",
+                        "message": f"HTTP {resp.status_code}",
+                    }
+        else:
+            checks["yclients"] = {
+                "name": "YClients API",
+                "status": "error",
+                "message": "Токен не задан",
+            }
+    except Exception as e:
+        checks["yclients"] = {
+            "name": "YClients API",
+            "status": "error",
+            "message": str(e)[:50],
+        }
+    
+    # 5. Bitrix24 API
+    try:
+        if BITRIX_WEBHOOK_URL:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"{BITRIX_WEBHOOK_URL.rstrip('/')}/profile"
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if "result" in data:
+                        user = data.get("result", {})
+                        checks["bitrix"] = {
+                            "name": "Bitrix24 API",
+                            "status": "ok",
+                            "message": "Подключено",
+                            "details": f"{user.get('NAME', '')} {user.get('LAST_NAME', '')}".strip() or "Webhook OK",
+                        }
+                    else:
+                        checks["bitrix"] = {
+                            "name": "Bitrix24 API",
+                            "status": "error",
+                            "message": data.get("error_description", "Ошибка"),
+                        }
+                else:
+                    checks["bitrix"] = {
+                        "name": "Bitrix24 API",
+                        "status": "error",
+                        "message": f"HTTP {resp.status_code}",
+                    }
+        else:
+            checks["bitrix"] = {
+                "name": "Bitrix24 API",
+                "status": "warning",
+                "message": "Не настроен",
+                "details": "BITRIX_WEBHOOK_URL не задан",
+            }
+    except Exception as e:
+        checks["bitrix"] = {
+            "name": "Bitrix24 API",
+            "status": "error",
+            "message": str(e)[:50],
+        }
+    
+    # 6. Scheduler
+    try:
+        from database import get_last_network_rating_update
+        async with AsyncSessionLocal() as db:
+            last_update = await get_last_network_rating_update(db)
+        
+        if last_update:
+            age = datetime.now() - last_update
+            hours_ago = age.total_seconds() / 3600
+            
+            if hours_ago < 25:  # Меньше суток + 1 час запаса
+                checks["scheduler"] = {
+                    "name": "Планировщик",
+                    "status": "ok",
+                    "message": "Работает",
+                    "details": f"Обновлено {hours_ago:.1f}ч назад",
+                }
+            else:
+                checks["scheduler"] = {
+                    "name": "Планировщик",
+                    "status": "warning",
+                    "message": "Давно не обновлялось",
+                    "details": f"Последнее обновление: {last_update.strftime('%d.%m %H:%M')}",
+                }
+        else:
+            checks["scheduler"] = {
+                "name": "Планировщик",
+                "status": "warning",
+                "message": "Нет данных",
+                "details": "Рейтинг ещё не загружен",
+            }
+    except Exception as e:
+        checks["scheduler"] = {
+            "name": "Планировщик",
+            "status": "error",
+            "message": str(e)[:50],
+        }
+    
+    return JSONResponse({
+        "checks": checks,
+        "timestamp": datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
+    })

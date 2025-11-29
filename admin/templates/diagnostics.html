@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Диагностика — Borodach Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🩺 Диагностика системы</h1>
+    <button onclick="runDiagnostics()" class="btn btn-primary" id="runBtn">
+        🔄 Запустить проверку
+    </button>
+</div>
+
+<p class="description">
+    Проверка всех компонентов системы. Нажмите кнопку для запуска диагностики.
+</p>
+
+<div class="diagnostics-grid" id="diagnosticsGrid">
+    <!-- Database -->
+    <div class="diagnostic-card" id="card-database">
+        <div class="diagnostic-icon">🗄️</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">PostgreSQL</div>
+            <div class="diagnostic-desc">База данных</div>
+        </div>
+        <div class="diagnostic-status" id="status-database">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+    
+    <!-- Redis -->
+    <div class="diagnostic-card" id="card-redis">
+        <div class="diagnostic-icon">🔴</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">Redis</div>
+            <div class="diagnostic-desc">Кэширование</div>
+        </div>
+        <div class="diagnostic-status" id="status-redis">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+    
+    <!-- Telegram Bot -->
+    <div class="diagnostic-card" id="card-telegram">
+        <div class="diagnostic-icon">🤖</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">Telegram Bot</div>
+            <div class="diagnostic-desc">Бот API</div>
+        </div>
+        <div class="diagnostic-status" id="status-telegram">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+    
+    <!-- YClients API -->
+    <div class="diagnostic-card" id="card-yclients">
+        <div class="diagnostic-icon">💈</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">YClients API</div>
+            <div class="diagnostic-desc">Интеграция салонов</div>
+        </div>
+        <div class="diagnostic-status" id="status-yclients">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+    
+    <!-- Bitrix API -->
+    <div class="diagnostic-card" id="card-bitrix">
+        <div class="diagnostic-icon">📋</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">Bitrix24 API</div>
+            <div class="diagnostic-desc">Система задач</div>
+        </div>
+        <div class="diagnostic-status" id="status-bitrix">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+    
+    <!-- Scheduler -->
+    <div class="diagnostic-card" id="card-scheduler">
+        <div class="diagnostic-icon">⏰</div>
+        <div class="diagnostic-info">
+            <div class="diagnostic-name">Планировщик</div>
+            <div class="diagnostic-desc">Обновление рейтинга</div>
+        </div>
+        <div class="diagnostic-status" id="status-scheduler">
+            <span class="status-pending">⏳ Ожидание</span>
+        </div>
+    </div>
+</div>
+
+<!-- Детали -->
+<div class="card" id="detailsCard" style="display: none;">
+    <div class="card-header">
+        <h2 class="card-title">📋 Детали проверки</h2>
+    </div>
+    <div id="detailsContent"></div>
+</div>
+
+<!-- Общий статус -->
+<div class="summary-card" id="summaryCard" style="display: none;">
+    <div class="summary-icon" id="summaryIcon">✅</div>
+    <div class="summary-text" id="summaryText">Все системы работают нормально</div>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.description {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.diagnostics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.diagnostic-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s;
+}
+
+.diagnostic-card.checking {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.diagnostic-card.success {
+    border-color: var(--success);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--success-light) 100%);
+}
+
+.diagnostic-card.error {
+    border-color: var(--danger);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--danger-light) 100%);
+}
+
+.diagnostic-card.warning {
+    border-color: var(--warning);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--warning-light) 100%);
+}
+
+.diagnostic-icon {
+    font-size: 2rem;
+    width: 3rem;
+    text-align: center;
+}
+
+.diagnostic-info {
+    flex: 1;
+}
+
+.diagnostic-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.diagnostic-desc {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+}
+
+.diagnostic-status {
+    text-align: right;
+    min-width: 120px;
+}
+
+.status-pending { color: var(--text-muted); }
+.status-checking { color: var(--accent); font-weight: 500; }
+.status-ok { color: var(--success); font-weight: 600; }
+.status-error { color: var(--danger); font-weight: 600; }
+.status-warning { color: var(--warning); font-weight: 600; }
+
+.status-detail {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+}
+
+.summary-card {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 2rem;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.summary-card.all-ok {
+    border-color: var(--success);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--success-light) 100%);
+}
+
+.summary-card.has-errors {
+    border-color: var(--danger);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--danger-light) 100%);
+}
+
+.summary-card.has-warnings {
+    border-color: var(--warning);
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--warning-light) 100%);
+}
+
+.summary-icon {
+    font-size: 2.5rem;
+}
+
+.summary-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+#detailsContent {
+    font-family: 'SF Mono', 'Menlo', monospace;
+    font-size: 0.8125rem;
+    line-height: 1.8;
+}
+
+.detail-row {
+    display: flex;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    width: 150px;
+    color: var(--text-muted);
+}
+
+.detail-value {
+    flex: 1;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.checking .diagnostic-icon {
+    animation: pulse 1s infinite;
+}
+</style>
+
+<script>
+async function runDiagnostics() {
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Проверка...';
+    
+    // Сбрасываем все статусы
+    const components = ['database', 'redis', 'telegram', 'yclients', 'bitrix', 'scheduler'];
+    components.forEach(c => {
+        document.getElementById(`card-${c}`).className = 'diagnostic-card';
+        document.getElementById(`status-${c}`).innerHTML = '<span class="status-pending">⏳ Ожидание</span>';
+    });
+    
+    document.getElementById('detailsCard').style.display = 'none';
+    document.getElementById('summaryCard').style.display = 'none';
+    
+    try {
+        const response = await fetch('/diagnostics/run');
+        const data = await response.json();
+        
+        let allOk = true;
+        let hasWarnings = false;
+        let details = [];
+        
+        // Обновляем статусы
+        for (const [key, result] of Object.entries(data.checks)) {
+            const card = document.getElementById(`card-${key}`);
+            const status = document.getElementById(`status-${key}`);
+            
+            if (result.status === 'ok') {
+                card.className = 'diagnostic-card success';
+                status.innerHTML = `<div class="status-ok">✅ OK</div>
+                    <div class="status-detail">${result.message || ''}</div>`;
+            } else if (result.status === 'warning') {
+                card.className = 'diagnostic-card warning';
+                status.innerHTML = `<div class="status-warning">⚠️ Предупреждение</div>
+                    <div class="status-detail">${result.message || ''}</div>`;
+                hasWarnings = true;
+            } else {
+                card.className = 'diagnostic-card error';
+                status.innerHTML = `<div class="status-error">❌ Ошибка</div>
+                    <div class="status-detail">${result.message || ''}</div>`;
+                allOk = false;
+            }
+            
+            details.push({
+                name: result.name,
+                status: result.status,
+                message: result.message,
+                details: result.details
+            });
+        }
+        
+        // Показываем детали
+        const detailsHtml = details.map(d => `
+            <div class="detail-row">
+                <div class="detail-label">${d.name}</div>
+                <div class="detail-value">
+                    ${d.status === 'ok' ? '✅' : d.status === 'warning' ? '⚠️' : '❌'} 
+                    ${d.message}
+                    ${d.details ? `<br><span style="color: var(--text-muted)">${d.details}</span>` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        document.getElementById('detailsContent').innerHTML = detailsHtml;
+        document.getElementById('detailsCard').style.display = 'block';
+        
+        // Итог
+        const summary = document.getElementById('summaryCard');
+        const summaryIcon = document.getElementById('summaryIcon');
+        const summaryText = document.getElementById('summaryText');
+        
+        if (allOk && !hasWarnings) {
+            summary.className = 'summary-card all-ok';
+            summaryIcon.textContent = '✅';
+            summaryText.textContent = `Все системы работают нормально (${data.timestamp})`;
+        } else if (allOk && hasWarnings) {
+            summary.className = 'summary-card has-warnings';
+            summaryIcon.textContent = '⚠️';
+            summaryText.textContent = 'Есть предупреждения, но система работает';
+        } else {
+            summary.className = 'summary-card has-errors';
+            summaryIcon.textContent = '❌';
+            summaryText.textContent = 'Обнаружены проблемы!';
+        }
+        
+        summary.style.display = 'flex';
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Ошибка при выполнении диагностики: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Запустить проверку';
+    }
+}
+
+// Автозапуск при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    runDiagnostics();
+});
+</script>
+{% endblock %}
+

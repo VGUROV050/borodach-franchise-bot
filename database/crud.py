@@ -425,6 +425,14 @@ async def get_all_network_ratings(
     return list(result.scalars().all())
 
 
+async def get_last_network_rating_update(db: AsyncSession) -> datetime | None:
+    """Получить время последнего обновления рейтинга."""
+    result = await db.execute(
+        select(NetworkRating.updated_at).order_by(NetworkRating.updated_at.desc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def save_rating_history(
     db: AsyncSession,
     year: int,
