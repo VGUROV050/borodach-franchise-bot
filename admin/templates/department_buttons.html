@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Кнопки отделов — Админка{% endblock %}
+{% block title %}Полезное — Управление кнопками{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">🔘 Кнопки отделов</h1>
+    <h1 class="page-title">📚 Полезное — Кнопки отделов</h1>
     <a href="/useful-info/buttons/create" class="btn btn-success">+ Добавить кнопку</a>
 </div>
 
 <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-    Настройте кнопки, которые будут отображаться в разделе "Полезное" для каждого отдела.
-    Кнопки "Связаться с отделом" и "Назад" добавляются автоматически.
+    Настройте кнопки меню для раздела "Полезное" в боте. Кнопка "◀️ Назад" добавляется автоматически.
 </p>
 
+<div class="departments-grid">
 {% for dept in DepartmentType %}
-<div class="card" style="margin-bottom: 1.5rem;">
+<div class="card department-card">
     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div class="card-title">
             {% if dept.value == 'development' %}🚀 Отдел Развития
@@ -22,87 +22,236 @@
             {% elif dept.value == 'design' %}🎨 Отдел Дизайна
             {% endif %}
         </div>
-        <a href="/useful-info/buttons/create?department={{ dept.value }}" class="btn btn-sm" 
-           style="background: var(--primary); color: white; padding: 0.25rem 0.75rem; font-size: 0.875rem;">
-            + Добавить
+        <a href="/useful-info/buttons/create?department={{ dept.value }}" class="btn btn-sm btn-add">
+            + Кнопка
         </a>
     </div>
     
-    {% if grouped[dept] %}
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 50px;">№</th>
-                <th>Текст кнопки</th>
-                <th style="width: 150px;">Статус</th>
-                <th style="width: 150px; text-align: center;">Действия</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="buttons-list">
+        {% if grouped[dept] %}
             {% for button in grouped[dept] %}
-            <tr{% if not button.is_active %} style="opacity: 0.5;"{% endif %}>
-                <td>{{ button.order }}</td>
-                <td>
-                    <strong>{{ button.button_text }}</strong>
-                    <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 0.25rem;">
-                        {{ button.message_text[:80] }}{% if button.message_text|length > 80 %}...{% endif %}
+            <div class="button-item{% if not button.is_active %} inactive{% endif %}">
+                <div class="button-main">
+                    <div class="button-order">{{ button.order }}</div>
+                    <div class="button-content">
+                        <div class="button-text">{{ button.button_text }}</div>
+                        <div class="button-preview">
+                            <div class="telegram-bubble-mini">
+                                {{ button.message_text[:100] }}{% if button.message_text|length > 100 %}...{% endif %}
+                            </div>
+                        </div>
                     </div>
-                </td>
-                <td>
-                    {% if button.is_active %}
-                    <span class="badge badge-success">Активна</span>
-                    {% else %}
-                    <span class="badge badge-secondary">Выключена</span>
-                    {% endif %}
-                </td>
-                <td style="text-align: center;">
-                    <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                        <a href="/useful-info/buttons/{{ button.id }}/edit" 
-                           class="btn btn-sm" style="background: var(--primary); color: white; padding: 0.25rem 0.5rem;">
-                            ✏️
-                        </a>
-                        <form action="/useful-info/buttons/{{ button.id }}/toggle" method="post" style="margin: 0;">
-                            <button type="submit" class="btn btn-sm" 
-                                    style="background: var(--warning); color: white; padding: 0.25rem 0.5rem;">
+                    <div class="button-actions">
+                        {% if button.is_active %}
+                        <span class="status-dot active" title="Активна"></span>
+                        {% else %}
+                        <span class="status-dot" title="Выключена"></span>
+                        {% endif %}
+                        <a href="/useful-info/buttons/{{ button.id }}/edit" class="btn-icon" title="Редактировать">✏️</a>
+                        <form action="/useful-info/buttons/{{ button.id }}/toggle" method="post" style="display: inline;">
+                            <button type="submit" class="btn-icon" title="{% if button.is_active %}Выключить{% else %}Включить{% endif %}">
                                 {% if button.is_active %}👁️{% else %}👁️‍🗨️{% endif %}
                             </button>
                         </form>
-                        <form action="/useful-info/buttons/{{ button.id }}/delete" method="post" style="margin: 0;"
+                        <form action="/useful-info/buttons/{{ button.id }}/delete" method="post" style="display: inline;"
                               onsubmit="return confirm('Удалить кнопку «{{ button.button_text }}»?');">
-                            <button type="submit" class="btn btn-sm" 
-                                    style="background: var(--danger); color: white; padding: 0.25rem 0.5rem;">
-                                🗑️
-                            </button>
+                            <button type="submit" class="btn-icon btn-danger" title="Удалить">🗑️</button>
                         </form>
                     </div>
-                </td>
-            </tr>
+                </div>
+            </div>
             {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div style="padding: 2rem; text-align: center; color: var(--text-muted);">
-        <p>Кнопок пока нет</p>
-        <a href="/useful-info/buttons/create?department={{ dept.value }}" class="btn btn-sm" 
-           style="background: var(--primary); color: white;">
-            Добавить первую кнопку
-        </a>
+        {% else %}
+            <div class="empty-state">
+                <p>Кнопок пока нет</p>
+                <a href="/useful-info/buttons/create?department={{ dept.value }}" class="btn btn-sm">
+                    Добавить первую
+                </a>
+            </div>
+        {% endif %}
     </div>
-    {% endif %}
+    
+    <!-- Превью как в боте -->
+    <div class="bot-preview">
+        <div class="preview-title">Превью в боте:</div>
+        <div class="preview-buttons">
+            {% for button in grouped[dept] %}
+                {% if button.is_active %}
+                <div class="preview-btn">{{ button.button_text }}</div>
+                {% endif %}
+            {% endfor %}
+            <div class="preview-btn preview-btn-back">◀️ Назад</div>
+        </div>
+    </div>
 </div>
 {% endfor %}
-
-<div class="card" style="background: var(--card-bg); border: 1px dashed var(--border);">
-    <div style="padding: 1.5rem;">
-        <h3 style="margin: 0 0 1rem 0; color: var(--text-muted);">💡 Как это работает</h3>
-        <ul style="color: var(--text-muted); margin: 0; padding-left: 1.5rem;">
-            <li>Кнопки отображаются в боте в разделе "Полезное" → выбор отдела</li>
-            <li>Порядок (№) определяет последовательность кнопок (меньше = выше)</li>
-            <li>Можно временно отключить кнопку, не удаляя её</li>
-            <li>Сообщение поддерживает HTML-форматирование (жирный, курсив, ссылки)</li>
-            <li>Кнопки "Связаться с отделом" и "Назад" добавляются автоматически в конец</li>
-        </ul>
-    </div>
 </div>
-{% endblock %}
 
+<style>
+.departments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 1.5rem;
+}
+
+.department-card {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-add {
+    background: var(--primary);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+}
+
+.buttons-list {
+    padding: 1rem;
+    flex: 1;
+}
+
+.button-item {
+    background: var(--bg-main);
+    border-radius: 10px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.button-item:last-child {
+    margin-bottom: 0;
+}
+
+.button-item.inactive {
+    opacity: 0.5;
+}
+
+.button-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.button-order {
+    background: var(--primary);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.button-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.button-text {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.button-preview {
+    font-size: 0.8rem;
+}
+
+.telegram-bubble-mini {
+    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    color: #333;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    max-height: 60px;
+    overflow: hidden;
+}
+
+.button-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    font-size: 1rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.btn-icon:hover {
+    opacity: 1;
+}
+
+.btn-icon.btn-danger:hover {
+    filter: saturate(2);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-right: 0.25rem;
+}
+
+.status-dot.active {
+    background: var(--success);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: var(--text-muted);
+}
+
+.empty-state p {
+    margin-bottom: 1rem;
+}
+
+/* Bot preview */
+.bot-preview {
+    border-top: 1px solid var(--border);
+    padding: 1rem;
+    background: #e5ddd5;
+    border-radius: 0 0 12px 12px;
+}
+
+.preview-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.5px;
+}
+
+.preview-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.preview-btn {
+    background: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.85rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.preview-btn-back {
+    background: #f0f0f0;
+    color: #666;
+}
+</style>
+{% endblock %}
