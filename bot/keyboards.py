@@ -34,7 +34,6 @@ BTN_NEW_TASK = "🆕 Новая задача"
 BTN_MY_TASKS = "📋 Мои задачи"
 
 # Подменю аккаунта
-BTN_MY_BARBERSHOPS_LIST = "💈 Мои барбершопы"
 BTN_ADD_BARBERSHOP = "➕ Добавить барбершоп"
 
 # Для совместимости (старые названия)
@@ -155,7 +154,6 @@ def account_menu_keyboard() -> ReplyKeyboardMarkup:
     """Меню аккаунта."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_MY_BARBERSHOPS_LIST)],
             [KeyboardButton(text=BTN_ADD_BARBERSHOP)],
             [KeyboardButton(text=BTN_MAIN_MENU)],
         ],

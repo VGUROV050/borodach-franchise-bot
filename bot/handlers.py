@@ -63,7 +63,6 @@ from .keyboards import (
     BTN_TASKS,
     BTN_ACCOUNT,
     BTN_MY_BARBERSHOPS,
-    BTN_MY_BARBERSHOPS_LIST,
     BTN_STATISTICS,
     BTN_STATS_CURRENT_MONTH,
     BTN_STATS_PREV_MONTH,
@@ -218,6 +217,8 @@ async def account_handler(message: types.Message, state: FSMContext) -> None:
         
         from database import get_partner_companies
         companies = await get_partner_companies(db, partner.id)
+        has_pending = partner.has_pending_branch
+        pending_text = partner.branches_text or ""
     
     # Формируем информацию об аккаунте
     text_parts = ["👤 <b>Ваш аккаунт</b>\n"]
@@ -230,13 +231,21 @@ async def account_handler(message: types.Message, state: FSMContext) -> None:
         phone_masked = f"****{partner.phone[-4:]}" if len(partner.phone) >= 4 else "****"
         text_parts.append(f"📱 <b>Телефон:</b> +7 {phone_masked}")
     
-    # Барбершопы
+    # Барбершопы (показываем все)
     text_parts.append(f"\n💈 <b>Барбершопы:</b> {len(companies)}")
     if companies:
-        for c in companies[:3]:  # Показываем первые 3
+        for c in companies:
             text_parts.append(f"   • {c.name}")
-        if len(companies) > 3:
-            text_parts.append(f"   • ... ещё {len(companies) - 3}")
+    else:
+        text_parts.append("   Нет привязанных барбершопов")
+    
+    # Показываем информацию о заявке если есть
+    if has_pending and pending_text:
+        text_parts.append(
+            f"\n📝 <b>Заявка на добавление:</b>\n"
+            f"   <i>{pending_text}</i>\n"
+            f"   ⏳ Статус: <b>На рассмотрении</b>"
+        )
     
     # Получаем статистику по задачам
     try:
@@ -277,49 +286,6 @@ async def account_handler(message: types.Message, state: FSMContext) -> None:
         tz = ZoneInfo("Europe/Moscow")
         verified = partner.verified_at.astimezone(tz).strftime("%d.%m.%Y")
         text_parts.append(f"✅ <b>Верификация:</b> {verified}")
-    
-    await message.answer("\n".join(text_parts), reply_markup=account_menu_keyboard())
-
-
-@router.message(F.text == BTN_MY_BARBERSHOPS_LIST)
-async def my_barbershops_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать барбершопы пользователя."""
-    if not await _check_verified(message):
-        return
-    
-    async with AsyncSessionLocal() as db:
-        partner = await get_partner_by_telegram_id(db, message.from_user.id)
-        
-        companies = []
-        has_pending = False
-        pending_text = ""
-        
-        if partner:
-            from database import get_partner_companies
-            companies = await get_partner_companies(db, partner.id)
-            has_pending = partner.has_pending_branch
-            pending_text = partner.branches_text or ""
-    
-    text_parts = ["💈 <b>Ваши барбершопы</b>\n"]
-    
-    if companies:
-        companies_text = "\n".join([
-            f"• <b>{c.name}</b>" + (f" ({c.city})" if c.city else "")
-            for c in companies
-        ])
-        text_parts.append(companies_text)
-    else:
-        text_parts.append("У вас пока нет привязанных барбершопов.")
-    
-    # Показываем информацию о заявке если есть
-    if has_pending and pending_text:
-        text_parts.append(
-            f"\n\n📝 <b>Заявка на добавление:</b>\n"
-            f"<i>{pending_text}</i>\n"
-            f"⏳ Статус: <b>На рассмотрении</b>"
-        )
-    elif not has_pending:
-        text_parts.append("\n\nВы можете запросить добавление ещё одного барбершопа.")
     
     await message.answer("\n".join(text_parts), reply_markup=account_menu_keyboard())
 
