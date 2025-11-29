@@ -46,6 +46,7 @@ from .keyboards import (
     main_menu_keyboard,
     tasks_menu_keyboard,
     barbershops_menu_keyboard,
+    account_menu_keyboard,
     cancel_keyboard,
     department_keyboard,
     confirm_description_keyboard,
@@ -60,7 +61,9 @@ from .keyboards import (
     useful_actions_keyboard,
     statistics_period_keyboard,
     BTN_TASKS,
+    BTN_ACCOUNT,
     BTN_MY_BARBERSHOPS,
+    BTN_MY_BARBERSHOPS_LIST,
     BTN_STATISTICS,
     BTN_STATS_CURRENT_MONTH,
     BTN_STATS_PREV_MONTH,
@@ -195,16 +198,94 @@ async def tasks_menu_handler(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Мои барбершопы
+# Аккаунт
 # ═══════════════════════════════════════════════════════════════════
 
-@router.message(F.text == BTN_MY_BARBERSHOPS)
-async def my_barbershops_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать барбершопы пользователя."""
+@router.message(F.text == BTN_ACCOUNT)
+async def account_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать информацию об аккаунте пользователя."""
     if not await _check_verified(message):
         return
     
     await state.clear()
+    
+    async with AsyncSessionLocal() as db:
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        
+        if not partner:
+            await message.answer("❌ Профиль не найден.", reply_markup=main_menu_keyboard())
+            return
+        
+        from database import get_partner_companies
+        companies = await get_partner_companies(db, partner.id)
+    
+    # Формируем информацию об аккаунте
+    text_parts = ["👤 <b>Ваш аккаунт</b>\n"]
+    
+    # Имя
+    text_parts.append(f"📛 <b>Имя:</b> {partner.full_name}")
+    
+    # Телефон (скрываем первые цифры)
+    if partner.phone:
+        phone_masked = f"****{partner.phone[-4:]}" if len(partner.phone) >= 4 else "****"
+        text_parts.append(f"📱 <b>Телефон:</b> +7 {phone_masked}")
+    
+    # Барбершопы
+    text_parts.append(f"\n💈 <b>Барбершопы:</b> {len(companies)}")
+    if companies:
+        for c in companies[:3]:  # Показываем первые 3
+            text_parts.append(f"   • {c.name}")
+        if len(companies) > 3:
+            text_parts.append(f"   • ... ещё {len(companies) - 3}")
+    
+    # Получаем статистику по задачам
+    try:
+        tasks = await get_user_tasks(message.from_user.id, only_active=False)
+        
+        # Считаем задачи по статусам
+        task_counts = {"new": 0, "in_progress": 0, "on_review": 0, "completed": 0, "cancelled": 0}
+        for task in tasks:
+            stage = format_task_stage(task.get("stage"))
+            if stage == "Новая":
+                task_counts["new"] += 1
+            elif stage == "В работе":
+                task_counts["in_progress"] += 1
+            elif stage == "На проверке":
+                task_counts["on_review"] += 1
+            elif stage == "Завершена":
+                task_counts["completed"] += 1
+            elif stage == "Отменена":
+                task_counts["cancelled"] += 1
+        
+        total_tasks = len(tasks)
+        text_parts.append(f"\n📋 <b>Задачи:</b> {total_tasks}")
+        if total_tasks > 0:
+            text_parts.append(f"   🆕 Новые: {task_counts['new']}")
+            text_parts.append(f"   ⏳ В работе: {task_counts['in_progress']}")
+            text_parts.append(f"   🔍 На проверке: {task_counts['on_review']}")
+            text_parts.append(f"   ✅ Завершено: {task_counts['completed']}")
+    except Exception:
+        text_parts.append("\n📋 <b>Задачи:</b> —")
+    
+    # Даты
+    if partner.created_at:
+        tz = ZoneInfo("Europe/Moscow")
+        created = partner.created_at.astimezone(tz).strftime("%d.%m.%Y")
+        text_parts.append(f"\n📅 <b>Регистрация:</b> {created}")
+    
+    if partner.verified_at:
+        tz = ZoneInfo("Europe/Moscow")
+        verified = partner.verified_at.astimezone(tz).strftime("%d.%m.%Y")
+        text_parts.append(f"✅ <b>Верификация:</b> {verified}")
+    
+    await message.answer("\n".join(text_parts), reply_markup=account_menu_keyboard())
+
+
+@router.message(F.text == BTN_MY_BARBERSHOPS_LIST)
+async def my_barbershops_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать барбершопы пользователя."""
+    if not await _check_verified(message):
+        return
     
     async with AsyncSessionLocal() as db:
         partner = await get_partner_by_telegram_id(db, message.from_user.id)
@@ -240,7 +321,7 @@ async def my_barbershops_handler(message: types.Message, state: FSMContext) -> N
     elif not has_pending:
         text_parts.append("\n\nВы можете запросить добавление ещё одного барбершопа.")
     
-    await message.answer("\n".join(text_parts), reply_markup=barbershops_menu_keyboard())
+    await message.answer("\n".join(text_parts), reply_markup=account_menu_keyboard())
 
 
 @router.message(F.text == BTN_ADD_BARBERSHOP)
@@ -257,7 +338,7 @@ async def add_barbershop_start(message: types.Message, state: FSMContext) -> Non
                 "⏳ <b>У вас уже есть заявка на рассмотрении</b>\n\n"
                 f"📝 <i>{partner.branches_text}</i>\n\n"
                 "Дождитесь её обработки администратором.",
-                reply_markup=barbershops_menu_keyboard(),
+                reply_markup=account_menu_keyboard(),
             )
             return
     

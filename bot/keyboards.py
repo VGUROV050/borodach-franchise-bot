@@ -4,7 +4,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 # Константы для текста кнопок (используются и в handlers)
 BTN_TASKS = "📋 Задачи"
-BTN_MY_BARBERSHOPS = "💈 Мои барбершопы"
+BTN_ACCOUNT = "👤 Аккаунт"
+BTN_MY_BARBERSHOPS = BTN_ACCOUNT  # Для обратной совместимости
 BTN_STATISTICS = "📊 Статистика"
 
 # Статистика — периоды
@@ -32,7 +33,8 @@ BTN_CONTACT_OFFICE = BTN_USEFUL
 BTN_NEW_TASK = "🆕 Новая задача"
 BTN_MY_TASKS = "📋 Мои задачи"
 
-# Подменю барбершопов
+# Подменю аккаунта
+BTN_MY_BARBERSHOPS_LIST = "💈 Мои барбершопы"
 BTN_ADD_BARBERSHOP = "➕ Добавить барбершоп"
 
 # Для совместимости (старые названия)
@@ -81,8 +83,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     """Главное меню бота."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_MY_BARBERSHOPS)],
-            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_USEFUL)],
+            [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_STATISTICS)],
+            [KeyboardButton(text=BTN_USEFUL), KeyboardButton(text=BTN_ACCOUNT)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
@@ -149,10 +151,11 @@ def tasks_menu_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
-    """Меню барбершопов."""
+def account_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Меню аккаунта."""
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text=BTN_MY_BARBERSHOPS_LIST)],
             [KeyboardButton(text=BTN_ADD_BARBERSHOP)],
             [KeyboardButton(text=BTN_MAIN_MENU)],
         ],
@@ -160,6 +163,11 @@ def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
         input_field_placeholder="Выберите действие",
     )
     return keyboard
+
+
+def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
+    """Меню барбершопов (для обратной совместимости)."""
+    return account_menu_keyboard()
 
 
 def statistics_period_keyboard() -> ReplyKeyboardMarkup:
