@@ -3,6 +3,49 @@
 {% block title %}Партнёры — Borodach Admin{% endblock %}
 
 {% block content %}
+<style>
+    .tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .tag-pending {
+        background: rgba(245, 158, 11, 0.1);
+        color: #d97706;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .tag-verified {
+        background: rgba(34, 197, 94, 0.1);
+        color: #16a34a;
+        border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+    .tag-rejected {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+    .btn-delete {
+        background: rgba(239, 68, 68, 0.1) !important;
+        color: #dc2626 !important;
+        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    }
+    .btn-delete:hover {
+        background: rgba(239, 68, 68, 0.2) !important;
+    }
+    .btn-edit {
+        background: rgba(59, 130, 246, 0.1) !important;
+        color: #2563eb !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    }
+    .btn-edit:hover {
+        background: rgba(59, 130, 246, 0.2) !important;
+    }
+</style>
+
 <h1 class="mb-2">👥 Партнёры</h1>
 
 <div class="card mb-2">
@@ -19,14 +62,14 @@
     <table>
         <thead>
             <tr>
-                <th>ID</th>
+                <th style="width: 50px;">ID</th>
                 <th>ФИО</th>
                 <th>Телефон</th>
                 <th>Telegram</th>
-                <th>Статус</th>
-                <th>Барбершопы</th>
-                <th>Дата</th>
-                <th>Действия</th>
+                <th style="width: 130px; text-align: center;">Статус</th>
+                <th style="max-width: 250px;">Барбершопы</th>
+                <th style="width: 100px;">Дата</th>
+                <th style="width: 130px; text-align: center;">Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -36,13 +79,13 @@
                 <td>{{ partner.full_name }}</td>
                 <td>{{ partner.phone or '—' }}</td>
                 <td>@{{ partner.telegram_username or '—' }}</td>
-                <td>
+                <td style="text-align: center;">
                     {% if partner.status.value == 'pending' %}
-                    <span class="badge badge-pending">Ожидает</span>
+                    <span class="tag tag-pending">Ожидает</span>
                     {% elif partner.status.value == 'verified' %}
-                    <span class="badge badge-verified">Верифицирован</span>
+                    <span class="tag tag-verified">Верифицирован</span>
                     {% else %}
-                    <span class="badge badge-rejected">Отклонён</span>
+                    <span class="tag tag-rejected">Отклонён</span>
                     {% endif %}
                 </td>
                 <td style="max-width: 250px; font-size: 0.85rem;">
@@ -59,19 +102,21 @@
                     {% endif %}
                 </td>
                 <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
-                <td class="flex gap-1">
-                    {% if partner.status.value == 'pending' %}
-                    <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm" title="Верифицировать">✅</a>
-                    <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
-                        <input type="hidden" name="reason" value="">
-                        <button type="submit" class="btn btn-danger btn-sm" title="Отклонить">❌</button>
-                    </form>
-                    {% endif %}
-                    <a href="/partners/{{ partner.id }}/edit" class="btn btn-sm" style="background: var(--accent); color: white;" title="Редактировать">✏️</a>
-                    <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline;"
-                          onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
-                        <button type="submit" class="btn btn-sm" style="background: #6c757d; color: white;" title="Удалить">🗑</button>
-                    </form>
+                <td>
+                    <div style="display: flex; gap: 6px; justify-content: center;">
+                        {% if partner.status.value == 'pending' %}
+                        <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm" title="Верифицировать">✅</a>
+                        <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
+                            <input type="hidden" name="reason" value="">
+                            <button type="submit" class="btn btn-danger btn-sm" title="Отклонить">❌</button>
+                        </form>
+                        {% endif %}
+                        <a href="/partners/{{ partner.id }}/edit" class="btn btn-sm btn-edit" title="Редактировать">✏️</a>
+                        <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline;"
+                              onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
+                            <button type="submit" class="btn btn-sm btn-delete" title="Удалить">🗑</button>
+                        </form>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
