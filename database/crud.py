@@ -1291,3 +1291,50 @@ async def delete_department_button(
     logger.info(f"Deleted department button {button_id}")
     return True
 
+
+async def init_default_department_buttons(db: AsyncSession) -> int:
+    """
+    Инициализировать дефолтные кнопки для каждого отдела (если пусто).
+    Возвращает количество созданных кнопок.
+    """
+    from database.models import DepartmentButton
+    
+    # Проверяем есть ли уже кнопки
+    result = await db.execute(select(DepartmentButton))
+    if result.scalars().first():
+        return 0  # Кнопки уже есть
+    
+    created = 0
+    
+    # Дефолтные кнопки для каждого отдела
+    defaults = {
+        DepartmentType.DEVELOPMENT: [
+            ("📋 Важная информация", "🚀 <b>Отдел Развития</b>\n\nЗдесь будет важная информация от отдела развития.\n\n<i>Текст можно изменить в админке.</i>", 1),
+            ("📞 Связаться с отделом", "🚀 <b>Связаться с Отделом Развития</b>\n\n👉 <a href='https://t.me/borodach_development'>@borodach_development</a>", 2),
+        ],
+        DepartmentType.MARKETING: [
+            ("📋 Важная информация", "📢 <b>Отдел Маркетинга</b>\n\nЗдесь будет важная информация от отдела маркетинга.\n\n<i>Текст можно изменить в админке.</i>", 1),
+            ("📞 Связаться с отделом", "📢 <b>Связаться с Отделом Маркетинга</b>\n\n👉 <a href='https://t.me/borodach_marketing'>@borodach_marketing</a>", 2),
+        ],
+        DepartmentType.DESIGN: [
+            ("📋 Важная информация", "🎨 <b>Отдел Дизайна</b>\n\nЗдесь будет важная информация от отдела дизайна.\n\n<i>Текст можно изменить в админке.</i>", 1),
+            ("📞 Связаться с отделом", "🎨 <b>Связаться с Отделом Дизайна</b>\n\nНапишите в чат поддержки для связи с дизайнерами.", 2),
+        ],
+    }
+    
+    for dept, buttons in defaults.items():
+        for button_text, message_text, order in buttons:
+            button = DepartmentButton(
+                department=dept,
+                button_text=button_text,
+                message_text=message_text,
+                order=order,
+                is_active=True,
+            )
+            db.add(button)
+            created += 1
+    
+    await db.commit()
+    logger.info(f"Initialized {created} default department buttons")
+    return created
+

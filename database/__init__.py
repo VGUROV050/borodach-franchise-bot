@@ -82,6 +82,7 @@ from .crud import (
     create_department_button,
     update_department_button,
     delete_department_button,
+    init_default_department_buttons,
 )
 
 __all__ = [
@@ -169,5 +170,6 @@ __all__ = [
     "create_department_button",
     "update_department_button",
     "delete_department_button",
+    "init_default_department_buttons",
 ]
 

@@ -489,79 +489,9 @@ async def useful_department_selected(message: types.Message, state: FSMContext) 
     )
 
 
-@router.message(UsefulStates.in_department, F.text == BTN_IMPORTANT_INFO)
-async def useful_important_info(message: types.Message, state: FSMContext) -> None:
-    """Важная информация по отделу."""
-    data = await state.get_data()
-    dept_key = data.get("selected_department")
-    
-    if not dept_key:
-        await state.clear()
-        await message.answer("Ошибка. Вернитесь в главное меню.", reply_markup=main_menu_keyboard())
-        return
-    
-    # Получаем текст из БД
-    from database import get_department_info, get_department_buttons, DepartmentType, DepartmentInfoType
-    
-    async with AsyncSessionLocal() as db:
-        info = await get_department_info(
-            db,
-            DepartmentType(dept_key),
-            DepartmentInfoType.IMPORTANT_INFO,
-        )
-        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
-    
-    if info and info.text:
-        text = clean_html_for_telegram(info.text)
-    else:
-        dept_name = DEPT_NAMES.get(dept_key, dept_key)
-        text = f"{dept_name}\n\nВажная информация пока не добавлена."
-    
-    await message.answer(
-        text,
-        reply_markup=useful_actions_keyboard(custom_buttons),
-        disable_web_page_preview=True,
-    )
-
-
-@router.message(UsefulStates.in_department, F.text == BTN_CONTACT_DEPARTMENT)
-async def useful_contact_department(message: types.Message, state: FSMContext) -> None:
-    """Связаться с отделом."""
-    data = await state.get_data()
-    dept_key = data.get("selected_department")
-    
-    if not dept_key:
-        await state.clear()
-        await message.answer("Ошибка. Вернитесь в главное меню.", reply_markup=main_menu_keyboard())
-        return
-    
-    # Получаем текст из БД
-    from database import get_department_info, get_department_buttons, DepartmentType, DepartmentInfoType
-    
-    async with AsyncSessionLocal() as db:
-        info = await get_department_info(
-            db,
-            DepartmentType(dept_key),
-            DepartmentInfoType.CONTACT_INFO,
-        )
-        custom_buttons = await get_department_buttons(db, DepartmentType(dept_key))
-    
-    if info and info.text:
-        text = clean_html_for_telegram(info.text)
-    else:
-        dept_name = DEPT_NAMES.get(dept_key, dept_key)
-        text = f"{dept_name}\n\nКонтактная информация пока не добавлена."
-    
-    await message.answer(
-        text,
-        reply_markup=useful_actions_keyboard(custom_buttons),
-        disable_web_page_preview=True,
-    )
-
-
 def _is_not_standard_button(message: types.Message) -> bool:
-    """Фильтр: пропускаем стандартные кнопки."""
-    standard_buttons = {BTN_IMPORTANT_INFO, BTN_CONTACT_DEPARTMENT, BTN_BACK, BTN_MAIN_MENU}
+    """Фильтр: пропускаем только кнопку Назад и Главное меню."""
+    standard_buttons = {BTN_BACK, BTN_MAIN_MENU}
     return message.text not in standard_buttons
 
 

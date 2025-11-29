@@ -1591,9 +1591,11 @@ async def department_buttons_page(request: Request, department: str = None):
     if not verify_session(request):
         return RedirectResponse(url="/login", status_code=302)
     
-    from database import get_all_department_buttons, DepartmentType
+    from database import get_all_department_buttons, init_default_department_buttons, DepartmentType
     
     async with AsyncSessionLocal() as db:
+        # Инициализируем дефолтные кнопки если их нет
+        await init_default_department_buttons(db)
         all_buttons = await get_all_department_buttons(db)
     
     # Группируем по отделам

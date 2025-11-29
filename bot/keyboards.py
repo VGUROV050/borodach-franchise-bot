@@ -108,14 +108,12 @@ def useful_actions_keyboard(custom_buttons: list = None) -> ReplyKeyboardMarkup:
     """
     rows = []
     
-    # Добавляем кастомные кнопки из БД
+    # Все кнопки кроме "Назад" берутся из БД
     if custom_buttons:
         for btn in custom_buttons:
             rows.append([KeyboardButton(text=btn.button_text)])
     
-    # Стандартные кнопки
-    rows.append([KeyboardButton(text=BTN_IMPORTANT_INFO)])
-    rows.append([KeyboardButton(text=BTN_CONTACT_DEPARTMENT)])
+    # Только "Назад" — стандартная кнопка
     rows.append([KeyboardButton(text=BTN_BACK)])
     
     keyboard = ReplyKeyboardMarkup(
