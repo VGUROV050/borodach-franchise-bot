@@ -47,7 +47,15 @@ async def main():
 
     try:
         logger.info("Starting bot polling...")
-        await dp.start_polling(bot)
+        # Явно указываем типы обновлений, включая poll_answer
+        await dp.start_polling(
+            bot,
+            allowed_updates=[
+                "message",
+                "callback_query", 
+                "poll_answer",  # Для получения ответов на опросы
+            ],
+        )
     finally:
         # Останавливаем планировщик
         stop_scheduler()
