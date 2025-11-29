@@ -1171,6 +1171,9 @@ async def geography_page(request: Request):
             "salons": sorted(by_region["Не определено"]["salons"], key=lambda x: x["revenue"], reverse=True),
         }
     
+    # Добавляем by_city для подсчёта городов присутствия
+    geo["by_city"] = dict(by_city)
+    
     return templates.TemplateResponse(
         "geography.html",
         {
