@@ -49,11 +49,11 @@
                 </td>
                 <td>
                     {% if log.status.value == 'approved' %}
-                    <span class="badge badge-success">✅ Одобрено</span>
+                    <span class="status-badge status-approved">Одобрено</span>
                     {% elif log.status.value == 'rejected' %}
-                    <span class="badge badge-danger">❌ Отклонено</span>
+                    <span class="status-badge status-rejected">Отклонено</span>
                     {% else %}
-                    <span class="badge">{{ log.status.value }}</span>
+                    <span class="status-badge">{{ log.status.value }}</span>
                     {% endif %}
                 </td>
                 <td style="max-width: 200px; font-size: 0.85rem;">
@@ -84,13 +84,24 @@
 </div>
 
 <style>
-    .badge-success {
-        background: var(--success);
-        color: white;
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
-    .badge-danger {
-        background: var(--danger);
-        color: white;
+    .status-approved {
+        background: rgba(34, 197, 94, 0.15);
+        color: #16a34a;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .status-rejected {
+        background: rgba(239, 68, 68, 0.15);
+        color: #dc2626;
+        border: 1px solid rgba(239, 68, 68, 0.3);
     }
 </style>
 {% endblock %}
