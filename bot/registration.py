@@ -59,7 +59,6 @@ async def registration_contact(message: types.Message, state: FSMContext) -> Non
 
 async def _process_contact(message: types.Message, state: FSMContext) -> None:
     """Обработка контакта (общая логика)."""
-    logger.info(f"_process_contact called: user={message.from_user.id}")
     contact = message.contact
     
     # Проверяем, что это контакт самого пользователя
@@ -82,9 +81,6 @@ async def _process_contact(message: types.Message, state: FSMContext) -> None:
     
     await state.update_data(phone=phone)
     await state.set_state(RegistrationStates.waiting_for_full_name)
-    
-    current_state = await state.get_state()
-    logger.info(f"State set to: {current_state} for user {message.from_user.id}")
     
     await message.answer(
         f"✅ Телефон: <b>{phone}</b>\n\n"
@@ -131,7 +127,6 @@ async def registration_name_cancel(message: types.Message, state: FSMContext) ->
 @router.message(RegistrationStates.waiting_for_full_name, F.contact)
 async def registration_name_contact_ignored(message: types.Message, state: FSMContext) -> None:
     """Игнорируем контакт на этапе ФИО."""
-    logger.info(f"Contact ignored at waiting_for_full_name, user={message.from_user.id}")
     await message.answer(
         "⚠️ Контакт уже получен. Пожалуйста, введите ваше <b>ФИО</b>:",
         reply_markup=cancel_registration_keyboard(),
@@ -141,8 +136,6 @@ async def registration_name_contact_ignored(message: types.Message, state: FSMCo
 @router.message(RegistrationStates.waiting_for_full_name, F.text)
 async def registration_full_name(message: types.Message, state: FSMContext) -> None:
     """Получили ФИО → запрашиваем барбершоп."""
-    logger.info(f"registration_full_name called: user={message.from_user.id}, text={message.text}")
-    
     if message.text == BTN_CANCEL_REGISTRATION:
         return  # Обрабатывается другим хендлером
     
@@ -195,8 +188,6 @@ async def registration_barbershop_contact_ignored(message: types.Message, state:
 @router.message(RegistrationStates.waiting_for_barbershop, F.text)
 async def registration_barbershop(message: types.Message, state: FSMContext) -> None:
     """Получили барбершоп → спрашиваем про ещё барбершопы."""
-    logger.info(f"registration_barbershop called: user={message.from_user.id}, text={message.text}")
-    
     if message.text == BTN_CANCEL_REGISTRATION:
         return  # Обрабатывается другим хендлером
     
@@ -216,14 +207,11 @@ async def registration_barbershop(message: types.Message, state: FSMContext) -> 
     await state.update_data(barbershops=barbershops)
     await state.set_state(RegistrationStates.waiting_for_more_barbershops)
     
-    logger.info(f"Barbershop added, state set to waiting_for_more_barbershops, user={message.from_user.id}")
-    
     # Формируем список барбершопов для отображения
     barbershops_list = "\n".join([f"  • {b}" for b in barbershops])
     
     # Отправляем сообщение с клавиатурой
     keyboard = add_more_barbershops_keyboard()
-    logger.info(f"Sending keyboard with buttons: {[btn.text for row in keyboard.keyboard for btn in row]}")
     
     await message.answer(
         f"✅ <b>Барбершоп добавлен:</b> {barbershop_text}\n\n"
@@ -326,8 +314,6 @@ async def check_status_registration(message: types.Message, state: FSMContext) -
     from database import get_partner_by_telegram_id, PartnerStatus
     from .keyboards import pending_verification_keyboard, main_menu_keyboard, registration_start_keyboard
     
-    logger.info(f"check_status_registration called: user={message.from_user.id}")
-    
     telegram_id = message.from_user.id
     
     async with AsyncSessionLocal() as db:
@@ -391,7 +377,6 @@ async def registration_contact_fallback(message: types.Message, state: FSMContex
     
     # Если пользователь уже в процессе регистрации, игнорируем
     if current_state is not None:
-        logger.info(f"Contact fallback ignored, user {message.from_user.id} already in state: {current_state}")
         await message.answer(
             "⚠️ Контакт уже получен. Продолжайте регистрацию.",
             reply_markup=cancel_registration_keyboard(),
@@ -404,7 +389,6 @@ async def registration_contact_fallback(message: types.Message, state: FSMContex
         partner = await get_partner_by_telegram_id(db, message.from_user.id)
     
     if partner is not None:
-        logger.info(f"Contact fallback ignored, user {message.from_user.id} already registered")
         from .keyboards import pending_verification_keyboard, main_menu_keyboard
         from database import PartnerStatus
         
@@ -420,5 +404,4 @@ async def registration_contact_fallback(message: types.Message, state: FSMContex
             )
         return
     
-    logger.info(f"Contact received without state, processing as registration: {message.from_user.id}")
     await _process_contact(message, state)
