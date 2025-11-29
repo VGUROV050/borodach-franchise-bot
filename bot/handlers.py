@@ -58,9 +58,14 @@ from .keyboards import (
     pending_verification_keyboard,
     useful_departments_keyboard,
     useful_actions_keyboard,
+    statistics_period_keyboard,
     BTN_TASKS,
     BTN_MY_BARBERSHOPS,
     BTN_STATISTICS,
+    BTN_STATS_CURRENT_MONTH,
+    BTN_STATS_PREV_MONTH,
+    BTN_STATS_TODAY,
+    BTN_STATS_YESTERDAY,
     BTN_USEFUL,
     BTN_USEFUL_DEVELOPMENT,
     BTN_USEFUL_MARKETING,
@@ -313,13 +318,31 @@ async def add_barbershop_process(message: types.Message, state: FSMContext) -> N
 # Статистика по барбершопам (YClients)
 # ═══════════════════════════════════════════════════════════════════
 
+class StatisticsStates(StatesGroup):
+    """Состояния для раздела Статистика."""
+    selecting_period = State()
+
+
 @router.message(F.text == BTN_STATISTICS)
 async def statistics_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать статистику по барбершопам из YClients."""
+    """Показать статистику по барбершопам из YClients (текущий месяц по умолчанию)."""
     if not await _check_verified(message):
         return
     
-    await state.clear()
+    # Показываем статистику за текущий месяц и меню выбора периода
+    await _show_statistics(message, state, period_type="current_month")
+
+
+async def _show_statistics(
+    message: types.Message, 
+    state: FSMContext, 
+    period_type: str = "current_month"
+) -> None:
+    """Показать статистику за указанный период."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    
+    await state.set_state(StatisticsStates.selecting_period)
     
     # Показываем сообщение о загрузке
     loading_msg = await message.answer("⏳ Загружаю статистику из YClients...")
@@ -345,13 +368,37 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
         )
         return
     
-    # Получаем статистику по каждому барбершопу
-    from yclients import get_monthly_revenue
+    # Определяем период
+    tz = ZoneInfo("Europe/Moscow")
+    today = datetime.now(tz)
     
-    stats_text = "📊 <b>Статистика за текущий месяц</b>\n"
+    if period_type == "today":
+        date_from = today.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_to = today
+        period_title = f"📊 <b>Статистика за сегодня</b>\n📅 {today.strftime('%d.%m.%Y')}\n"
+    elif period_type == "yesterday":
+        yesterday = today - timedelta(days=1)
+        date_from = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+        date_to = yesterday.replace(hour=23, minute=59, second=59)
+        period_title = f"📊 <b>Статистика за вчера</b>\n📅 {yesterday.strftime('%d.%m.%Y')}\n"
+    elif period_type == "prev_month":
+        # Первый день прошлого месяца
+        first_day_this_month = today.replace(day=1)
+        last_day_prev_month = first_day_this_month - timedelta(days=1)
+        date_from = last_day_prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_to = last_day_prev_month.replace(hour=23, minute=59, second=59)
+        period_title = f"📊 <b>Статистика за прошлый месяц</b>\n📅 {date_from.strftime('%d.%m')} - {date_to.strftime('%d.%m.%Y')}\n"
+    else:  # current_month
+        date_from = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        date_to = today
+        period_title = f"📊 <b>Статистика за текущий месяц</b>\n📅 {date_from.strftime('%d.%m')} - {date_to.strftime('%d.%m.%Y')}\n"
+    
+    # Получаем статистику по каждому барбершопу
+    from yclients import get_period_revenue
+    
+    stats_text = period_title
     total_revenue = 0
     total_completed = 0
-    period = ""
     
     for company in companies:
         barbershop_name = company.name
@@ -362,18 +409,17 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             stats_text += "   ⚠️ YClients ID не указан\n"
             continue
         
-        # Получаем выручку
-        result = await get_monthly_revenue(yclients_id)
+        # Получаем выручку за период
+        result = await get_period_revenue(
+            yclients_id, 
+            date_from.strftime("%Y-%m-%d"),
+            date_to.strftime("%Y-%m-%d")
+        )
         
         if result.get("success"):
             revenue = result.get("revenue", 0)
             completed = result.get("completed_count", 0)
             total_count = result.get("total_count", 0)
-            
-            # Период из первого успешного ответа
-            if not period:
-                period = result.get("period", "")
-                stats_text += f"📅 <b>{period}</b>\n"
             
             total_revenue += revenue
             total_completed += completed
@@ -382,28 +428,27 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
             stats_text += f"   💰 Выручка: <b>{revenue:,.0f} ₽</b>\n"
             stats_text += f"   ✅ Завершено: {completed} из {total_count} записей\n"
             
-            # Получаем место в рейтинге сети, изменение и средний чек
-            async with AsyncSessionLocal() as db:
-                rating = await get_network_rating_by_company(db, yclients_id)
-            
-            if rating and rating.rank > 0:
-                # Рейтинг по выручке
-                rank_text = f"   🏆 Рейтинг по выручке в сети: <b>{rating.rank}</b> из {rating.total_companies}"
+            # Рейтинг показываем только для текущего месяца
+            if period_type == "current_month":
+                async with AsyncSessionLocal() as db:
+                    rating = await get_network_rating_by_company(db, yclients_id)
                 
-                # Изменение позиции (если есть данные за прошлый месяц)
-                if rating.previous_rank and rating.previous_rank > 0:
-                    change = rating.previous_rank - rating.rank
-                    if change > 0:
-                        rank_text += f" <b>↑{change}</b> 📈"
-                    elif change < 0:
-                        rank_text += f" <b>↓{abs(change)}</b> 📉"
-                    else:
-                        rank_text += " ➡️"
-                
-                stats_text += rank_text + "\n"
-                
-                if rating.avg_check > 0:
-                    stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
+                if rating and rating.rank > 0:
+                    rank_text = f"   🏆 Рейтинг в сети: <b>{rating.rank}</b> из {rating.total_companies}"
+                    
+                    if rating.previous_rank and rating.previous_rank > 0:
+                        change = rating.previous_rank - rating.rank
+                        if change > 0:
+                            rank_text += f" <b>↑{change}</b> 📈"
+                        elif change < 0:
+                            rank_text += f" <b>↓{abs(change)}</b> 📉"
+                        else:
+                            rank_text += " ➡️"
+                    
+                    stats_text += rank_text + "\n"
+                    
+                    if rating.avg_check > 0:
+                        stats_text += f"   💵 Средний чек: <b>{rating.avg_check:,.0f} ₽</b>\n"
         else:
             stats_text += f"\n💈 <b>{barbershop_name}</b>\n"
             stats_text += f"   ❌ {result.get('error', 'Ошибка загрузки')}\n"
@@ -417,7 +462,39 @@ async def statistics_handler(message: types.Message, state: FSMContext) -> None:
     
     # Удаляем сообщение о загрузке и отправляем результат
     await loading_msg.delete()
-    await message.answer(stats_text, reply_markup=main_menu_keyboard())
+    await message.answer(stats_text, reply_markup=statistics_period_keyboard())
+
+
+# Обработчики периодов статистики
+@router.message(StatisticsStates.selecting_period, F.text == BTN_STATS_CURRENT_MONTH)
+async def stats_current_month(message: types.Message, state: FSMContext) -> None:
+    """Статистика за текущий месяц."""
+    await _show_statistics(message, state, "current_month")
+
+
+@router.message(StatisticsStates.selecting_period, F.text == BTN_STATS_PREV_MONTH)
+async def stats_prev_month(message: types.Message, state: FSMContext) -> None:
+    """Статистика за прошлый месяц."""
+    await _show_statistics(message, state, "prev_month")
+
+
+@router.message(StatisticsStates.selecting_period, F.text == BTN_STATS_TODAY)
+async def stats_today(message: types.Message, state: FSMContext) -> None:
+    """Статистика за сегодня."""
+    await _show_statistics(message, state, "today")
+
+
+@router.message(StatisticsStates.selecting_period, F.text == BTN_STATS_YESTERDAY)
+async def stats_yesterday(message: types.Message, state: FSMContext) -> None:
+    """Статистика за вчера."""
+    await _show_statistics(message, state, "yesterday")
+
+
+@router.message(StatisticsStates.selecting_period, F.text == BTN_BACK)
+async def stats_back_to_menu(message: types.Message, state: FSMContext) -> None:
+    """Назад в главное меню."""
+    await state.clear()
+    await message.answer("🏠 Главное меню", reply_markup=main_menu_keyboard())
 
 
 # ═══════════════════════════════════════════════════════════════════

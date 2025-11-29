@@ -216,6 +216,88 @@ async def get_monthly_revenue(company_id: str, year: int = None, month: int = No
 
 
 @api_retry(max_attempts=3, min_wait=2, max_wait=15)
+async def get_period_revenue(company_id: str, date_from: str, date_to: str) -> dict:
+    """
+    Получить выручку за произвольный период для филиала.
+    
+    Args:
+        company_id: ID компании в YClients
+        date_from: Дата начала в формате YYYY-MM-DD
+        date_to: Дата конца в формате YYYY-MM-DD
+    
+    Returns:
+        {
+            "success": True/False,
+            "revenue": float,
+            "completed_count": int,
+            "total_count": int,
+            "error": str (если ошибка)
+        }
+    """
+    api = YClientsAPI()
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            url = f"{BASE_URL}/company/{company_id}/analytics/overall/"
+            
+            params = {
+                "date_from": date_from,
+                "date_to": date_to,
+            }
+            
+            response = await client.get(
+                url,
+                headers=api.headers,
+                params=params,
+                timeout=30.0,
+            )
+            
+            logger.info(f"YClients period analytics for {company_id} ({date_from} - {date_to}): status={response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success"):
+                    analytics = data.get("data", {})
+                    
+                    # Получаем общую выручку
+                    income_stats = analytics.get("income_total_stats", {})
+                    revenue_str = income_stats.get("current_sum", "0")
+                    revenue = float(revenue_str.replace(",", ".").replace(" ", "") if revenue_str else 0)
+                    
+                    # Статистика записей
+                    record_stats = analytics.get("record_stats", {})
+                    completed_count = record_stats.get("current_completed_count", 0)
+                    total_count = record_stats.get("current_total_count", 0)
+                    
+                    return {
+                        "success": True,
+                        "revenue": revenue,
+                        "completed_count": completed_count,
+                        "total_count": total_count,
+                    }
+                else:
+                    logger.error(f"YClients period analytics success=false: {data}")
+                    return {
+                        "success": False,
+                        "error": "API вернул success=false",
+                    }
+            else:
+                logger.error(f"YClients period analytics error: {response.status_code} - {response.text}")
+                return {
+                    "success": False,
+                    "error": f"Ошибка API: {response.status_code}",
+                }
+            
+    except Exception as e:
+        logger.error(f"YClients period exception: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+@api_retry(max_attempts=3, min_wait=2, max_wait=15)
 async def get_chain_companies(chain_id: str = None) -> list[dict]:
     """
     Получить список всех салонов в сети.

@@ -6,6 +6,12 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 BTN_TASKS = "📋 Задачи"
 BTN_MY_BARBERSHOPS = "💈 Мои барбершопы"
 BTN_STATISTICS = "📊 Статистика"
+
+# Статистика — периоды
+BTN_STATS_CURRENT_MONTH = "📅 Текущий месяц"
+BTN_STATS_PREV_MONTH = "📆 Прошлый месяц"
+BTN_STATS_TODAY = "📊 Сегодня"
+BTN_STATS_YESTERDAY = "📊 Вчера"
 BTN_USEFUL = "📚 Полезное"
 BTN_BACK = "⬅️ Назад"
 BTN_MAIN_MENU = "🏠 Главное меню"
@@ -152,6 +158,20 @@ def barbershops_menu_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def statistics_period_keyboard() -> ReplyKeyboardMarkup:
+    """Меню выбора периода статистики."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_STATS_TODAY), KeyboardButton(text=BTN_STATS_YESTERDAY)],
+            [KeyboardButton(text=BTN_STATS_CURRENT_MONTH), KeyboardButton(text=BTN_STATS_PREV_MONTH)],
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите период",
     )
     return keyboard
 
