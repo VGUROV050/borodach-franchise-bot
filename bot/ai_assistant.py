@@ -43,10 +43,12 @@ async def get_ai_suggestion(user_message: str) -> str | None:
         Текст подсказки или None если AI недоступен
     """
     if not client:
-        logger.warning("OpenAI API key not configured")
+        logger.warning("⚠️ [AI] OpenAI API key not configured - using fallback")
         return None
     
     try:
+        logger.info(f"🤖 [AI] Sending request to OpenAI: '{user_message[:50]}...'")
+        
         response = await client.chat.completions.create(
             model="gpt-4o-mini",  # Быстрая и дешёвая модель
             messages=[
@@ -58,10 +60,13 @@ async def get_ai_suggestion(user_message: str) -> str | None:
         )
         
         suggestion = response.choices[0].message.content
+        tokens_used = response.usage.total_tokens if response.usage else "?"
+        
+        logger.info(f"✅ [AI] OpenAI response received (tokens: {tokens_used})")
         return suggestion.strip() if suggestion else None
         
     except Exception as e:
-        logger.error(f"OpenAI API error: {e}")
+        logger.error(f"❌ [AI] OpenAI API error: {e}")
         return None
 
 

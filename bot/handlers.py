@@ -1646,14 +1646,18 @@ async def fallback_handler(message: types.Message, state: FSMContext) -> None:
     # Пробуем получить AI-подсказку
     from .ai_assistant import get_ai_suggestion, get_fallback_suggestion
     
+    logger.info(f"[Fallback] User {message.from_user.id} sent: '{user_text[:50]}...'")
+    
     suggestion = await get_ai_suggestion(user_text)
     
     if suggestion:
+        logger.info(f"[Fallback] Using AI response for user {message.from_user.id}")
         await message.answer(
             f"💡 {suggestion}",
             reply_markup=main_menu_keyboard(),
         )
     else:
         # Если AI недоступен — используем ключевые слова
+        logger.info(f"[Fallback] Using keyword fallback for user {message.from_user.id}")
         fallback = get_fallback_suggestion(user_text)
         await message.answer(fallback, reply_markup=main_menu_keyboard())
