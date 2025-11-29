@@ -1680,8 +1680,14 @@ async def run_diagnostics(request: Request):
     try:
         if YCLIENTS_PARTNER_TOKEN:
             async with httpx.AsyncClient(timeout=10) as client:
+                # YClients требует Bearer + User Token
+                if YCLIENTS_USER_TOKEN:
+                    auth_header = f"Bearer {YCLIENTS_PARTNER_TOKEN}, User {YCLIENTS_USER_TOKEN}"
+                else:
+                    auth_header = f"Bearer {YCLIENTS_PARTNER_TOKEN}"
+                
                 headers = {
-                    "Authorization": f"Bearer {YCLIENTS_PARTNER_TOKEN}",
+                    "Authorization": auth_header,
                     "Accept": "application/vnd.api.v2+json",
                 }
                 resp = await client.get(
@@ -1774,7 +1780,12 @@ async def run_diagnostics(request: Request):
             last_update = await get_last_network_rating_update(db)
         
         if last_update:
-            age = datetime.now() - last_update
+            # Приводим к naive datetime для сравнения
+            now = datetime.now()
+            if last_update.tzinfo is not None:
+                last_update = last_update.replace(tzinfo=None)
+            
+            age = now - last_update
             hours_ago = age.total_seconds() / 3600
             
             if hours_ago < 25:  # Меньше суток + 1 час запаса
