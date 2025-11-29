@@ -14,22 +14,77 @@
 </div>
 
 <div class="form-container">
-    <form action="/useful-info/{{ department.value }}/{{ info_type.value }}/edit" method="post">
+    <form action="/useful-info/{{ department.value }}/{{ info_type.value }}/edit" method="post" id="infoForm">
         <div class="form-group">
-            <label for="text">Текст сообщения</label>
-            <textarea id="text" name="text" rows="12" placeholder="Введите текст...">{{ info.text if info else '' }}</textarea>
-            <small>
-                Поддерживается HTML: 
-                <code>&lt;b&gt;жирный&lt;/b&gt;</code>, 
-                <code>&lt;i&gt;курсив&lt;/i&gt;</code>, 
-                <code>&lt;a href="url"&gt;ссылка&lt;/a&gt;</code>,
-                <code>&lt;code&gt;код&lt;/code&gt;</code>
+            <label class="form-label">Текст сообщения</label>
+            
+            <!-- Панель инструментов -->
+            <div class="editor-toolbar">
+                <button type="button" onclick="formatText('bold')" title="Жирный (Ctrl+B)">
+                    <strong>B</strong>
+                </button>
+                <button type="button" onclick="formatText('italic')" title="Курсив (Ctrl+I)">
+                    <em>I</em>
+                </button>
+                <button type="button" onclick="formatText('underline')" title="Подчёркнутый (Ctrl+U)">
+                    <u>U</u>
+                </button>
+                <button type="button" onclick="formatText('code')" title="Код">
+                    &lt;/&gt;
+                </button>
+                <div class="toolbar-divider"></div>
+                <button type="button" onclick="toggleEmojiPicker()" title="Эмодзи" id="emojiBtn">
+                    😊
+                </button>
+            </div>
+            
+            <!-- Пикер эмодзи -->
+            <div id="emojiPicker" class="emoji-picker" style="display: none;">
+                <div class="emoji-grid">
+                    <span onclick="insertEmoji('😊')">😊</span>
+                    <span onclick="insertEmoji('😃')">😃</span>
+                    <span onclick="insertEmoji('👍')">👍</span>
+                    <span onclick="insertEmoji('👏')">👏</span>
+                    <span onclick="insertEmoji('💪')">💪</span>
+                    <span onclick="insertEmoji('✅')">✅</span>
+                    <span onclick="insertEmoji('❌')">❌</span>
+                    <span onclick="insertEmoji('⚠️')">⚠️</span>
+                    <span onclick="insertEmoji('📢')">📢</span>
+                    <span onclick="insertEmoji('🔔')">🔔</span>
+                    <span onclick="insertEmoji('📌')">📌</span>
+                    <span onclick="insertEmoji('💡')">💡</span>
+                    <span onclick="insertEmoji('⭐')">⭐</span>
+                    <span onclick="insertEmoji('✨')">✨</span>
+                    <span onclick="insertEmoji('🎉')">🎉</span>
+                    <span onclick="insertEmoji('🏆')">🏆</span>
+                    <span onclick="insertEmoji('💰')">💰</span>
+                    <span onclick="insertEmoji('📈')">📈</span>
+                    <span onclick="insertEmoji('📊')">📊</span>
+                    <span onclick="insertEmoji('🗓')">🗓</span>
+                    <span onclick="insertEmoji('⏰')">⏰</span>
+                    <span onclick="insertEmoji('📱')">📱</span>
+                    <span onclick="insertEmoji('📧')">📧</span>
+                    <span onclick="insertEmoji('📞')">📞</span>
+                    <span onclick="insertEmoji('🏢')">🏢</span>
+                    <span onclick="insertEmoji('🚀')">🚀</span>
+                    <span onclick="insertEmoji('📢')">📢</span>
+                    <span onclick="insertEmoji('🎨')">🎨</span>
+                    <span onclick="insertEmoji('❤️')">❤️</span>
+                    <span onclick="insertEmoji('🔗')">🔗</span>
+                </div>
+            </div>
+            
+            <!-- Редактор -->
+            <div id="textEditor" class="text-editor" contenteditable="true" 
+                 placeholder="Введите текст сообщения..."></div>
+            
+            <!-- Скрытое поле для отправки -->
+            <input type="hidden" name="text" id="textInput">
+            
+            <small class="editor-hint">
+                Выделите текст и нажмите кнопку форматирования. 
+                Для ссылок используйте: выделите текст → Ctrl+K или введите вручную &lt;a href="URL"&gt;текст&lt;/a&gt;
             </small>
-        </div>
-        
-        <div class="preview-section">
-            <h3>👁 Предпросмотр</h3>
-            <div class="preview-box" id="preview"></div>
         </div>
         
         <div class="form-actions">
@@ -87,60 +142,121 @@
     margin-bottom: 1.5rem;
 }
 
-.form-group label {
+.form-label {
     display: block;
     font-weight: 600;
     margin-bottom: 0.5rem;
 }
 
-.form-group textarea {
-    width: 100%;
-    padding: 1rem;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    font-family: 'SF Mono', 'Menlo', monospace;
-    font-size: 0.9rem;
-    resize: vertical;
-    line-height: 1.6;
+.editor-toolbar {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 10px 10px 0 0;
 }
 
-.form-group textarea:focus {
+.editor-toolbar button {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: var(--bg-card);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.editor-toolbar button:hover {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.toolbar-divider {
+    width: 1px;
+    background: var(--border);
+    margin: 0 0.5rem;
+}
+
+.text-editor {
+    min-height: 200px;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0 0 10px 10px;
+    font-size: 0.9375rem;
+    line-height: 1.6;
     outline: none;
+}
+
+.text-editor:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-light);
 }
 
-.form-group small {
+.text-editor:empty:before {
+    content: attr(placeholder);
+    color: var(--text-muted);
+}
+
+.text-editor b, .text-editor strong { font-weight: 700; }
+.text-editor i, .text-editor em { font-style: italic; }
+.text-editor u { text-decoration: underline; }
+.text-editor code { 
+    background: var(--bg-main); 
+    padding: 0.125rem 0.375rem; 
+    border-radius: 4px;
+    font-family: monospace;
+}
+.text-editor a {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.emoji-picker {
+    display: inline-block;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.emoji-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    max-width: 270px;
+}
+
+.emoji-grid span {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+}
+
+.emoji-grid span:hover {
+    background: var(--accent-light);
+}
+
+.editor-hint {
     display: block;
     margin-top: 0.5rem;
     color: var(--text-muted);
     font-size: 0.8rem;
-}
-
-.form-group small code {
-    background: var(--bg-dark);
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-}
-
-.preview-section {
-    margin-bottom: 1.5rem;
-}
-
-.preview-section h3 {
-    font-size: 1rem;
-    margin-bottom: 0.75rem;
-}
-
-.preview-box {
-    padding: 1rem;
-    background: var(--bg-main);
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    min-height: 100px;
-    white-space: pre-wrap;
-    line-height: 1.6;
 }
 
 .form-actions {
@@ -153,28 +269,123 @@
 </style>
 
 <script>
-const textarea = document.getElementById('text');
-const preview = document.getElementById('preview');
+// Инициализация редактора с существующим текстом
+document.addEventListener('DOMContentLoaded', function() {
+    const editor = document.getElementById('textEditor');
+    const existingText = `{{ info.text|safe if info else '' }}`;
+    if (existingText) {
+        editor.innerHTML = existingText;
+    }
+});
 
-function updatePreview() {
-    // Простая замена HTML тегов для предпросмотра
-    let html = textarea.value
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/&lt;b&gt;/g, '<b>')
-        .replace(/&lt;\/b&gt;/g, '</b>')
-        .replace(/&lt;i&gt;/g, '<i>')
-        .replace(/&lt;\/i&gt;/g, '</i>')
-        .replace(/&lt;code&gt;/g, '<code>')
-        .replace(/&lt;\/code&gt;/g, '</code>')
-        .replace(/&lt;a href=['"]([^'"]+)['"]&gt;/g, '<a href="$1" target="_blank">')
-        .replace(/&lt;\/a&gt;/g, '</a>');
+// Форматирование текста
+function formatText(type) {
+    const editor = document.getElementById('textEditor');
+    editor.focus();
     
-    preview.innerHTML = html || '<span style="color: var(--text-muted)">Текст пока пустой</span>';
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString();
+    
+    if (!selectedText) return;
+    
+    let tag;
+    switch(type) {
+        case 'bold': tag = 'b'; break;
+        case 'italic': tag = 'i'; break;
+        case 'underline': tag = 'u'; break;
+        case 'code': tag = 'code'; break;
+        default: return;
+    }
+    
+    const wrapper = document.createElement(tag);
+    range.surroundContents(wrapper);
+    
+    selection.removeAllRanges();
 }
 
-textarea.addEventListener('input', updatePreview);
-updatePreview();
+// Горячие клавиши
+document.addEventListener('keydown', function(e) {
+    if (e.target.id !== 'textEditor') return;
+    
+    if (e.ctrlKey || e.metaKey) {
+        switch(e.key.toLowerCase()) {
+            case 'b':
+                e.preventDefault();
+                formatText('bold');
+                break;
+            case 'i':
+                e.preventDefault();
+                formatText('italic');
+                break;
+            case 'u':
+                e.preventDefault();
+                formatText('underline');
+                break;
+        }
+    }
+});
+
+// Эмодзи пикер
+function toggleEmojiPicker() {
+    const picker = document.getElementById('emojiPicker');
+    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+}
+
+function insertEmoji(emoji) {
+    const editor = document.getElementById('textEditor');
+    editor.focus();
+    
+    const selection = window.getSelection();
+    const range = selection.getRangeAt(0);
+    
+    const textNode = document.createTextNode(emoji);
+    range.insertNode(textNode);
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    
+    document.getElementById('emojiPicker').style.display = 'none';
+}
+
+// Закрыть эмодзи пикер при клике вне
+document.addEventListener('click', function(e) {
+    const picker = document.getElementById('emojiPicker');
+    const btn = document.getElementById('emojiBtn');
+    if (picker && !picker.contains(e.target) && e.target !== btn) {
+        picker.style.display = 'none';
+    }
+});
+
+// Конвертация в HTML перед отправкой
+document.getElementById('infoForm').addEventListener('submit', function(e) {
+    const editor = document.getElementById('textEditor');
+    const input = document.getElementById('textInput');
+    
+    // Получаем HTML и конвертируем теги
+    let html = editor.innerHTML;
+    
+    // Убираем лишние div/br от contenteditable
+    html = html.replace(/<div>/gi, '\n').replace(/<\/div>/gi, '');
+    html = html.replace(/<br\s*\/?>/gi, '\n');
+    
+    // Заменяем strong на b, em на i
+    html = html.replace(/<strong>/gi, '<b>').replace(/<\/strong>/gi, '</b>');
+    html = html.replace(/<em>/gi, '<i>').replace(/<\/em>/gi, '</i>');
+    
+    // Убираем пустой контент
+    html = html.trim();
+    
+    if (!html) {
+        e.preventDefault();
+        alert('Введите текст сообщения');
+        return;
+    }
+    
+    input.value = html;
+});
 </script>
 {% endblock %}
-
