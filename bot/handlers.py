@@ -559,7 +559,13 @@ async def useful_contact_department(message: types.Message, state: FSMContext) -
     )
 
 
-@router.message(UsefulStates.in_department)
+def _is_not_standard_button(message: types.Message) -> bool:
+    """Фильтр: пропускаем стандартные кнопки."""
+    standard_buttons = {BTN_IMPORTANT_INFO, BTN_CONTACT_DEPARTMENT, BTN_BACK, BTN_MAIN_MENU}
+    return message.text not in standard_buttons
+
+
+@router.message(UsefulStates.in_department, _is_not_standard_button)
 async def useful_custom_button_handler(message: types.Message, state: FSMContext) -> None:
     """Обработчик кастомных кнопок из БД."""
     data = await state.get_data()
@@ -573,7 +579,7 @@ async def useful_custom_button_handler(message: types.Message, state: FSMContext
     
     # Проверяем, является ли это кастомной кнопкой
     if message.text not in custom_button_texts:
-        # Не наша кнопка - игнорируем или показываем подсказку
+        # Не кастомная кнопка - игнорируем
         return
     
     # Получаем кнопку из БД
