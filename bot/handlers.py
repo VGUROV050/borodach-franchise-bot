@@ -1,6 +1,7 @@
 # Bot handlers
 
 import logging
+import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -10,6 +11,36 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config.settings import DEPARTMENTS
+
+
+def clean_html_for_telegram(text: str) -> str:
+    """
+    Очистить HTML от неподдерживаемых Telegram тегов.
+    Telegram поддерживает: <b>, <i>, <u>, <s>, <code>, <pre>, <a>, <tg-spoiler>
+    """
+    if not text:
+        return text
+    
+    # Убираем span и другие неподдерживаемые теги, оставляя содержимое
+    text = re.sub(r'<span[^>]*>(.*?)</span>', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'<div[^>]*>(.*?)</div>', r'\1\n', text, flags=re.DOTALL)
+    text = re.sub(r'<p[^>]*>(.*?)</p>', r'\1\n', text, flags=re.DOTALL)
+    
+    # Убираем style атрибуты из разрешённых тегов
+    text = re.sub(r'<(b|i|u|s|code|pre|a)([^>]*?)style="[^"]*"([^>]*)>', r'<\1\2\3>', text)
+    
+    # Заменяем <br> на перенос строки
+    text = re.sub(r'<br\s*/?>', '\n', text)
+    
+    # Убираем любые другие неизвестные теги
+    allowed_tags = ['b', 'i', 'u', 's', 'code', 'pre', 'a', 'tg-spoiler']
+    pattern = r'<(?!/?({})\b)[^>]+>'.format('|'.join(allowed_tags))
+    text = re.sub(pattern, '', text)
+    
+    # Убираем множественные переносы строк
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text.strip()
 from database import AsyncSessionLocal, get_partner_by_telegram_id, PartnerStatus
 from .keyboards import (
     main_menu_keyboard,
@@ -468,7 +499,7 @@ async def useful_important_info(message: types.Message, state: FSMContext) -> No
         )
     
     if info and info.text:
-        text = info.text
+        text = clean_html_for_telegram(info.text)
     else:
         dept_name = DEPT_NAMES.get(dept_key, dept_key)
         text = f"{dept_name}\n\nВажная информация пока не добавлена."
@@ -502,7 +533,7 @@ async def useful_contact_department(message: types.Message, state: FSMContext) -
         )
     
     if info and info.text:
-        text = info.text
+        text = clean_html_for_telegram(info.text)
     else:
         dept_name = DEPT_NAMES.get(dept_key, dept_key)
         text = f"{dept_name}\n\nКонтактная информация пока не добавлена."
