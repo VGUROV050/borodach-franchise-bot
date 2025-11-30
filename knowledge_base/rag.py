@@ -20,22 +20,35 @@ class KnowledgeRAG:
         self.embedding_model = "text-embedding-3-small"
         self.chat_model = "gpt-4o-mini"
         
-        self.system_prompt = """Ты — помощник для франчайзи барбершопов BORODACH. 
-У тебя есть доступ к базе знаний из обучающих видео.
+        # Промпт для краткого ответа
+        self.brief_prompt = """Ты — помощник для франчайзи барбершопов BORODACH.
 
-Твоя задача:
-1. Отвечать на вопросы, используя предоставленный контекст из видео
-2. Если информация есть в видео — указывать название урока
-3. Отвечать кратко и по делу
-4. Если в контексте нет ответа — честно сказать об этом
+Твоя задача — дать КРАТКИЙ ответ (2-4 предложения) на основе контекста из видео.
 
-Формат ответа:
-- Краткий ответ на вопрос
-- Ссылка на видео: "📹 Подробнее: {название урока}"
+Правила:
+1. Отвечай кратко и по существу
+2. Укажи название урока в конце: "📹 Урок: {название}"
+3. Если ответа нет в контексте — честно скажи об этом
 
-Если не нашёл ответ в контексте:
-"К сожалению, в базе знаний нет информации по этому вопросу. Попробуйте связаться с офисом через раздел 'Полезное'."
+НЕ ПИШИ длинные объяснения — только суть!
 """
+        
+        # Промпт для подробного ответа
+        self.detailed_prompt = """Ты — помощник для франчайзи барбершопов BORODACH.
+
+Твоя задача — дать ПОДРОБНЫЙ и развёрнутый ответ на основе контекста из видео.
+
+Правила:
+1. Объясни тему максимально полно
+2. Используй структуру: тезисы, примеры, шаги
+3. Если есть несколько аспектов — раскрой каждый
+4. В конце укажи источники: "📹 Источники: {названия уроков}"
+
+Отвечай развёрнуто, как преподаватель на лекции!
+"""
+        
+        # Старый промпт для обратной совместимости
+        self.system_prompt = self.brief_prompt
     
     async def create_query_embedding(self, query: str) -> Optional[list[float]]:
         """Create embedding for search query."""
@@ -78,54 +91,106 @@ class KnowledgeRAG:
         
         return "\n---\n".join(context_parts)
     
-    async def answer(self, question: str) -> str:
+    async def answer_question_brief(self, question: str) -> Optional[dict]:
         """
-        Answer a question using RAG.
-        Returns formatted answer with video references.
+        Answer a question briefly, returning answer and context for follow-up.
+        
+        Returns:
+            dict with 'answer' and 'context' keys, or None if failed
         """
         if not self.client:
-            return "⚠️ Система ответов временно недоступна. Попробуйте позже."
+            return None
         
         # Check if knowledge base has data
         stats = await get_knowledge_stats()
         if stats["embedded_count"] == 0:
-            return "📚 База знаний пока пуста. Скоро здесь появятся обучающие материалы!"
+            return None
         
         # Search for relevant chunks
         chunks = await self.search(question, limit=3)
         
         if not chunks:
-            return (
-                "К сожалению, не нашёл подходящей информации в базе знаний.\n\n"
-                "💡 Попробуйте переформулировать вопрос или обратитесь в офис "
-                "через раздел «📚 Полезное»."
-            )
+            return None
         
         # Format context
         context = self.format_context(chunks)
         
         try:
-            logger.info(f"[RAG] Generating answer for: {question[:50]}...")
+            logger.info(f"[RAG] Generating BRIEF answer for: {question[:50]}...")
             
             response = await self.client.chat.completions.create(
                 model=self.chat_model,
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
+                    {"role": "system", "content": self.brief_prompt},
                     {"role": "user", "content": f"Контекст из видео:\n\n{context}\n\nВопрос: {question}"}
                 ],
                 temperature=0.3,
-                max_tokens=500,
+                max_tokens=200,  # Краткий ответ
                 timeout=15.0
             )
             
             answer = response.choices[0].message.content
-            logger.info(f"[RAG] Answer generated (tokens: {response.usage.total_tokens})")
+            logger.info(f"[RAG] Brief answer generated (tokens: {response.usage.total_tokens})")
+            
+            return {
+                "answer": answer,
+                "context": context
+            }
+            
+        except Exception as e:
+            logger.error(f"[RAG] Error generating brief answer: {e}")
+            return None
+    
+    async def answer_question_detailed(self, question: str, context: str) -> Optional[str]:
+        """
+        Answer a question in detail using pre-saved context.
+        
+        Args:
+            question: Original question
+            context: Pre-saved context from brief answer
+            
+        Returns:
+            Detailed answer string or None if failed
+        """
+        if not self.client:
+            return None
+        
+        try:
+            logger.info(f"[RAG] Generating DETAILED answer for: {question[:50]}...")
+            
+            response = await self.client.chat.completions.create(
+                model=self.chat_model,
+                messages=[
+                    {"role": "system", "content": self.detailed_prompt},
+                    {"role": "user", "content": f"Контекст из видео:\n\n{context}\n\nВопрос: {question}"}
+                ],
+                temperature=0.4,
+                max_tokens=1000,  # Подробный ответ
+                timeout=30.0
+            )
+            
+            answer = response.choices[0].message.content
+            logger.info(f"[RAG] Detailed answer generated (tokens: {response.usage.total_tokens})")
             
             return answer
             
         except Exception as e:
-            logger.error(f"[RAG] Error generating answer: {e}")
-            return "⚠️ Произошла ошибка при формировании ответа. Попробуйте позже."
+            logger.error(f"[RAG] Error generating detailed answer: {e}")
+            return None
+    
+    async def answer(self, question: str) -> str:
+        """
+        Answer a question using RAG (legacy method for compatibility).
+        Returns formatted answer with video references.
+        """
+        result = await self.answer_question_brief(question)
+        if result:
+            return result["answer"]
+        return (
+            "К сожалению, не нашёл подходящей информации в базе знаний.\n\n"
+            "💡 Попробуйте переформулировать вопрос или обратитесь в офис "
+            "через раздел «📚 Полезное»."
+        )
     
     async def is_knowledge_question(self, text: str) -> bool:
         """

@@ -8,6 +8,7 @@ BTN_ACCOUNT = "👤 Аккаунт"
 BTN_MY_BARBERSHOPS = BTN_ACCOUNT  # Для обратной совместимости
 BTN_STATISTICS = "📊 Статистика"
 BTN_AI_ASSISTANT = "🎓 Обучение"
+BTN_AI_MORE_DETAILS = "📖 Подробнее"
 
 # Статистика — периоды
 BTN_STATS_CURRENT_MONTH = "📅 Текущий месяц"
@@ -93,12 +94,22 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     return keyboard
 
 
-def ai_assistant_keyboard() -> ReplyKeyboardMarkup:
-    """Меню AI-ассистента (обучение)."""
+def ai_assistant_keyboard(show_more_button: bool = False) -> ReplyKeyboardMarkup:
+    """
+    Меню AI-ассистента (обучение).
+    
+    Args:
+        show_more_button: Показать кнопку "Подробнее" после ответа
+    """
+    rows = []
+    
+    if show_more_button:
+        rows.append([KeyboardButton(text=BTN_AI_MORE_DETAILS)])
+    
+    rows.append([KeyboardButton(text=BTN_MAIN_MENU)])
+    
     keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text=BTN_MAIN_MENU)],
-        ],
+        keyboard=rows,
         resize_keyboard=True,
         input_field_placeholder="Задайте вопрос по обучению...",
     )

@@ -79,7 +79,8 @@ from .keyboards import (
     BTN_BACK,
     BTN_ADD_BARBERSHOP,
     BTN_NEW_TASK,
-    BTN_AI_ASSISTANT, 
+    BTN_AI_ASSISTANT,
+    BTN_AI_MORE_DETAILS, 
     BTN_MY_TASKS,
     BTN_CANCEL,
     BTN_ADD_COMMENT,
@@ -1651,6 +1652,55 @@ async def ai_assistant_back(message: types.Message, state: FSMContext) -> None:
     )
 
 
+@router.message(AIAssistantStates.waiting_for_question, F.text == BTN_AI_MORE_DETAILS)
+async def ai_assistant_more_details(message: types.Message, state: FSMContext) -> None:
+    """Подробный ответ на предыдущий вопрос."""
+    from knowledge_base.rag import KnowledgeRAG
+    
+    data = await state.get_data()
+    last_question = data.get("last_question")
+    last_context = data.get("last_context")
+    
+    if not last_question or not last_context:
+        await message.answer(
+            "🤔 Сначала задайте вопрос, чтобы получить подробный ответ.",
+            reply_markup=ai_assistant_keyboard(show_more_button=False),
+        )
+        return
+    
+    loading_msg = await message.answer("📚 Готовлю подробный ответ...")
+    
+    try:
+        rag = KnowledgeRAG()
+        detailed_answer = await rag.answer_question_detailed(last_question, last_context)
+        
+        await loading_msg.delete()
+        
+        if detailed_answer:
+            await message.answer(
+                f"📚 <b>Подробный ответ:</b>\n\n{detailed_answer}\n\n"
+                "💬 Можете задать новый вопрос.",
+                reply_markup=ai_assistant_keyboard(show_more_button=False),
+            )
+        else:
+            await message.answer(
+                "🤔 Не удалось получить подробный ответ.\n"
+                "Попробуйте задать вопрос иначе.",
+                reply_markup=ai_assistant_keyboard(show_more_button=False),
+            )
+        
+        # Очищаем контекст после подробного ответа
+        await state.update_data(last_question=None, last_context=None)
+        
+    except Exception as e:
+        logger.error(f"RAG detailed error: {e}")
+        await loading_msg.delete()
+        await message.answer(
+            "❌ Произошла ошибка.\nПопробуйте позже.",
+            reply_markup=ai_assistant_keyboard(show_more_button=False),
+        )
+
+
 @router.message(AIAssistantStates.waiting_for_question, F.text)
 async def ai_assistant_question(message: types.Message, state: FSMContext) -> None:
     """Обработка вопроса пользователя через RAG."""
@@ -1661,7 +1711,7 @@ async def ai_assistant_question(message: types.Message, state: FSMContext) -> No
     if len(user_question) < 3:
         await message.answer(
             "🤔 Пожалуйста, задайте более развёрнутый вопрос.",
-            reply_markup=ai_assistant_keyboard(),
+            reply_markup=ai_assistant_keyboard(show_more_button=False),
         )
         return
     
@@ -1670,21 +1720,29 @@ async def ai_assistant_question(message: types.Message, state: FSMContext) -> No
     
     try:
         rag = KnowledgeRAG()
-        answer = await rag.answer_question(user_question)
+        result = await rag.answer_question_brief(user_question)
         
         await loading_msg.delete()
         
-        if answer:
+        if result and result.get("answer"):
+            # Сохраняем вопрос и контекст для "Подробнее"
+            await state.update_data(
+                last_question=user_question,
+                last_context=result.get("context", "")
+            )
+            
             await message.answer(
-                f"📖 {answer}\n\n"
-                "💬 Можете задать ещё вопрос или вернуться в меню.",
-                reply_markup=ai_assistant_keyboard(),
+                f"📖 {result['answer']}\n\n"
+                "👆 Нажмите «Подробнее» для развёрнутого ответа\n"
+                "💬 Или задайте новый вопрос",
+                reply_markup=ai_assistant_keyboard(show_more_button=True),
             )
         else:
+            await state.update_data(last_question=None, last_context=None)
             await message.answer(
                 "🤔 К сожалению, не нашёл информацию по вашему вопросу.\n\n"
                 "Попробуйте переформулировать или задать другой вопрос.",
-                reply_markup=ai_assistant_keyboard(),
+                reply_markup=ai_assistant_keyboard(show_more_button=False),
             )
     except Exception as e:
         logger.error(f"RAG error: {e}")
@@ -1692,7 +1750,7 @@ async def ai_assistant_question(message: types.Message, state: FSMContext) -> No
         await message.answer(
             "❌ Произошла ошибка при поиске ответа.\n"
             "Попробуйте позже.",
-            reply_markup=ai_assistant_keyboard(),
+            reply_markup=ai_assistant_keyboard(show_more_button=False),
         )
 
 
