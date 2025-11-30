@@ -100,21 +100,32 @@ class VideoProcessor:
                     timestamp_granularities=["segment"]
                 )
             
-            # Convert to dict
-            transcript = {
-                "filename": audio_path.stem,
-                "language": response.language,
-                "duration": response.duration,
-                "text": response.text,
-                "segments": [
-                    {
+            # Convert to dict (handle both object and dict responses)
+            segments = []
+            for i, seg in enumerate(response.segments):
+                # Handle both object attributes and dict keys
+                if hasattr(seg, 'id'):
+                    segments.append({
                         "id": seg.id,
                         "start": seg.start,
                         "end": seg.end,
-                        "text": seg.text.strip()
-                    }
-                    for seg in response.segments
-                ]
+                        "text": seg.text.strip() if hasattr(seg.text, 'strip') else str(seg.text).strip()
+                    })
+                else:
+                    # Dict format
+                    segments.append({
+                        "id": seg.get('id', i),
+                        "start": seg.get('start', 0),
+                        "end": seg.get('end', 0),
+                        "text": str(seg.get('text', '')).strip()
+                    })
+            
+            transcript = {
+                "filename": audio_path.stem,
+                "language": getattr(response, 'language', 'ru'),
+                "duration": getattr(response, 'duration', 0),
+                "text": getattr(response, 'text', ''),
+                "segments": segments
             }
             
             # Save transcript
