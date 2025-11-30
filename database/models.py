@@ -275,11 +275,33 @@ class NetworkRating(Base):
     # Название салона (из YClients)
     company_name: Mapped[str] = mapped_column(String(255))
     
-    # Выручка за текущий месяц
+    # Город (для сравнения с похожими)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    
+    # Миллионник (для группировки)
+    is_million_city: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # === Основные метрики ===
+    
+    # Выручка за текущий месяц (общая)
     revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Выручка по услугам
+    services_revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Выручка по товарам
+    products_revenue: Mapped[float] = mapped_column(Float, default=0.0)
     
     # Средний чек
     avg_check: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Количество завершённых записей
+    completed_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Процент повторных визитов (0-100)
+    repeat_visitors_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # === Рейтинг ===
     
     # Место в рейтинге (1 = лидер)
     rank: Mapped[int] = mapped_column(Integer, default=0, index=True)
@@ -309,7 +331,7 @@ class NetworkRating(Base):
 
 
 class NetworkRatingHistory(Base):
-    """История рейтингов за прошлые месяцы."""
+    """История рейтингов за прошлые месяцы (хранится 12 месяцев)."""
     
     __tablename__ = "network_rating_history"
     
@@ -321,9 +343,20 @@ class NetworkRatingHistory(Base):
     # Название салона
     company_name: Mapped[str] = mapped_column(String(255))
     
-    # Данные за месяц
+    # Город
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    
+    # === Метрики за месяц ===
+    
     revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    services_revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    products_revenue: Mapped[float] = mapped_column(Float, default=0.0)
     avg_check: Mapped[float] = mapped_column(Float, default=0.0)
+    completed_count: Mapped[int] = mapped_column(Integer, default=0)
+    repeat_visitors_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # === Рейтинг ===
+    
     rank: Mapped[int] = mapped_column(Integer, default=0)
     total_companies: Mapped[int] = mapped_column(Integer, default=0)
     
