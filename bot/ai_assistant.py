@@ -145,12 +145,26 @@ async def get_smart_answer(
             
             # Получаем тренды для каждого салона
             all_trend_insights = []
+            
+            # Получаем средние тренды по сети для сравнения
+            try:
+                from bot.partner_analytics import get_network_average_trends, compare_with_network_trends
+                network_trends = await get_network_average_trends()
+            except Exception as e:
+                logger.warning(f"Failed to get network trends: {e}")
+                network_trends = None
+            
             for company in analytics.companies:
                 try:
                     trends = await get_company_trends(company.company_id, company)
                     if trends:
                         trends_context += "\n" + format_trends_for_ai(trends)
                         all_trend_insights.extend(get_trend_insights(trends))
+                        
+                        # Сравниваем с сетью
+                        if network_trends and trends.revenue:
+                            network_comparison = compare_with_network_trends(trends.revenue, network_trends)
+                            all_trend_insights.extend(network_comparison)
                 except Exception as e:
                     logger.warning(f"Failed to get trends for {company.company_id}: {e}")
             
@@ -193,8 +207,12 @@ async def get_smart_answer(
 
 {"Дай ПОДРОБНЫЙ развёрнутый ответ с конкретными рекомендациями." if detailed else "Дай КРАТКИЙ ответ (3-5 предложений) с главной рекомендацией."}
 
-ВАЖНО: Форматируй ответ простым текстом с эмодзи. НЕ используй Markdown (**, ##, ###). 
-Для выделения используй эмодзи и заглавные буквы.
+ВАЖНО: 
+- Форматируй ответ ПРОСТЫМ ТЕКСТОМ с эмодзи
+- НЕ используй Markdown (**, ##, ###, ``` и т.д.)
+- Для выделения используй ЗАГЛАВНЫЕ БУКВЫ и эмодзи
+- Числа форматируй с пробелами (1 234 567)
+- Проценты пиши со знаком (например: +15.3% или -8.2%)
 
 Если нет данных партнёра — ответь на основе базы знаний.
 Если вопрос не по теме — вежливо направь к нужному разделу меню.

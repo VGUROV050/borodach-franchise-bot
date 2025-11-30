@@ -506,6 +506,107 @@ def format_trends_for_ai(trends: CompanyTrends) -> str:
     return "\n".join(lines)
 
 
+async def get_network_average_trends() -> Optional[TrendData]:
+    """
+    Получить средние тренды по всей сети.
+    Сравнивает текущий месяц с предыдущими.
+    """
+    from datetime import datetime
+    from sqlalchemy import select, func
+    
+    async with AsyncSessionLocal() as db:
+        # Получаем средние значения из истории
+        now = datetime.now()
+        
+        def get_month_avg(months_ago: int) -> float:
+            """Получить среднюю выручку за N месяцев назад."""
+            target_total = now.year * 12 + now.month - months_ago
+            target_year = target_total // 12
+            target_month = target_total % 12 or 12
+            if target_month == 0:
+                target_month = 12
+                target_year -= 1
+            return target_year, target_month
+        
+        # Текущий месяц - из network_rating
+        result = await db.execute(
+            select(func.avg(NetworkRating.revenue)).where(NetworkRating.revenue > 0)
+        )
+        current_avg = result.scalar() or 0
+        
+        # Прошлые месяцы - из history
+        prev_year, prev_month = get_month_avg(1)
+        result = await db.execute(
+            select(func.avg(NetworkRatingHistory.revenue)).where(
+                NetworkRatingHistory.year == prev_year,
+                NetworkRatingHistory.month == prev_month,
+                NetworkRatingHistory.revenue > 0,
+            )
+        )
+        prev_avg = result.scalar() or 0
+        
+        m3_year, m3_month = get_month_avg(3)
+        result = await db.execute(
+            select(func.avg(NetworkRatingHistory.revenue)).where(
+                NetworkRatingHistory.year == m3_year,
+                NetworkRatingHistory.month == m3_month,
+                NetworkRatingHistory.revenue > 0,
+            )
+        )
+        m3_avg = result.scalar() or 0
+        
+        m6_year, m6_month = get_month_avg(6)
+        result = await db.execute(
+            select(func.avg(NetworkRatingHistory.revenue)).where(
+                NetworkRatingHistory.year == m6_year,
+                NetworkRatingHistory.month == m6_month,
+                NetworkRatingHistory.revenue > 0,
+            )
+        )
+        m6_avg = result.scalar() or 0
+        
+        if current_avg == 0:
+            return None
+        
+        return TrendData(
+            current=float(current_avg),
+            previous=float(prev_avg),
+            months_ago_3=float(m3_avg),
+            months_ago_6=float(m6_avg),
+        )
+
+
+def compare_with_network_trends(company_trends: TrendData, network_trends: TrendData) -> list[str]:
+    """
+    Сравнить тренды салона с трендами сети.
+    """
+    insights = []
+    
+    # Сравнение за месяц
+    company_1m = company_trends.change_1m_pct
+    network_1m = network_trends.change_1m_pct
+    diff_1m = company_1m - network_1m
+    
+    if abs(diff_1m) > 5:
+        if diff_1m > 0:
+            insights.append(f"📈 За месяц: ты {company_1m:+.1f}%, сеть {network_1m:+.1f}% → ты ЛУЧШЕ сети на {diff_1m:.1f}%")
+        else:
+            insights.append(f"📉 За месяц: ты {company_1m:+.1f}%, сеть {network_1m:+.1f}% → ты ХУЖЕ сети на {abs(diff_1m):.1f}%")
+    
+    # Сравнение за 3 месяца
+    company_3m = company_trends.change_3m_pct
+    network_3m = network_trends.change_3m_pct
+    diff_3m = company_3m - network_3m
+    
+    if abs(diff_3m) > 5:
+        if diff_3m > 0:
+            insights.append(f"📈 За 3 мес: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% → опережаешь сеть!")
+        else:
+            insights.append(f"📉 За 3 мес: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% → отстаёшь от сети")
+    
+    return insights
+
+
 def get_trend_insights(trends: CompanyTrends) -> list[str]:
     """
     Получить инсайты на основе трендов.
