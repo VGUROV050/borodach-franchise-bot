@@ -22,7 +22,7 @@ from knowledge_base.db_manager import (
     mark_lesson_transcribed,
     mark_lesson_embedded,
 )
-from database.connection import async_session_maker
+from database.connection import AsyncSessionLocal as async_session_maker
 
 logging.basicConfig(
     level=logging.INFO,
