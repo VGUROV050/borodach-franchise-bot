@@ -388,6 +388,11 @@ async def update_network_rating(
     products_revenue: float = 0.0,
     completed_count: int = 0,
     repeat_visitors_pct: float = 0.0,
+    # Клиентская статистика
+    new_clients_count: int = 0,
+    return_clients_count: int = 0,
+    total_clients_count: int = 0,
+    client_base_return_pct: float = 0.0,
 ) -> NetworkRating:
     """Обновить или создать запись рейтинга салона с расширенными метриками."""
     result = await db.execute(
@@ -412,6 +417,11 @@ async def update_network_rating(
         rating.products_revenue = products_revenue
         rating.completed_count = completed_count
         rating.repeat_visitors_pct = repeat_visitors_pct
+        # Клиентская статистика
+        rating.new_clients_count = new_clients_count
+        rating.return_clients_count = return_clients_count
+        rating.total_clients_count = total_clients_count
+        rating.client_base_return_pct = client_base_return_pct
     else:
         # Создаём новую запись
         rating = NetworkRating(
@@ -429,6 +439,11 @@ async def update_network_rating(
             products_revenue=products_revenue,
             completed_count=completed_count,
             repeat_visitors_pct=repeat_visitors_pct,
+            # Клиентская статистика
+            new_clients_count=new_clients_count,
+            return_clients_count=return_clients_count,
+            total_clients_count=total_clients_count,
+            client_base_return_pct=client_base_return_pct,
         )
         db.add(rating)
     
@@ -491,6 +506,12 @@ async def save_rating_history(
             avg_check=r.avg_check,
             completed_count=r.completed_count,
             repeat_visitors_pct=r.repeat_visitors_pct,
+            # Клиентская статистика
+            new_clients_count=r.new_clients_count,
+            return_clients_count=r.return_clients_count,
+            total_clients_count=r.total_clients_count,
+            client_base_return_pct=r.client_base_return_pct,
+            # Рейтинг
             rank=r.rank,
             total_companies=r.total_companies,
             year=year,

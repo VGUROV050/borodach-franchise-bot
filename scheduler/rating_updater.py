@@ -66,21 +66,41 @@ async def update_network_rating_job():
             logger.error("Failed to calculate network ranking - no data received")
             return
         
-        # Сохраняем в БД с previous_rank
+        # Получаем информацию о городах для сравнения
+        from admin.analytics import extract_city_from_name, is_millionnik
+        
+        # Сохраняем в БД с previous_rank и всеми метриками
         async with AsyncSessionLocal() as db:
             for company in ranking:
                 company_id = company["company_id"]
+                company_name = company["company_name"]
                 prev_rank = previous_ranks.get(company_id, 0)
+                
+                # Парсим город из названия
+                city = extract_city_from_name(company_name)
+                is_million_city = is_millionnik(city) if city else False
                 
                 await update_network_rating(
                     db=db,
                     yclients_company_id=company_id,
-                    company_name=company["company_name"],
+                    company_name=company_name,
                     revenue=company["revenue"],
                     rank=company["rank"],
                     total_companies=company["total_companies"],
                     avg_check=company.get("avg_check", 0.0),
                     previous_rank=prev_rank,
+                    # Расширенные метрики
+                    city=city,
+                    is_million_city=is_million_city,
+                    services_revenue=company.get("services_revenue", 0.0),
+                    products_revenue=company.get("products_revenue", 0.0),
+                    completed_count=company.get("completed_count", 0),
+                    repeat_visitors_pct=company.get("repeat_visitors_pct", 0.0),
+                    # Клиентская статистика
+                    new_clients_count=company.get("new_clients_count", 0),
+                    return_clients_count=company.get("return_clients_count", 0),
+                    total_clients_count=company.get("total_clients_count", 0),
+                    client_base_return_pct=company.get("client_base_return_pct", 0.0),
                 )
         
         duration = (datetime.now() - start_time).total_seconds()

@@ -301,6 +301,20 @@ class NetworkRating(Base):
     # Процент повторных визитов (0-100)
     repeat_visitors_pct: Mapped[float] = mapped_column(Float, default=0.0)
     
+    # === Клиентская статистика ===
+    
+    # Количество новых клиентов за период
+    new_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Количество вернувшихся клиентов за период
+    return_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Всего клиентов в базе
+    total_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Процент возврата клиентской базы (return_clients / total_clients * 100)
+    client_base_return_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    
     # === Рейтинг ===
     
     # Место в рейтинге (1 = лидер)
@@ -354,6 +368,13 @@ class NetworkRatingHistory(Base):
     avg_check: Mapped[float] = mapped_column(Float, default=0.0)
     completed_count: Mapped[int] = mapped_column(Integer, default=0)
     repeat_visitors_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # === Клиентская статистика ===
+    
+    new_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    return_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    total_clients_count: Mapped[int] = mapped_column(Integer, default=0)
+    client_base_return_pct: Mapped[float] = mapped_column(Float, default=0.0)
     
     # === Рейтинг ===
     
