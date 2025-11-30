@@ -7,3 +7,8 @@ __pycache__/
 logs/*.log
 bot.pid
 
+# Knowledge Base media files (large)
+knowledge_base/videos/
+knowledge_base/audio/
+knowledge_base/transcripts/
+
