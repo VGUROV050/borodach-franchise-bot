@@ -105,6 +105,16 @@ async def test_raw_analytics():
                 print(f"\n🔄 client_return_stats:")
                 pprint(client_return)
                 
+                # Новые клиенты
+                new_clients = analytics.get("clients_new_stats", {})
+                print(f"\n👤 clients_new_stats:")
+                pprint(new_clients)
+                
+                # Вернувшиеся клиенты  
+                returning = analytics.get("clients_returning_stats", {})
+                print(f"\n🔁 clients_returning_stats:")
+                pprint(returning)
+                
                 # Сохраним полный ответ в файл для анализа
                 with open("scripts/yclients_response_sample.json", "w", encoding="utf-8") as f:
                     json.dump(analytics, f, ensure_ascii=False, indent=2)
@@ -243,12 +253,54 @@ async def test_history_availability():
     print(f"\n📊 Доступно {available_count} из 12 месяцев")
 
 
+async def test_repeat_visitors_field():
+    """Детально проверить поле повторных визитов."""
+    print("\n" + "="*60)
+    print("📊 ТЕСТ: Поиск поля повторных визитов")
+    print("="*60)
+    
+    companies = await get_chain_companies()
+    if not companies:
+        print("❌ Нет салонов")
+        return
+    
+    company = companies[0]
+    company_id = str(company.get("id"))
+    company_name = company.get("title", "Unknown")
+    
+    print(f"📍 Тестируем салон: {company_name}")
+    
+    api = YClientsAPI()
+    today = datetime.now()
+    date_from = today.replace(day=1).strftime("%Y-%m-%d")
+    date_to = today.strftime("%Y-%m-%d")
+    
+    async with httpx.AsyncClient() as client:
+        url = f"{BASE_URL}/company/{company_id}/analytics/overall/"
+        params = {"date_from": date_from, "date_to": date_to}
+        
+        response = await client.get(url, headers=api.headers, params=params, timeout=30.0)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                analytics = data.get("data", {})
+                
+                print("\n🔍 Ищем поля с 'return', 'repeat', 'client' в названии:")
+                for key, value in analytics.items():
+                    key_lower = key.lower()
+                    if any(x in key_lower for x in ["return", "repeat", "client", "visitor"]):
+                        print(f"\n  📦 {key}:")
+                        pprint(value)
+
+
 async def main():
     """Запуск всех тестов."""
     print("\n🔧 ТЕСТИРОВАНИЕ ДАННЫХ YCLIENTS")
     print("=" * 60)
     
     await test_raw_analytics()
+    await test_repeat_visitors_field()
     await test_metrics_parsing()
     await test_history_availability()
     
