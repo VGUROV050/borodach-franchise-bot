@@ -8,7 +8,12 @@ logs/*.log
 bot.pid
 
 # Knowledge Base media files (large)
-knowledge_base/videos/
+knowledge_base/videos/**/*.mp4
+knowledge_base/videos/**/*.mov
+knowledge_base/videos/**/*.avi
+knowledge_base/videos/**/*.mkv
+knowledge_base/videos/**/*.webm
 knowledge_base/audio/
 # knowledge_base/transcripts/ — транскрипты храним в git
+# metadata.json в videos/ сохраняем в git
 
