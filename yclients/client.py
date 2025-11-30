@@ -441,6 +441,7 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                     "new_clients_count": 0,
                     "return_clients_count": 0,
                     "total_clients_count": 0,
+                    "client_base_return_pct": 0.0,
                 }
                 
                 if response.status_code == 200:
@@ -477,6 +478,14 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                         metrics["new_clients_count"] = client_stats.get("new_count", 0) or 0
                         metrics["return_clients_count"] = client_stats.get("return_count", 0) or 0
                         metrics["total_clients_count"] = client_stats.get("total_count", 0) or 0
+                        
+                        # % возврата клиентской базы = вернувшиеся / всего в базе
+                        total_in_base = metrics["total_clients_count"]
+                        return_count = metrics["return_clients_count"]
+                        if total_in_base > 0:
+                            metrics["client_base_return_pct"] = round(return_count / total_in_base * 100, 1)
+                        else:
+                            metrics["client_base_return_pct"] = 0.0
                 
                 results.append(metrics)
                 
@@ -498,6 +507,7 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                     "new_clients_count": 0,
                     "return_clients_count": 0,
                     "total_clients_count": 0,
+                    "client_base_return_pct": 0.0,
                 })
     
     logger.info(f"Finished fetching metrics for {len(results)} companies")

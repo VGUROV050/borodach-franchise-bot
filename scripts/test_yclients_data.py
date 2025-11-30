@@ -178,13 +178,17 @@ async def test_metrics_parsing():
                     new_clients = client_stats.get("new_count", 0) or 0
                     return_clients = client_stats.get("return_count", 0) or 0
                     
+                    total_clients = client_stats.get("total_count", 0) or 0
+                    base_return_pct = round(return_clients / total_clients * 100, 1) if total_clients > 0 else 0
+                    
                     print(f"📍 {company_name}")
                     print(f"   💰 Выручка: {revenue:,.0f} ₽")
                     print(f"   💇 Услуги: {services:,.0f} ₽")
                     print(f"   🛍️ Товары: {products:,.0f} ₽")
                     print(f"   📊 Ср.чек: {avg_check:,.0f} ₽")
                     print(f"   📋 Записей: {completed}")
-                    print(f"   🔄 Повторные: {repeat_pct}% ({return_clients} из {new_clients + return_clients})")
+                    print(f"   🔄 Повторные визиты: {repeat_pct}% ({return_clients} из {new_clients + return_clients} пришедших)")
+                    print(f"   📊 Возврат базы: {base_return_pct}% ({return_clients} из {total_clients} в базе)")
                     print()
 
 
