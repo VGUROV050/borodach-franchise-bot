@@ -96,28 +96,25 @@ async def fetch_and_save_month(year: int, month: int) -> int:
     return count
 
 
-async def backfill_12_months():
-    """Заполнить историю за последние 12 месяцев."""
+async def backfill_12_months(start_months_ago: int = 1, end_months_ago: int = 12):
+    """
+    Заполнить историю за указанный диапазон месяцев.
+    
+    Args:
+        start_months_ago: С какого месяца начать (1 = прошлый месяц)
+        end_months_ago: До какого месяца (12 = год назад)
+    """
     logger.info("=" * 60)
-    logger.info("🚀 ЗАПОЛНЕНИЕ ИСТОРИИ ЗА 12 МЕСЯЦЕВ")
+    logger.info(f"🚀 ЗАПОЛНЕНИЕ ИСТОРИИ ({start_months_ago}-{end_months_ago} мес. назад)")
     logger.info("=" * 60)
+    logger.info("⏱️  Между месяцами пауза 30 сек для защиты API")
+    logger.info("")
     
     today = datetime.now()
     total_saved = 0
     
-    # Идём от текущего месяца назад на 12 месяцев
-    for months_ago in range(1, 13):  # 1-12 месяцев назад (не включая текущий)
-        # Вычисляем год и месяц
-        target_date = today.replace(day=1) - timedelta(days=months_ago * 28)
-        year = target_date.year
-        month = target_date.month
-        
-        # Корректируем если ушли в предыдущий год
-        check_date = datetime(today.year, today.month, 1) - timedelta(days=months_ago * 30)
-        year = check_date.year
-        month = check_date.month
-        
-        # Более точный расчёт
+    for months_ago in range(start_months_ago, end_months_ago + 1):
+        # Точный расчёт года и месяца
         total_months = today.year * 12 + today.month - months_ago
         year = total_months // 12
         month = total_months % 12
@@ -129,12 +126,16 @@ async def backfill_12_months():
             saved = await fetch_and_save_month(year, month)
             total_saved += saved
             
-            # Небольшая пауза между запросами
-            if saved > 0:
-                await asyncio.sleep(2)
+            # Пауза 30 секунд между месяцами для защиты API
+            if saved > 0 and months_ago < end_months_ago:
+                logger.info(f"   ⏳ Пауза 30 сек перед следующим месяцем...")
+                await asyncio.sleep(30)
                 
         except Exception as e:
             logger.error(f"   ❌ Ошибка при загрузке {year}-{month:02d}: {e}")
+            # При ошибке ждём дольше
+            logger.info(f"   ⏳ Пауза 60 сек после ошибки...")
+            await asyncio.sleep(60)
     
     logger.info("=" * 60)
     logger.info(f"🎉 ГОТОВО! Всего сохранено: {total_saved} записей")
@@ -174,7 +175,27 @@ async def show_history_summary():
 
 async def main():
     """Главная функция."""
-    await backfill_12_months()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Заполнение истории рейтингов')
+    parser.add_argument('--start', type=int, default=1, help='Начать с N месяцев назад (default: 1)')
+    parser.add_argument('--end', type=int, default=12, help='Закончить N месяцев назад (default: 12)')
+    parser.add_argument('--batch', type=int, default=3, help='Обрабатывать по N месяцев за раз (default: 3)')
+    
+    args = parser.parse_args()
+    
+    if args.batch and args.batch < (args.end - args.start + 1):
+        # Режим батчей
+        logger.info(f"🔄 Режим батчей: по {args.batch} месяца за запуск")
+        end = min(args.start + args.batch - 1, args.end)
+        await backfill_12_months(args.start, end)
+        
+        if end < args.end:
+            logger.info(f"\n💡 Для продолжения запустите:")
+            logger.info(f"   python scripts/backfill_history.py --start {end + 1} --end {args.end}")
+    else:
+        await backfill_12_months(args.start, args.end)
+    
     await show_history_summary()
 
 

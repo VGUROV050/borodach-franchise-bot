@@ -1,5 +1,6 @@
 # YClients API Client
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
@@ -492,6 +493,9 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                 # Логируем прогресс каждые 20 салонов
                 if (i + 1) % 20 == 0:
                     logger.info(f"Processed {i + 1}/{len(companies)} companies")
+                
+                # Небольшая пауза между запросами (0.3 сек) для защиты API
+                await asyncio.sleep(0.3)
                     
             except Exception as e:
                 logger.error(f"Error fetching metrics for {company_id}: {e}")
