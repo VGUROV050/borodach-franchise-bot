@@ -123,11 +123,15 @@ async def get_smart_answer(
             format_analytics_for_ai,
             get_partner_issues,
             get_partner_strengths,
+            get_company_trends,
+            format_trends_for_ai,
+            get_trend_insights,
         )
         
         analytics = await get_partner_analytics(telegram_id)
         partner_context = ""
         issues_context = ""
+        trends_context = ""
         
         if analytics and analytics.companies:
             partner_context = format_analytics_for_ai(analytics)
@@ -138,6 +142,20 @@ async def get_smart_answer(
                 issues_context = "\n⚠️ ПРОБЛЕМНЫЕ ЗОНЫ:\n" + "\n".join(f"• {i}" for i in issues)
             if strengths:
                 issues_context += "\n\n✅ СИЛЬНЫЕ СТОРОНЫ:\n" + "\n".join(f"• {s}" for s in strengths)
+            
+            # Получаем тренды для каждого салона
+            all_trend_insights = []
+            for company in analytics.companies:
+                try:
+                    trends = await get_company_trends(company.company_id, company)
+                    if trends:
+                        trends_context += "\n" + format_trends_for_ai(trends)
+                        all_trend_insights.extend(get_trend_insights(trends))
+                except Exception as e:
+                    logger.warning(f"Failed to get trends for {company.company_id}: {e}")
+            
+            if all_trend_insights:
+                issues_context += "\n\n📊 ИНСАЙТЫ ПО ДИНАМИКЕ:\n" + "\n".join(f"• {i}" for i in all_trend_insights)
         
         # 2. Ищем в базе знаний
         kb_context = ""
@@ -169,6 +187,7 @@ async def get_smart_answer(
 - Указывать конкретные цифры и проценты
 
 {partner_context}
+{trends_context}
 {issues_context}
 {kb_context}
 

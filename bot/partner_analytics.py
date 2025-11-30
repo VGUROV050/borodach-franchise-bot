@@ -16,9 +16,69 @@ from database.crud import (
     get_similar_cities_average,
     get_company_history_12m,
 )
-from database.models import NetworkRating, YClientsCompany
+from database.models import NetworkRating, NetworkRatingHistory, YClientsCompany
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TrendData:
+    """Данные о тренде метрики."""
+    current: float
+    previous: float  # Прошлый месяц
+    months_ago_3: float  # 3 месяца назад
+    months_ago_6: float  # 6 месяцев назад
+    
+    @property
+    def change_1m_pct(self) -> float:
+        """Изменение за 1 месяц в %."""
+        if self.previous > 0:
+            return round((self.current / self.previous - 1) * 100, 1)
+        return 0.0
+    
+    @property
+    def change_3m_pct(self) -> float:
+        """Изменение за 3 месяца в %."""
+        if self.months_ago_3 > 0:
+            return round((self.current / self.months_ago_3 - 1) * 100, 1)
+        return 0.0
+    
+    @property
+    def change_6m_pct(self) -> float:
+        """Изменение за 6 месяцев в %."""
+        if self.months_ago_6 > 0:
+            return round((self.current / self.months_ago_6 - 1) * 100, 1)
+        return 0.0
+    
+    @property
+    def trend_emoji(self) -> str:
+        """Эмодзи тренда за 3 месяца."""
+        if self.change_3m_pct > 10:
+            return "📈"
+        elif self.change_3m_pct < -10:
+            return "📉"
+        else:
+            return "➡️"
+
+
+@dataclass
+class CompanyTrends:
+    """Тренды метрик салона."""
+    company_id: str
+    company_name: str
+    
+    revenue: Optional[TrendData] = None
+    avg_check: Optional[TrendData] = None
+    completed_count: Optional[TrendData] = None
+    repeat_visitors_pct: Optional[TrendData] = None
+    client_base_return_pct: Optional[TrendData] = None
+    
+    # История рангов
+    rank_history: list[tuple[str, int]] = None  # [(период, ранг), ...]
+    
+    def __post_init__(self):
+        if self.rank_history is None:
+            self.rank_history = []
 
 
 @dataclass
@@ -304,4 +364,189 @@ def get_partner_strengths(analytics: PartnerAnalytics) -> list[str]:
             strengths.append(f"{prefix}В топ-20% сети ({c.rank} место)")
     
     return strengths
+
+
+async def get_company_trends(yclients_id: str, current_metrics: CompanyMetrics) -> Optional[CompanyTrends]:
+    """
+    Получить тренды метрик салона за последние месяцы.
+    
+    Args:
+        yclients_id: ID салона в YClients
+        current_metrics: Текущие метрики салона
+    
+    Returns:
+        CompanyTrends или None
+    """
+    from datetime import datetime
+    
+    async with AsyncSessionLocal() as db:
+        history = await get_company_history_12m(db, yclients_id)
+    
+    if not history:
+        return None
+    
+    # Сортируем по дате (от новых к старым)
+    sorted_history = sorted(history, key=lambda h: (h.year, h.month), reverse=True)
+    
+    # Получаем данные за разные периоды
+    now = datetime.now()
+    
+    def get_history_for_months_ago(months: int) -> Optional[NetworkRatingHistory]:
+        """Найти запись за N месяцев назад."""
+        target_total = now.year * 12 + now.month - months
+        target_year = target_total // 12
+        target_month = target_total % 12 or 12
+        if target_month == 0:
+            target_month = 12
+            target_year -= 1
+        
+        for h in sorted_history:
+            if h.year == target_year and h.month == target_month:
+                return h
+        return None
+    
+    prev_month = get_history_for_months_ago(1)
+    months_3 = get_history_for_months_ago(3)
+    months_6 = get_history_for_months_ago(6)
+    
+    # Формируем тренды
+    trends = CompanyTrends(
+        company_id=yclients_id,
+        company_name=current_metrics.company_name,
+    )
+    
+    # Выручка
+    trends.revenue = TrendData(
+        current=current_metrics.revenue,
+        previous=prev_month.revenue if prev_month else 0,
+        months_ago_3=months_3.revenue if months_3 else 0,
+        months_ago_6=months_6.revenue if months_6 else 0,
+    )
+    
+    # Средний чек
+    trends.avg_check = TrendData(
+        current=current_metrics.avg_check,
+        previous=prev_month.avg_check if prev_month else 0,
+        months_ago_3=months_3.avg_check if months_3 else 0,
+        months_ago_6=months_6.avg_check if months_6 else 0,
+    )
+    
+    # Записи
+    trends.completed_count = TrendData(
+        current=float(current_metrics.completed_count),
+        previous=float(prev_month.completed_count) if prev_month else 0,
+        months_ago_3=float(months_3.completed_count) if months_3 else 0,
+        months_ago_6=float(months_6.completed_count) if months_6 else 0,
+    )
+    
+    # Повторные визиты
+    trends.repeat_visitors_pct = TrendData(
+        current=current_metrics.repeat_visitors_pct,
+        previous=prev_month.repeat_visitors_pct if prev_month else 0,
+        months_ago_3=months_3.repeat_visitors_pct if months_3 else 0,
+        months_ago_6=months_6.repeat_visitors_pct if months_6 else 0,
+    )
+    
+    # Возврат базы
+    trends.client_base_return_pct = TrendData(
+        current=current_metrics.client_base_return_pct,
+        previous=prev_month.client_base_return_pct if prev_month else 0,
+        months_ago_3=months_3.client_base_return_pct if months_3 else 0,
+        months_ago_6=months_6.client_base_return_pct if months_6 else 0,
+    )
+    
+    # История рангов
+    trends.rank_history = [
+        (f"{h.year}-{h.month:02d}", h.rank) 
+        for h in sorted_history[:6]  # Последние 6 месяцев
+    ]
+    
+    return trends
+
+
+def format_trends_for_ai(trends: CompanyTrends) -> str:
+    """
+    Форматировать тренды для AI-контекста.
+    """
+    lines = [
+        f"📈 ДИНАМИКА: {trends.company_name}",
+        "",
+    ]
+    
+    if trends.revenue:
+        lines.extend([
+            f"💰 Выручка:",
+            f"   {trends.revenue.trend_emoji} За месяц: {trends.revenue.change_1m_pct:+.1f}%",
+            f"   За 3 мес: {trends.revenue.change_3m_pct:+.1f}%",
+            f"   За 6 мес: {trends.revenue.change_6m_pct:+.1f}%",
+            "",
+        ])
+    
+    if trends.avg_check:
+        lines.extend([
+            f"📊 Средний чек:",
+            f"   {trends.avg_check.trend_emoji} За месяц: {trends.avg_check.change_1m_pct:+.1f}%",
+            f"   За 3 мес: {trends.avg_check.change_3m_pct:+.1f}%",
+            "",
+        ])
+    
+    if trends.repeat_visitors_pct:
+        lines.extend([
+            f"🔄 Повторные визиты:",
+            f"   {trends.repeat_visitors_pct.trend_emoji} За месяц: {trends.repeat_visitors_pct.change_1m_pct:+.1f}%",
+            f"   За 3 мес: {trends.repeat_visitors_pct.change_3m_pct:+.1f}%",
+            "",
+        ])
+    
+    if trends.rank_history:
+        lines.append("🏆 Рейтинг по месяцам:")
+        for period, rank in trends.rank_history[:4]:
+            lines.append(f"   {period}: {rank} место")
+    
+    return "\n".join(lines)
+
+
+def get_trend_insights(trends: CompanyTrends) -> list[str]:
+    """
+    Получить инсайты на основе трендов.
+    """
+    insights = []
+    name = trends.company_name
+    
+    # Анализ выручки
+    if trends.revenue:
+        if trends.revenue.change_3m_pct > 15:
+            insights.append(f"📈 {name}: Отличный рост выручки +{trends.revenue.change_3m_pct:.0f}% за 3 месяца!")
+        elif trends.revenue.change_3m_pct < -15:
+            insights.append(f"📉 {name}: Выручка упала на {abs(trends.revenue.change_3m_pct):.0f}% за 3 месяца — требует внимания")
+        
+        if trends.revenue.change_1m_pct < -20:
+            insights.append(f"⚠️ {name}: Резкое падение выручки за месяц ({trends.revenue.change_1m_pct:.0f}%)")
+    
+    # Анализ среднего чека
+    if trends.avg_check:
+        if trends.avg_check.change_3m_pct > 10:
+            insights.append(f"📈 {name}: Средний чек растёт (+{trends.avg_check.change_3m_pct:.0f}% за 3 мес)")
+        elif trends.avg_check.change_3m_pct < -10:
+            insights.append(f"📉 {name}: Средний чек падает ({trends.avg_check.change_3m_pct:.0f}% за 3 мес)")
+    
+    # Анализ повторных
+    if trends.repeat_visitors_pct:
+        if trends.repeat_visitors_pct.change_3m_pct < -10:
+            insights.append(f"⚠️ {name}: Снижается % повторных визитов ({trends.repeat_visitors_pct.change_3m_pct:.0f}%)")
+        elif trends.repeat_visitors_pct.change_3m_pct > 10:
+            insights.append(f"✅ {name}: Растёт лояльность клиентов (+{trends.repeat_visitors_pct.change_3m_pct:.0f}%)")
+    
+    # Анализ рейтинга
+    if len(trends.rank_history) >= 3:
+        current_rank = trends.rank_history[0][1]
+        old_rank = trends.rank_history[2][1]  # 3 месяца назад
+        rank_change = old_rank - current_rank
+        
+        if rank_change > 5:
+            insights.append(f"🏆 {name}: Поднялся в рейтинге на {rank_change} позиций за 3 месяца!")
+        elif rank_change < -5:
+            insights.append(f"⬇️ {name}: Опустился в рейтинге на {abs(rank_change)} позиций")
+    
+    return insights
 
