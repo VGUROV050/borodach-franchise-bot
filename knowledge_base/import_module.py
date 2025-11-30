@@ -56,6 +56,18 @@ async def import_module(module_title: str, videos_path: Path, create_embeddings:
     
     logger.info(f"Found {len(videos)} videos in {videos_path}")
     
+    # Load metadata.json for Russian titles if exists
+    metadata = {}
+    metadata_path = videos_path / "metadata.json"
+    if metadata_path.exists():
+        try:
+            import json
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+            logger.info(f"Loaded metadata for {len(metadata)} videos")
+        except Exception as e:
+            logger.warning(f"Failed to load metadata.json: {e}")
+    
     processor = VideoProcessor()
     
     async with async_session_maker() as session:
@@ -73,11 +85,15 @@ async def import_module(module_title: str, videos_path: Path, create_embeddings:
         for i, video_path in enumerate(videos):
             logger.info(f"\n[{i+1}/{len(videos)}] Processing: {video_path.name}")
             
-            # Create lesson title from filename
-            # Remove extension and clean up
-            lesson_title = video_path.stem.replace("_", " ").replace("-", " ")
-            # Capitalize first letter
-            lesson_title = lesson_title[0].upper() + lesson_title[1:] if lesson_title else video_path.name
+            # Get lesson title from metadata.json or generate from filename
+            if video_path.name in metadata:
+                lesson_title = metadata[video_path.name]
+                logger.info(f"Using title from metadata: {lesson_title}")
+            else:
+                # Fallback: create lesson title from filename
+                lesson_title = video_path.stem.replace("_", " ").replace("-", " ")
+                # Capitalize first letter
+                lesson_title = lesson_title[0].upper() + lesson_title[1:] if lesson_title else video_path.name
             
             # Create or get lesson
             lesson = await get_or_create_lesson(
