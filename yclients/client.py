@@ -438,6 +438,9 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                     "avg_check": 0.0,
                     "completed_count": 0,
                     "repeat_visitors_pct": 0.0,
+                    "new_clients_count": 0,
+                    "return_clients_count": 0,
+                    "total_clients_count": 0,
                 }
                 
                 if response.status_code == 200:
@@ -465,10 +468,15 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                         record_stats = analytics.get("record_stats", {})
                         metrics["completed_count"] = record_stats.get("current_completed_count", 0) or 0
                         
-                        # Процент повторных визитов (client_return_stats если есть)
-                        client_return = analytics.get("client_return_stats", {})
-                        return_pct = client_return.get("current_percent", 0)
+                        # Процент повторных визитов из client_stats
+                        client_stats = analytics.get("client_stats", {})
+                        return_pct = client_stats.get("return_percent", 0)
                         metrics["repeat_visitors_pct"] = float(return_pct) if return_pct else 0.0
+                        
+                        # Дополнительно: количество новых и вернувшихся клиентов
+                        metrics["new_clients_count"] = client_stats.get("new_count", 0) or 0
+                        metrics["return_clients_count"] = client_stats.get("return_count", 0) or 0
+                        metrics["total_clients_count"] = client_stats.get("total_count", 0) or 0
                 
                 results.append(metrics)
                 
@@ -487,6 +495,9 @@ async def get_all_companies_metrics(year: int = None, month: int = None) -> list
                     "avg_check": 0.0,
                     "completed_count": 0,
                     "repeat_visitors_pct": 0.0,
+                    "new_clients_count": 0,
+                    "return_clients_count": 0,
+                    "total_clients_count": 0,
                 })
     
     logger.info(f"Finished fetching metrics for {len(results)} companies")

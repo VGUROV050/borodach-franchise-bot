@@ -172,7 +172,11 @@ async def test_metrics_parsing():
                     products = parse_sum(analytics.get("income_goods_stats", {}).get("current_sum", "0"))
                     avg_check = parse_sum(analytics.get("income_average_stats", {}).get("current_sum", "0"))
                     completed = analytics.get("record_stats", {}).get("current_completed_count", 0) or 0
-                    repeat_pct = analytics.get("client_return_stats", {}).get("current_percent", 0) or 0
+                    # Исправлено: берём из client_stats
+                    client_stats = analytics.get("client_stats", {})
+                    repeat_pct = client_stats.get("return_percent", 0) or 0
+                    new_clients = client_stats.get("new_count", 0) or 0
+                    return_clients = client_stats.get("return_count", 0) or 0
                     
                     print(f"📍 {company_name}")
                     print(f"   💰 Выручка: {revenue:,.0f} ₽")
@@ -180,7 +184,7 @@ async def test_metrics_parsing():
                     print(f"   🛍️ Товары: {products:,.0f} ₽")
                     print(f"   📊 Ср.чек: {avg_check:,.0f} ₽")
                     print(f"   📋 Записей: {completed}")
-                    print(f"   🔄 Повторные: {repeat_pct}%")
+                    print(f"   🔄 Повторные: {repeat_pct}% ({return_clients} из {new_clients + return_clients})")
                     print()
 
 
