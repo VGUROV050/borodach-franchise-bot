@@ -7,6 +7,7 @@ BTN_TASKS = "📋 Задачи"
 BTN_ACCOUNT = "👤 Аккаунт"
 BTN_MY_BARBERSHOPS = BTN_ACCOUNT  # Для обратной совместимости
 BTN_STATISTICS = "📊 Статистика"
+BTN_AI_ASSISTANT = "🎓 Обучение"
 
 # Статистика — периоды
 BTN_STATS_CURRENT_MONTH = "📅 Текущий месяц"
@@ -84,9 +85,22 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_USEFUL)],
             [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_ACCOUNT)],
+            [KeyboardButton(text=BTN_AI_ASSISTANT)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
+    )
+    return keyboard
+
+
+def ai_assistant_keyboard() -> ReplyKeyboardMarkup:
+    """Меню AI-ассистента (обучение)."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_MAIN_MENU)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Задайте вопрос по обучению...",
     )
     return keyboard
 

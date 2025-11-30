@@ -60,6 +60,7 @@ from .keyboards import (
     useful_departments_keyboard,
     useful_actions_keyboard,
     statistics_period_keyboard,
+    ai_assistant_keyboard,
     BTN_TASKS,
     BTN_ACCOUNT,
     BTN_MY_BARBERSHOPS,
@@ -77,7 +78,8 @@ from .keyboards import (
     BTN_MAIN_MENU,
     BTN_BACK,
     BTN_ADD_BARBERSHOP,
-    BTN_NEW_TASK, 
+    BTN_NEW_TASK,
+    BTN_AI_ASSISTANT, 
     BTN_MY_TASKS,
     BTN_CANCEL,
     BTN_ADD_COMMENT,
@@ -368,6 +370,11 @@ async def add_barbershop_process(message: types.Message, state: FSMContext) -> N
 class StatisticsStates(StatesGroup):
     """Состояния для раздела Статистика."""
     selecting_period = State()
+
+
+class AIAssistantStates(StatesGroup):
+    """Состояния для AI-ассистента (обучение)."""
+    waiting_for_question = State()
 
 
 @router.message(F.text == BTN_STATISTICS)
@@ -1610,6 +1617,86 @@ async def cancel_task_reject(message: types.Message, state: FSMContext) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# AI-ассистент (Обучение) — вопросы по базе знаний
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(F.text == BTN_AI_ASSISTANT)
+async def ai_assistant_start(message: types.Message, state: FSMContext) -> None:
+    """Открыть раздел AI-ассистента для вопросов по обучению."""
+    if not await _check_verified(message):
+        return
+    
+    await state.set_state(AIAssistantStates.waiting_for_question)
+    
+    await message.answer(
+        "🎓 <b>AI-ассистент по обучению</b>\n\n"
+        "Здесь вы можете задать вопросы по материалам обучения:\n"
+        "• Управление барбершопом\n"
+        "• KPI и показатели\n"
+        "• Планирование\n"
+        "• Мотивация персонала\n"
+        "• И многое другое\n\n"
+        "💬 <b>Просто напишите ваш вопрос</b>",
+        reply_markup=ai_assistant_keyboard(),
+    )
+
+
+@router.message(AIAssistantStates.waiting_for_question, F.text == BTN_MAIN_MENU)
+async def ai_assistant_back(message: types.Message, state: FSMContext) -> None:
+    """Вернуться в главное меню из AI-ассистента."""
+    await state.clear()
+    await message.answer(
+        "🏠 Главное меню",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+@router.message(AIAssistantStates.waiting_for_question, F.text)
+async def ai_assistant_question(message: types.Message, state: FSMContext) -> None:
+    """Обработка вопроса пользователя через RAG."""
+    from knowledge_base.rag import KnowledgeRAG
+    
+    user_question = message.text.strip()
+    
+    if len(user_question) < 3:
+        await message.answer(
+            "🤔 Пожалуйста, задайте более развёрнутый вопрос.",
+            reply_markup=ai_assistant_keyboard(),
+        )
+        return
+    
+    # Показываем индикатор загрузки
+    loading_msg = await message.answer("🔍 Ищу ответ в базе знаний...")
+    
+    try:
+        rag = KnowledgeRAG()
+        answer = await rag.answer_question(user_question)
+        
+        await loading_msg.delete()
+        
+        if answer:
+            await message.answer(
+                f"📖 {answer}\n\n"
+                "💬 Можете задать ещё вопрос или вернуться в меню.",
+                reply_markup=ai_assistant_keyboard(),
+            )
+        else:
+            await message.answer(
+                "🤔 К сожалению, не нашёл информацию по вашему вопросу.\n\n"
+                "Попробуйте переформулировать или задать другой вопрос.",
+                reply_markup=ai_assistant_keyboard(),
+            )
+    except Exception as e:
+        logger.error(f"RAG error: {e}")
+        await loading_msg.delete()
+        await message.answer(
+            "❌ Произошла ошибка при поиске ответа.\n"
+            "Попробуйте позже.",
+            reply_markup=ai_assistant_keyboard(),
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Fallback handler — обработка неожиданных сообщений
 # ═══════════════════════════════════════════════════════════════════
 
@@ -1643,29 +1730,15 @@ async def fallback_handler(message: types.Message, state: FSMContext) -> None:
         )
         return
     
-    # Импортируем AI-функции
+    # Импортируем AI-функции для навигации
     from .ai_assistant import (
         get_ai_suggestion, 
         get_fallback_suggestion,
-        get_knowledge_answer,
-        is_knowledge_question
     )
     
     logger.info(f"[Fallback] User {message.from_user.id} sent: '{user_text[:50]}...'")
     
-    # Сначала проверяем, похоже ли это на вопрос к базе знаний
-    if is_knowledge_question(user_text):
-        logger.info(f"[Fallback] Looks like a knowledge question, trying RAG...")
-        kb_answer = await get_knowledge_answer(user_text)
-        if kb_answer:
-            logger.info(f"[Fallback] Using knowledge base answer")
-            await message.answer(
-                f"📖 {kb_answer}",
-                reply_markup=main_menu_keyboard(),
-            )
-            return
-    
-    # Если не вопрос или база знаний пустая — используем AI для навигации
+    # Используем AI для подсказки навигации
     suggestion = await get_ai_suggestion(user_text)
     
     if suggestion:
