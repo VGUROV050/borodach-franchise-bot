@@ -105,15 +105,15 @@ async def test_raw_analytics():
                 print(f"\n🔄 client_return_stats:")
                 pprint(client_return)
                 
-                # Новые клиенты
-                new_clients = analytics.get("clients_new_stats", {})
-                print(f"\n👤 clients_new_stats:")
-                pprint(new_clients)
+                # Общая статистика клиентов (ВАЖНО!)
+                client_stats = analytics.get("client_stats", {})
+                print(f"\n👥 client_stats:")
+                pprint(client_stats)
                 
-                # Вернувшиеся клиенты  
-                returning = analytics.get("clients_returning_stats", {})
-                print(f"\n🔁 clients_returning_stats:")
-                pprint(returning)
+                # Заполненность расписания
+                fullness = analytics.get("fullness_stats", {})
+                print(f"\n📅 fullness_stats:")
+                pprint(fullness)
                 
                 # Сохраним полный ответ в файл для анализа
                 with open("scripts/yclients_response_sample.json", "w", encoding="utf-8") as f:
@@ -286,12 +286,15 @@ async def test_repeat_visitors_field():
             if data.get("success"):
                 analytics = data.get("data", {})
                 
-                print("\n🔍 Ищем поля с 'return', 'repeat', 'client' в названии:")
+                print("\n🔍 ВСЕ ключи и их значения:")
                 for key, value in analytics.items():
-                    key_lower = key.lower()
-                    if any(x in key_lower for x in ["return", "repeat", "client", "visitor"]):
-                        print(f"\n  📦 {key}:")
+                    print(f"\n  📦 {key}:")
+                    if isinstance(value, dict) and value:
                         pprint(value)
+                    elif value:
+                        print(f"      {value}")
+                    else:
+                        print("      (пусто)")
 
 
 async def main():
