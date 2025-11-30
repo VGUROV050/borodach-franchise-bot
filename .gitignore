@@ -10,5 +10,5 @@ bot.pid
 # Knowledge Base media files (large)
 knowledge_base/videos/
 knowledge_base/audio/
-knowledge_base/transcripts/
+# knowledge_base/transcripts/ — транскрипты храним в git
 
