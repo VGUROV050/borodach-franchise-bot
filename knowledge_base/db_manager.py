@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import KnowledgeModule, KnowledgeLesson, KnowledgeChunk
-from database.connection import async_session_maker
+from database.connection import AsyncSessionLocal as async_session_maker
 
 logger = logging.getLogger(__name__)
 
