@@ -1643,11 +1643,29 @@ async def fallback_handler(message: types.Message, state: FSMContext) -> None:
         )
         return
     
-    # Пробуем получить AI-подсказку
-    from .ai_assistant import get_ai_suggestion, get_fallback_suggestion
+    # Импортируем AI-функции
+    from .ai_assistant import (
+        get_ai_suggestion, 
+        get_fallback_suggestion,
+        get_knowledge_answer,
+        is_knowledge_question
+    )
     
     logger.info(f"[Fallback] User {message.from_user.id} sent: '{user_text[:50]}...'")
     
+    # Сначала проверяем, похоже ли это на вопрос к базе знаний
+    if is_knowledge_question(user_text):
+        logger.info(f"[Fallback] Looks like a knowledge question, trying RAG...")
+        kb_answer = await get_knowledge_answer(user_text)
+        if kb_answer:
+            logger.info(f"[Fallback] Using knowledge base answer")
+            await message.answer(
+                f"📖 {kb_answer}",
+                reply_markup=main_menu_keyboard(),
+            )
+            return
+    
+    # Если не вопрос или база знаний пустая — используем AI для навигации
     suggestion = await get_ai_suggestion(user_text)
     
     if suggestion:

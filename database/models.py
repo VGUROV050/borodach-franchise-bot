@@ -619,3 +619,135 @@ class PollMessage(Base):
     def __repr__(self) -> str:
         return f"<PollMessage poll={self.poll_id} msg={self.telegram_message_id}>"
 
+
+# ============================================================
+# KNOWLEDGE BASE - База знаний (видео уроки)
+# ============================================================
+
+class KnowledgeModule(Base):
+    """Модуль (тема) в базе знаний."""
+    
+    __tablename__ = "knowledge_modules"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Название модуля
+    title: Mapped[str] = mapped_column(String(255))
+    
+    # Описание
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Порядок отображения
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Активен ли модуль
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Временные метки
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    # Связь с уроками
+    lessons: Mapped[list["KnowledgeLesson"]] = relationship(
+        back_populates="module",
+        cascade="all, delete-orphan",
+        order_by="KnowledgeLesson.order",
+    )
+    
+    def __repr__(self) -> str:
+        return f"<KnowledgeModule {self.id}: {self.title}>"
+
+
+class KnowledgeLesson(Base):
+    """Урок (видео) в модуле."""
+    
+    __tablename__ = "knowledge_lessons"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Связь с модулем
+    module_id: Mapped[int] = mapped_column(ForeignKey("knowledge_modules.id", ondelete="CASCADE"), index=True)
+    
+    # Название урока
+    title: Mapped[str] = mapped_column(String(255))
+    
+    # Имя видео файла
+    video_filename: Mapped[str] = mapped_column(String(255))
+    
+    # Длительность в секундах
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Порядок в модуле
+    order: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Статус обработки
+    is_transcribed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_embedded: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Временные метки
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    transcribed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    
+    # Связи
+    module: Mapped["KnowledgeModule"] = relationship(back_populates="lessons")
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+    )
+    
+    def __repr__(self) -> str:
+        return f"<KnowledgeLesson {self.id}: {self.title}>"
+
+
+class KnowledgeChunk(Base):
+    """Фрагмент транскрипта с эмбеддингом для RAG."""
+    
+    __tablename__ = "knowledge_chunks"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Связь с уроком
+    lesson_id: Mapped[int] = mapped_column(ForeignKey("knowledge_lessons.id", ondelete="CASCADE"), index=True)
+    
+    # Текст фрагмента
+    text: Mapped[str] = mapped_column(Text)
+    
+    # Тайм-коды (секунды)
+    start_time: Mapped[float] = mapped_column(Float, default=0.0)
+    end_time: Mapped[float] = mapped_column(Float, default=0.0)
+    
+    # Порядковый номер чанка в уроке
+    chunk_index: Mapped[int] = mapped_column(Integer, default=0)
+    
+    # Эмбеддинг (будет храниться как pgvector)
+    # Для pgvector нужно добавить расширение и использовать специальный тип
+    # Пока сохраняем как JSON строку, потом мигрируем на pgvector
+    embedding_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Временные метки
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+    
+    # Связи
+    lesson: Mapped["KnowledgeLesson"] = relationship(back_populates="chunks")
+    
+    @property
+    def timestamp_formatted(self) -> str:
+        """Форматированный тайм-код (MM:SS)."""
+        minutes = int(self.start_time // 60)
+        seconds = int(self.start_time % 60)
+        return f"{minutes:02d}:{seconds:02d}"
+    
+    def __repr__(self) -> str:
+        return f"<KnowledgeChunk lesson={self.lesson_id} @{self.timestamp_formatted}>"
+

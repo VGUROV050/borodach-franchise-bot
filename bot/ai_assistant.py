@@ -19,6 +19,7 @@ BOT_CAPABILITIES = """
 2. 📚 Полезное — полезная информация по отделам (Развитие, Маркетинг, Дизайн), контакты отделов
 3. 📊 Статистика — выручка барбершопов, рейтинг в сети, за разные периоды (сегодня, вчера, месяц)
 4. 👤 Аккаунт — информация о профиле, список барбершопов, добавление барбершопа
+5. 📖 База знаний — ответы на вопросы из обучающих видео (если база знаний заполнена)
 
 Внутри раздела "Задачи":
 - 🆕 Новая задача — создать задачу в отдел (Развитие, Маркетинг, Дизайн)
@@ -33,6 +34,55 @@ BOT_CAPABILITIES = """
 Отвечай КРАТКО (1-3 предложения). Направь пользователя к нужной кнопке меню.
 Используй emoji из меню в ответе.
 """
+
+# Ключевые слова для определения вопросов к базе знаний
+KNOWLEDGE_KEYWORDS = [
+    "как", "почему", "зачем", "когда", "где", "что такое",
+    "сколько", "какой", "какая", "какие",
+    "расскажи", "объясни", "подскажи",
+    "делать", "работать", "оформить", "получить",
+    "клиент", "сотрудник", "касса", "выручка", "зарплата",
+    "обучение", "стандарт", "процедура", "регламент",
+]
+
+
+def is_knowledge_question(text: str) -> bool:
+    """Check if the text looks like a question for knowledge base."""
+    text_lower = text.lower()
+    
+    # Question mark is a strong indicator
+    if "?" in text:
+        return True
+    
+    # Check for knowledge-related keywords
+    return any(keyword in text_lower for keyword in KNOWLEDGE_KEYWORDS)
+
+
+async def get_knowledge_answer(user_message: str) -> str | None:
+    """
+    Try to answer from knowledge base using RAG.
+    Returns answer or None if KB is empty or no relevant info found.
+    """
+    try:
+        from knowledge_base.rag import knowledge_rag
+        from knowledge_base.db_manager import get_knowledge_stats
+        
+        # Check if KB has data
+        stats = await get_knowledge_stats()
+        if stats["embedded_count"] == 0:
+            logger.info("📚 [KB] Knowledge base is empty, skipping RAG")
+            return None
+        
+        logger.info(f"📚 [KB] Searching knowledge base for: '{user_message[:50]}...'")
+        answer = await knowledge_rag.answer(user_message)
+        return answer
+        
+    except ImportError:
+        logger.warning("📚 [KB] Knowledge base module not available")
+        return None
+    except Exception as e:
+        logger.error(f"📚 [KB] Error querying knowledge base: {e}")
+        return None
 
 
 async def get_ai_suggestion(user_message: str) -> str | None:

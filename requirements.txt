@@ -35,3 +35,6 @@ aiogram-throttling==0.1.4
 
 # AI Assistant
 openai==1.12.0
+
+# Knowledge Base (vector similarity search)
+numpy==1.26.4
