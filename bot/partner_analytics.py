@@ -589,9 +589,9 @@ def compare_with_network_trends(company_trends: TrendData, network_trends: Trend
     
     if abs(diff_1m) > 5:
         if diff_1m > 0:
-            insights.append(f"📈 За месяц: ты {company_1m:+.1f}%, сеть {network_1m:+.1f}% → ты ЛУЧШЕ сети на {diff_1m:.1f}%")
+            insights.append(f"📈 За месяц: твой салон {company_1m:+.1f}%, сеть в среднем {network_1m:+.1f}% — ты лучше сети на {diff_1m:.1f}%")
         else:
-            insights.append(f"📉 За месяц: ты {company_1m:+.1f}%, сеть {network_1m:+.1f}% → ты ХУЖЕ сети на {abs(diff_1m):.1f}%")
+            insights.append(f"📉 За месяц: твой салон {company_1m:+.1f}%, сеть в среднем {network_1m:+.1f}% — отстаёшь от сети на {abs(diff_1m):.1f}%")
     
     # Сравнение за 3 месяца
     company_3m = company_trends.change_3m_pct
@@ -600,9 +600,9 @@ def compare_with_network_trends(company_trends: TrendData, network_trends: Trend
     
     if abs(diff_3m) > 5:
         if diff_3m > 0:
-            insights.append(f"📈 За 3 мес: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% → опережаешь сеть!")
+            insights.append(f"📈 За 3 месяца: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% — опережаешь сеть")
         else:
-            insights.append(f"📉 За 3 мес: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% → отстаёшь от сети")
+            insights.append(f"📉 За 3 месяца: ты {company_3m:+.1f}%, сеть {network_3m:+.1f}% — отстаёшь от сети")
     
     return insights
 
