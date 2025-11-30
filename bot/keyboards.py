@@ -7,7 +7,7 @@ BTN_TASKS = "📋 Задачи"
 BTN_ACCOUNT = "👤 Аккаунт"
 BTN_MY_BARBERSHOPS = BTN_ACCOUNT  # Для обратной совместимости
 BTN_STATISTICS = "📊 Статистика"
-BTN_AI_ASSISTANT = "🎓 Обучение"
+BTN_AI_ASSISTANT = "🤖 AI-ассистент"
 BTN_AI_MORE_DETAILS = "📖 Подробнее"
 
 # Статистика — периоды
