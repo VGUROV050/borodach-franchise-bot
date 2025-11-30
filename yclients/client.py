@@ -355,10 +355,16 @@ async def get_chain_companies(chain_id: str = None) -> list[dict]:
         return []
 
 
-async def get_all_companies_revenue(year: int = None, month: int = None) -> list[dict]:
+def _parse_yclients_sum(value: str) -> float:
+    """Парсит числовое значение из YClients API."""
+    if not value:
+        return 0.0
+    return float(str(value).replace(",", ".").replace(" ", "").replace("\xa0", ""))
+
+
+async def get_all_companies_metrics(year: int = None, month: int = None) -> list[dict]:
     """
-    Получить выручку всех салонов сети за указанный месяц.
-    Если год/месяц не указаны - берётся текущий месяц (неполный).
+    Получить расширенные метрики всех салонов сети за указанный месяц.
     
     Args:
         year: Год (опционально)
@@ -366,7 +372,16 @@ async def get_all_companies_revenue(year: int = None, month: int = None) -> list
     
     Returns:
         Список словарей с данными:
-        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "avg_check": 1500.0}, ...]
+        [{
+            "company_id": str,
+            "company_name": str,
+            "revenue": float,           # Общая выручка
+            "services_revenue": float,  # Выручка по услугам
+            "products_revenue": float,  # Выручка по товарам
+            "avg_check": float,         # Средний чек
+            "completed_count": int,     # Завершённых записей
+            "repeat_visitors_pct": float, # % повторных (пока 0, будет отдельный эндпоинт)
+        }, ...]
     """
     # Получаем список салонов сети
     companies = await get_chain_companies()
@@ -382,12 +397,10 @@ async def get_all_companies_revenue(year: int = None, month: int = None) -> list
     today = datetime.now()
     
     if year is None or month is None:
-        # Текущий месяц (неполный)
         start_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         end_date = today
         period_name = "текущий месяц"
     else:
-        # Указанный месяц (полный)
         start_of_month = datetime(year, month, 1)
         if month == 12:
             end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -398,7 +411,7 @@ async def get_all_companies_revenue(year: int = None, month: int = None) -> list
     date_from = start_of_month.strftime("%Y-%m-%d")
     date_to = end_date.strftime("%Y-%m-%d")
     
-    logger.info(f"Fetching revenue for {len(companies)} companies for {period_name}...")
+    logger.info(f"Fetching metrics for {len(companies)} companies for {period_name}...")
     
     async with httpx.AsyncClient() as client:
         for i, company in enumerate(companies):
@@ -416,8 +429,16 @@ async def get_all_companies_revenue(year: int = None, month: int = None) -> list
                     timeout=30.0,
                 )
                 
-                revenue = 0.0
-                avg_check = 0.0
+                metrics = {
+                    "company_id": company_id,
+                    "company_name": company_name,
+                    "revenue": 0.0,
+                    "services_revenue": 0.0,
+                    "products_revenue": 0.0,
+                    "avg_check": 0.0,
+                    "completed_count": 0,
+                    "repeat_visitors_pct": 0.0,
+                }
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -425,60 +446,101 @@ async def get_all_companies_revenue(year: int = None, month: int = None) -> list
                         analytics = data.get("data", {})
                         
                         # Общая выручка
-                        income_stats = analytics.get("income_total_stats", {})
-                        revenue_str = income_stats.get("current_sum", "0")
-                        revenue = float(revenue_str.replace(",", ".").replace(" ", "") if revenue_str else 0)
+                        income_total = analytics.get("income_total_stats", {})
+                        metrics["revenue"] = _parse_yclients_sum(income_total.get("current_sum", "0"))
+                        
+                        # Выручка по услугам (income_services_stats)
+                        income_services = analytics.get("income_services_stats", {})
+                        metrics["services_revenue"] = _parse_yclients_sum(income_services.get("current_sum", "0"))
+                        
+                        # Выручка по товарам (income_goods_stats)
+                        income_goods = analytics.get("income_goods_stats", {})
+                        metrics["products_revenue"] = _parse_yclients_sum(income_goods.get("current_sum", "0"))
                         
                         # Средний чек
                         avg_stats = analytics.get("income_average_stats", {})
-                        avg_str = avg_stats.get("current_sum", "0")
-                        avg_check = float(avg_str.replace(",", ".").replace(" ", "") if avg_str else 0)
+                        metrics["avg_check"] = _parse_yclients_sum(avg_stats.get("current_sum", "0"))
+                        
+                        # Завершённые записи
+                        record_stats = analytics.get("record_stats", {})
+                        metrics["completed_count"] = record_stats.get("current_completed_count", 0) or 0
+                        
+                        # Процент повторных визитов (client_return_stats если есть)
+                        client_return = analytics.get("client_return_stats", {})
+                        return_pct = client_return.get("current_percent", 0)
+                        metrics["repeat_visitors_pct"] = float(return_pct) if return_pct else 0.0
                 
-                results.append({
-                    "company_id": company_id,
-                    "company_name": company_name,
-                    "revenue": revenue,
-                    "avg_check": avg_check,
-                })
+                results.append(metrics)
                 
                 # Логируем прогресс каждые 20 салонов
                 if (i + 1) % 20 == 0:
                     logger.info(f"Processed {i + 1}/{len(companies)} companies")
                     
             except Exception as e:
-                logger.error(f"Error fetching revenue for {company_id}: {e}")
+                logger.error(f"Error fetching metrics for {company_id}: {e}")
                 results.append({
                     "company_id": company_id,
                     "company_name": company_name,
                     "revenue": 0.0,
+                    "services_revenue": 0.0,
+                    "products_revenue": 0.0,
                     "avg_check": 0.0,
+                    "completed_count": 0,
+                    "repeat_visitors_pct": 0.0,
                 })
     
-    logger.info(f"Finished fetching revenue for {len(results)} companies")
+    logger.info(f"Finished fetching metrics for {len(results)} companies")
     return results
+
+
+# Обратная совместимость
+async def get_all_companies_revenue(year: int = None, month: int = None) -> list[dict]:
+    """Обёртка для обратной совместимости."""
+    metrics = await get_all_companies_metrics(year, month)
+    return [
+        {
+            "company_id": m["company_id"],
+            "company_name": m["company_name"],
+            "revenue": m["revenue"],
+            "avg_check": m["avg_check"],
+        }
+        for m in metrics
+    ]
 
 
 async def calculate_network_ranking(year: int = None, month: int = None) -> list[dict]:
     """
     Рассчитать рейтинг всех салонов сети по выручке за указанный месяц.
     Учитываются только салоны с выручкой > 0.
+    Возвращает расширенные метрики.
     
     Args:
         year: Год (опционально, по умолчанию - текущий месяц)
         month: Месяц (опционально)
     
     Returns:
-        Список словарей с рейтингом (отсортирован по выручке DESC):
-        [{"company_id": "123", "company_name": "Салон 1", "revenue": 123456.0, "avg_check": 1500.0, "rank": 1}, ...]
+        Список словарей с рейтингом и метриками (отсортирован по выручке DESC):
+        [{
+            "company_id": str,
+            "company_name": str,
+            "revenue": float,
+            "services_revenue": float,
+            "products_revenue": float,
+            "avg_check": float,
+            "completed_count": int,
+            "repeat_visitors_pct": float,
+            "rank": int,
+            "total_companies": int,
+        }, ...]
     """
-    # Получаем выручку всех салонов за указанный месяц
-    all_revenue = await get_all_companies_revenue(year, month)
+    # Получаем метрики всех салонов за указанный месяц
+    all_metrics = await get_all_companies_metrics(year, month)
     
-    if not all_revenue:
+    if not all_metrics:
         return []
     
     # Фильтруем салоны с выручкой > 0
-    active_companies = [c for c in all_revenue if c["revenue"] > 0]
+    active_companies = [c for c in all_metrics if c["revenue"] > 0]
     
     # Сортируем по выручке (от большей к меньшей)
     sorted_companies = sorted(active_companies, key=lambda x: x["revenue"], reverse=True)
@@ -489,7 +551,10 @@ async def calculate_network_ranking(year: int = None, month: int = None) -> list
         company["rank"] = i + 1
         company["total_companies"] = total
     
-    logger.info(f"Calculated ranking for {total} active companies (filtered from {len(all_revenue)} total). Top 3: {sorted_companies[:3]}")
+    logger.info(f"Calculated ranking for {total} active companies (filtered from {len(all_metrics)} total)")
+    if sorted_companies:
+        top = sorted_companies[0]
+        logger.info(f"Top company: {top['company_name']} - revenue: {top['revenue']:.0f}, services: {top['services_revenue']:.0f}, products: {top['products_revenue']:.0f}")
     
     return sorted_companies
 

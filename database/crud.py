@@ -381,8 +381,15 @@ async def update_network_rating(
     total_companies: int,
     avg_check: float = 0.0,
     previous_rank: int = 0,
+    # Новые метрики
+    city: str = None,
+    is_million_city: bool = False,
+    services_revenue: float = 0.0,
+    products_revenue: float = 0.0,
+    completed_count: int = 0,
+    repeat_visitors_pct: float = 0.0,
 ) -> NetworkRating:
-    """Обновить или создать запись рейтинга салона."""
+    """Обновить или создать запись рейтинга салона с расширенными метриками."""
     result = await db.execute(
         select(NetworkRating).where(NetworkRating.yclients_company_id == yclients_company_id)
     )
@@ -397,6 +404,14 @@ async def update_network_rating(
         rating.avg_check = avg_check
         if previous_rank > 0:
             rating.previous_rank = previous_rank
+        # Новые поля
+        if city:
+            rating.city = city
+        rating.is_million_city = is_million_city
+        rating.services_revenue = services_revenue
+        rating.products_revenue = products_revenue
+        rating.completed_count = completed_count
+        rating.repeat_visitors_pct = repeat_visitors_pct
     else:
         # Создаём новую запись
         rating = NetworkRating(
@@ -407,6 +422,13 @@ async def update_network_rating(
             total_companies=total_companies,
             avg_check=avg_check,
             previous_rank=previous_rank,
+            # Новые поля
+            city=city,
+            is_million_city=is_million_city,
+            services_revenue=services_revenue,
+            products_revenue=products_revenue,
+            completed_count=completed_count,
+            repeat_visitors_pct=repeat_visitors_pct,
         )
         db.add(rating)
     
@@ -440,6 +462,7 @@ async def save_rating_history(
 ) -> int:
     """
     Сохранить текущий рейтинг в историю за указанный месяц.
+    Включает все расширенные метрики.
     Возвращает количество сохранённых записей.
     """
     # Проверяем, нет ли уже записей за этот месяц
@@ -461,8 +484,13 @@ async def save_rating_history(
         history = NetworkRatingHistory(
             yclients_company_id=r.yclients_company_id,
             company_name=r.company_name,
+            city=r.city,
             revenue=r.revenue,
+            services_revenue=r.services_revenue,
+            products_revenue=r.products_revenue,
             avg_check=r.avg_check,
+            completed_count=r.completed_count,
+            repeat_visitors_pct=r.repeat_visitors_pct,
             rank=r.rank,
             total_companies=r.total_companies,
             year=year,
@@ -474,6 +502,145 @@ async def save_rating_history(
     await db.commit()
     logger.info(f"Saved {count} ratings to history for {year}-{month}")
     return count
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Сравнение по городам и регионам
+# ═══════════════════════════════════════════════════════════════════
+
+async def get_city_average(
+    db: AsyncSession,
+    city: str,
+) -> dict:
+    """
+    Получить средние метрики по городу.
+    
+    Returns:
+        {
+            "city": str,
+            "company_count": int,
+            "avg_revenue": float,
+            "avg_services_revenue": float,
+            "avg_products_revenue": float,
+            "avg_check": float,
+            "avg_completed_count": float,
+            "avg_repeat_visitors_pct": float,
+        }
+    """
+    from sqlalchemy import func as sqlfunc
+    
+    result = await db.execute(
+        select(
+            sqlfunc.count(NetworkRating.id).label("count"),
+            sqlfunc.avg(NetworkRating.revenue).label("avg_revenue"),
+            sqlfunc.avg(NetworkRating.services_revenue).label("avg_services_revenue"),
+            sqlfunc.avg(NetworkRating.products_revenue).label("avg_products_revenue"),
+            sqlfunc.avg(NetworkRating.avg_check).label("avg_check"),
+            sqlfunc.avg(NetworkRating.completed_count).label("avg_completed_count"),
+            sqlfunc.avg(NetworkRating.repeat_visitors_pct).label("avg_repeat_pct"),
+        ).where(
+            NetworkRating.city == city,
+            NetworkRating.revenue > 0,  # Только активные
+        )
+    )
+    row = result.one()
+    
+    return {
+        "city": city,
+        "company_count": row.count or 0,
+        "avg_revenue": float(row.avg_revenue or 0),
+        "avg_services_revenue": float(row.avg_services_revenue or 0),
+        "avg_products_revenue": float(row.avg_products_revenue or 0),
+        "avg_check": float(row.avg_check or 0),
+        "avg_completed_count": float(row.avg_completed_count or 0),
+        "avg_repeat_visitors_pct": float(row.avg_repeat_pct or 0),
+    }
+
+
+async def get_similar_cities_average(
+    db: AsyncSession,
+    is_million_city: bool,
+) -> dict:
+    """
+    Получить средние метрики по похожим городам (миллионники vs остальные).
+    
+    Returns:
+        {
+            "city_type": "millionnik" | "region",
+            "company_count": int,
+            "avg_revenue": float,
+            "avg_services_revenue": float,
+            "avg_products_revenue": float,
+            "avg_check": float,
+            "avg_completed_count": float,
+            "avg_repeat_visitors_pct": float,
+        }
+    """
+    from sqlalchemy import func as sqlfunc
+    
+    result = await db.execute(
+        select(
+            sqlfunc.count(NetworkRating.id).label("count"),
+            sqlfunc.avg(NetworkRating.revenue).label("avg_revenue"),
+            sqlfunc.avg(NetworkRating.services_revenue).label("avg_services_revenue"),
+            sqlfunc.avg(NetworkRating.products_revenue).label("avg_products_revenue"),
+            sqlfunc.avg(NetworkRating.avg_check).label("avg_check"),
+            sqlfunc.avg(NetworkRating.completed_count).label("avg_completed_count"),
+            sqlfunc.avg(NetworkRating.repeat_visitors_pct).label("avg_repeat_pct"),
+        ).where(
+            NetworkRating.is_million_city == is_million_city,
+            NetworkRating.revenue > 0,
+        )
+    )
+    row = result.one()
+    
+    return {
+        "city_type": "millionnik" if is_million_city else "region",
+        "company_count": row.count or 0,
+        "avg_revenue": float(row.avg_revenue or 0),
+        "avg_services_revenue": float(row.avg_services_revenue or 0),
+        "avg_products_revenue": float(row.avg_products_revenue or 0),
+        "avg_check": float(row.avg_check or 0),
+        "avg_completed_count": float(row.avg_completed_count or 0),
+        "avg_repeat_visitors_pct": float(row.avg_repeat_pct or 0),
+    }
+
+
+async def get_company_history_12m(
+    db: AsyncSession,
+    yclients_company_id: str,
+) -> list[NetworkRatingHistory]:
+    """
+    Получить историю метрик салона за последние 12 месяцев.
+    Отсортировано от старых к новым.
+    """
+    from datetime import datetime
+    
+    # Определяем диапазон: последние 12 месяцев
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+    
+    # Вычисляем год и месяц 12 месяцев назад
+    if current_month > 12:
+        start_year = current_year - 1
+        start_month = current_month
+    else:
+        months_back = 12
+        total_months = current_year * 12 + current_month - months_back
+        start_year = total_months // 12
+        start_month = total_months % 12 or 12
+    
+    result = await db.execute(
+        select(NetworkRatingHistory).where(
+            NetworkRatingHistory.yclients_company_id == yclients_company_id,
+        ).order_by(
+            NetworkRatingHistory.year,
+            NetworkRatingHistory.month,
+        )
+    )
+    
+    return list(result.scalars().all())
 
 
 async def get_rating_history(
