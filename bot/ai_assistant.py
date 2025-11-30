@@ -1,6 +1,7 @@
 # AI Assistant for handling unexpected user messages
 
 import logging
+from typing import Optional
 from openai import AsyncOpenAI
 
 from config.settings import OPENAI_API_KEY
@@ -63,7 +64,7 @@ def is_knowledge_question(text: str) -> bool:
     return any(keyword in text_lower for keyword in KNOWLEDGE_KEYWORDS)
 
 
-async def get_knowledge_answer(user_message: str) -> str | None:
+async def get_knowledge_answer(user_message: str, detailed: bool = False) -> str | None:
     """
     Try to answer from knowledge base using RAG.
     Returns answer or None if KB is empty or no relevant info found.
@@ -78,8 +79,8 @@ async def get_knowledge_answer(user_message: str) -> str | None:
             logger.info("📚 [KB] Knowledge base is empty, skipping RAG")
             return None
         
-        logger.info(f"📚 [KB] Searching knowledge base for: '{user_message[:50]}...'")
-        answer = await knowledge_rag.answer(user_message)
+        logger.info(f"📚 [KB] Searching knowledge base for: '{user_message[:50]}...' (detailed={detailed})")
+        answer = await knowledge_rag.answer(user_message, detailed=detailed)
         return answer
         
     except ImportError:
@@ -88,6 +89,119 @@ async def get_knowledge_answer(user_message: str) -> str | None:
     except Exception as e:
         logger.error(f"📚 [KB] Error querying knowledge base: {e}")
         return None
+
+
+async def get_smart_answer(
+    user_message: str, 
+    telegram_id: int,
+    detailed: bool = False,
+) -> str:
+    """
+    Умный ответ AI с учётом данных партнёра и базы знаний.
+    
+    1. Получает данные партнёра (метрики салонов)
+    2. Определяет проблемные зоны
+    3. Ищет релевантную информацию в базе знаний
+    4. Формирует персонализированный ответ
+    
+    Args:
+        user_message: Вопрос пользователя
+        telegram_id: Telegram ID для получения данных
+        detailed: Подробный ответ
+    
+    Returns:
+        Персонализированный ответ
+    """
+    if not client:
+        logger.warning("⚠️ [AI] OpenAI not available")
+        return await get_knowledge_answer(user_message, detailed) or "AI-ассистент временно недоступен."
+    
+    try:
+        # 1. Получаем данные партнёра
+        from bot.partner_analytics import (
+            get_partner_analytics, 
+            format_analytics_for_ai,
+            get_partner_issues,
+            get_partner_strengths,
+        )
+        
+        analytics = await get_partner_analytics(telegram_id)
+        partner_context = ""
+        issues_context = ""
+        
+        if analytics and analytics.companies:
+            partner_context = format_analytics_for_ai(analytics)
+            issues = get_partner_issues(analytics)
+            strengths = get_partner_strengths(analytics)
+            
+            if issues:
+                issues_context = "\n⚠️ ПРОБЛЕМНЫЕ ЗОНЫ:\n" + "\n".join(f"• {i}" for i in issues)
+            if strengths:
+                issues_context += "\n\n✅ СИЛЬНЫЕ СТОРОНЫ:\n" + "\n".join(f"• {s}" for s in strengths)
+        
+        # 2. Ищем в базе знаний
+        kb_context = ""
+        try:
+            from knowledge_base.rag import knowledge_rag
+            from knowledge_base.db_manager import get_knowledge_stats
+            
+            stats = await get_knowledge_stats()
+            if stats["embedded_count"] > 0:
+                chunks = await knowledge_rag.search(user_message, top_k=3)
+                if chunks:
+                    kb_context = "\n📚 ИНФОРМАЦИЯ ИЗ БАЗЫ ЗНАНИЙ:\n"
+                    for chunk in chunks:
+                        kb_context += f"\n[{chunk.get('lesson_title', 'Урок')}]\n{chunk.get('text', '')[:500]}\n"
+        except Exception as e:
+            logger.warning(f"KB search error: {e}")
+        
+        # 3. Формируем системный промпт
+        system_prompt = f"""Ты — AI-ассистент для франчайзи барбершопов BORODACH.
+
+У тебя есть доступ к:
+1. Реальным данным салонов партнёра (выручка, средний чек, рейтинг, клиенты)
+2. Базе знаний из обучающих видео
+
+Твоя задача:
+- Анализировать данные партнёра
+- Сравнивать с средними показателями по сети и городу
+- Давать конкретные рекомендации на основе базы знаний
+- Указывать конкретные цифры и проценты
+
+{partner_context}
+{issues_context}
+{kb_context}
+
+{"Дай ПОДРОБНЫЙ развёрнутый ответ с конкретными рекомендациями." if detailed else "Дай КРАТКИЙ ответ (3-5 предложений) с главной рекомендацией."}
+
+Если нет данных партнёра — ответь на основе базы знаний.
+Если вопрос не по теме — вежливо направь к нужному разделу меню.
+"""
+
+        # 4. Запрос к GPT
+        logger.info(f"🤖 [AI] Smart answer request: '{user_message[:50]}...'")
+        
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=1000 if detailed else 400,
+            temperature=0.5,
+        )
+        
+        answer = response.choices[0].message.content
+        tokens = response.usage.total_tokens if response.usage else "?"
+        logger.info(f"✅ [AI] Smart answer ready (tokens: {tokens})")
+        
+        return answer.strip() if answer else "Не удалось сформировать ответ."
+        
+    except Exception as e:
+        logger.error(f"❌ [AI] Smart answer error: {e}")
+        # Фоллбэк на обычный ответ из базы знаний
+        kb_answer = await get_knowledge_answer(user_message, detailed)
+        return kb_answer or "Произошла ошибка. Попробуйте позже."
 
 
 async def get_ai_suggestion(user_message: str) -> str | None:

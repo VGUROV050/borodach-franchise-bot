@@ -1654,31 +1654,34 @@ async def ai_assistant_back(message: types.Message, state: FSMContext) -> None:
 
 @router.message(AIAssistantStates.waiting_for_question, F.text == BTN_AI_MORE_DETAILS)
 async def ai_assistant_more_details(message: types.Message, state: FSMContext) -> None:
-    """Подробный ответ на предыдущий вопрос."""
-    from knowledge_base.rag import KnowledgeRAG
+    """Подробный ответ на предыдущий вопрос с данными партнёра."""
+    from bot.ai_assistant import get_smart_answer
     
     data = await state.get_data()
     last_question = data.get("last_question")
-    last_context = data.get("last_context")
     
-    if not last_question or not last_context:
+    if not last_question:
         await message.answer(
             "🤔 Сначала задайте вопрос, чтобы получить подробный ответ.",
             reply_markup=ai_assistant_keyboard(show_more_button=False),
         )
         return
     
-    loading_msg = await message.answer("📚 Готовлю подробный ответ...")
+    loading_msg = await message.answer("📊 Готовлю подробный анализ с вашими данными...")
     
     try:
-        rag = KnowledgeRAG()
-        detailed_answer = await rag.answer_question_detailed(last_question, last_context)
+        # Получаем подробный ответ с данными партнёра
+        detailed_answer = await get_smart_answer(
+            user_message=last_question,
+            telegram_id=message.from_user.id,
+            detailed=True,  # Подробный ответ
+        )
         
         await loading_msg.delete()
         
         if detailed_answer:
             await message.answer(
-                f"📚 <b>Подробный ответ:</b>\n\n{detailed_answer}\n\n"
+                f"📊 <b>Подробный анализ:</b>\n\n{detailed_answer}\n\n"
                 "💬 Можете задать новый вопрос.",
                 reply_markup=ai_assistant_keyboard(show_more_button=False),
             )
@@ -1690,10 +1693,10 @@ async def ai_assistant_more_details(message: types.Message, state: FSMContext) -
             )
         
         # Очищаем контекст после подробного ответа
-        await state.update_data(last_question=None, last_context=None)
+        await state.update_data(last_question=None)
         
     except Exception as e:
-        logger.error(f"RAG detailed error: {e}")
+        logger.error(f"Smart detailed error: {e}")
         await loading_msg.delete()
         await message.answer(
             "❌ Произошла ошибка.\nПопробуйте позже.",
@@ -1703,8 +1706,8 @@ async def ai_assistant_more_details(message: types.Message, state: FSMContext) -
 
 @router.message(AIAssistantStates.waiting_for_question, F.text)
 async def ai_assistant_question(message: types.Message, state: FSMContext) -> None:
-    """Обработка вопроса пользователя через RAG."""
-    from knowledge_base.rag import KnowledgeRAG
+    """Обработка вопроса пользователя — умный ответ с данными партнёра."""
+    from bot.ai_assistant import get_smart_answer
     
     user_question = message.text.strip()
     
@@ -1716,40 +1719,39 @@ async def ai_assistant_question(message: types.Message, state: FSMContext) -> No
         return
     
     # Показываем индикатор загрузки
-    loading_msg = await message.answer("🔍 Ищу ответ в базе знаний...")
+    loading_msg = await message.answer("🔍 Анализирую данные и ищу ответ...")
     
     try:
-        rag = KnowledgeRAG()
-        result = await rag.answer_question_brief(user_question)
+        # Получаем умный ответ с учётом данных партнёра
+        answer = await get_smart_answer(
+            user_message=user_question,
+            telegram_id=message.from_user.id,
+            detailed=False,  # Краткий ответ
+        )
         
         await loading_msg.delete()
         
-        if result and result.get("answer"):
-            # Сохраняем вопрос и контекст для "Подробнее"
-            await state.update_data(
-                last_question=user_question,
-                last_context=result.get("context", "")
-            )
+        if answer:
+            # Сохраняем вопрос для "Подробнее"
+            await state.update_data(last_question=user_question)
             
             await message.answer(
-                f"📖 {result['answer']}\n\n"
-                "👆 Нажмите «Подробнее» для развёрнутого ответа\n"
-                "💬 Или задайте новый вопрос",
+                f"🤖 {answer}\n\n"
+                "👆 Нажмите «📖 Подробнее» для развёрнутого ответа",
                 reply_markup=ai_assistant_keyboard(show_more_button=True),
             )
         else:
-            await state.update_data(last_question=None, last_context=None)
+            await state.update_data(last_question=None)
             await message.answer(
-                "🤔 К сожалению, не нашёл информацию по вашему вопросу.\n\n"
-                "Попробуйте переформулировать или задать другой вопрос.",
+                "🤔 К сожалению, не удалось найти ответ.\n\n"
+                "Попробуйте переформулировать вопрос.",
                 reply_markup=ai_assistant_keyboard(show_more_button=False),
             )
     except Exception as e:
-        logger.error(f"RAG error: {e}")
+        logger.error(f"Smart answer error: {e}")
         await loading_msg.delete()
         await message.answer(
-            "❌ Произошла ошибка при поиске ответа.\n"
-            "Попробуйте позже.",
+            "❌ Произошла ошибка.\nПопробуйте позже.",
             reply_markup=ai_assistant_keyboard(show_more_button=False),
         )
 

@@ -1,0 +1,307 @@
+"""
+Аналитика данных партнёра для AI-ассистента.
+Получение метрик, сравнение с сетью, формирование контекста.
+"""
+
+import logging
+from typing import Optional
+from dataclasses import dataclass
+
+from database import AsyncSessionLocal
+from database.crud import (
+    get_partner_by_telegram_id,
+    get_partner_companies,
+    get_network_rating_by_company,
+    get_city_average,
+    get_similar_cities_average,
+    get_company_history_12m,
+)
+from database.models import NetworkRating, YClientsCompany
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CompanyMetrics:
+    """Метрики одного салона с сравнением."""
+    company_id: str
+    company_name: str
+    city: str
+    is_million_city: bool
+    
+    # Текущие метрики
+    revenue: float
+    services_revenue: float
+    products_revenue: float
+    avg_check: float
+    completed_count: int
+    repeat_visitors_pct: float
+    new_clients_count: int
+    return_clients_count: int
+    total_clients_count: int
+    client_base_return_pct: float
+    rank: int
+    total_companies: int
+    
+    # Сравнение с городом
+    city_avg_revenue: float = 0.0
+    city_avg_check: float = 0.0
+    city_avg_repeat_pct: float = 0.0
+    city_company_count: int = 0
+    
+    # Сравнение с похожими городами (миллионники/регионы)
+    similar_avg_revenue: float = 0.0
+    similar_avg_check: float = 0.0
+    similar_avg_repeat_pct: float = 0.0
+    
+    @property
+    def revenue_vs_city_pct(self) -> float:
+        """Отклонение выручки от среднего по городу в %."""
+        if self.city_avg_revenue > 0:
+            return round((self.revenue / self.city_avg_revenue - 1) * 100, 1)
+        return 0.0
+    
+    @property
+    def check_vs_city_pct(self) -> float:
+        """Отклонение среднего чека от города в %."""
+        if self.city_avg_check > 0:
+            return round((self.avg_check / self.city_avg_check - 1) * 100, 1)
+        return 0.0
+    
+    @property
+    def repeat_vs_city_diff(self) -> float:
+        """Разница % повторных от города."""
+        return round(self.repeat_visitors_pct - self.city_avg_repeat_pct, 1)
+
+
+@dataclass
+class PartnerAnalytics:
+    """Полная аналитика партнёра."""
+    partner_id: int
+    partner_name: str
+    companies: list[CompanyMetrics]
+    
+    @property
+    def total_revenue(self) -> float:
+        return sum(c.revenue for c in self.companies)
+    
+    @property
+    def avg_rank(self) -> float:
+        if not self.companies:
+            return 0
+        return sum(c.rank for c in self.companies) / len(self.companies)
+    
+    @property
+    def best_company(self) -> Optional[CompanyMetrics]:
+        if not self.companies:
+            return None
+        return min(self.companies, key=lambda c: c.rank)
+    
+    @property
+    def worst_company(self) -> Optional[CompanyMetrics]:
+        if not self.companies:
+            return None
+        return max(self.companies, key=lambda c: c.rank)
+
+
+async def get_partner_analytics(telegram_id: int) -> Optional[PartnerAnalytics]:
+    """
+    Получить полную аналитику партнёра с сравнением по сети.
+    
+    Args:
+        telegram_id: Telegram ID партнёра
+    
+    Returns:
+        PartnerAnalytics или None если партнёр не найден
+    """
+    async with AsyncSessionLocal() as db:
+        # Получаем партнёра
+        partner = await get_partner_by_telegram_id(db, telegram_id)
+        if not partner:
+            logger.warning(f"Partner not found for telegram_id={telegram_id}")
+            return None
+        
+        # Получаем салоны партнёра
+        companies = await get_partner_companies(db, partner.id)
+        if not companies:
+            logger.info(f"Partner {partner.id} has no companies linked")
+            return PartnerAnalytics(
+                partner_id=partner.id,
+                partner_name=partner.full_name,
+                companies=[],
+            )
+        
+        # Собираем метрики по каждому салону
+        company_metrics = []
+        
+        for company in companies:
+            # Получаем рейтинг салона
+            rating = await get_network_rating_by_company(db, company.yclients_id)
+            
+            if not rating:
+                logger.warning(f"No rating found for company {company.yclients_id}")
+                continue
+            
+            # Получаем средние по городу
+            city_avg = {"company_count": 0, "avg_revenue": 0, "avg_check": 0, "avg_repeat_visitors_pct": 0}
+            if rating.city:
+                city_avg = await get_city_average(db, rating.city)
+            
+            # Получаем средние по похожим городам
+            similar_avg = await get_similar_cities_average(db, rating.is_million_city)
+            
+            metrics = CompanyMetrics(
+                company_id=company.yclients_id,
+                company_name=company.name,
+                city=rating.city or "Неизвестно",
+                is_million_city=rating.is_million_city,
+                
+                revenue=rating.revenue,
+                services_revenue=rating.services_revenue,
+                products_revenue=rating.products_revenue,
+                avg_check=rating.avg_check,
+                completed_count=rating.completed_count,
+                repeat_visitors_pct=rating.repeat_visitors_pct,
+                new_clients_count=rating.new_clients_count,
+                return_clients_count=rating.return_clients_count,
+                total_clients_count=rating.total_clients_count,
+                client_base_return_pct=rating.client_base_return_pct,
+                rank=rating.rank,
+                total_companies=rating.total_companies,
+                
+                city_avg_revenue=city_avg.get("avg_revenue", 0),
+                city_avg_check=city_avg.get("avg_check", 0),
+                city_avg_repeat_pct=city_avg.get("avg_repeat_visitors_pct", 0),
+                city_company_count=city_avg.get("company_count", 0),
+                
+                similar_avg_revenue=similar_avg.get("avg_revenue", 0),
+                similar_avg_check=similar_avg.get("avg_check", 0),
+                similar_avg_repeat_pct=similar_avg.get("avg_repeat_visitors_pct", 0),
+            )
+            
+            company_metrics.append(metrics)
+        
+        return PartnerAnalytics(
+            partner_id=partner.id,
+            partner_name=partner.full_name,
+            companies=company_metrics,
+        )
+
+
+def format_analytics_for_ai(analytics: PartnerAnalytics) -> str:
+    """
+    Форматировать аналитику партнёра для передачи в AI.
+    
+    Returns:
+        Текст с данными партнёра для контекста AI
+    """
+    if not analytics.companies:
+        return "У партнёра пока нет привязанных салонов."
+    
+    lines = [
+        f"📊 ДАННЫЕ ПАРТНЁРА: {analytics.partner_name}",
+        f"Салонов: {len(analytics.companies)}",
+        f"Общая выручка: {analytics.total_revenue:,.0f} ₽",
+        "",
+    ]
+    
+    for c in analytics.companies:
+        # Определяем статус относительно города
+        revenue_status = "🟢" if c.revenue_vs_city_pct >= 0 else "🔴"
+        check_status = "🟢" if c.check_vs_city_pct >= 0 else "🔴"
+        repeat_status = "🟢" if c.repeat_vs_city_diff >= 0 else "🔴"
+        
+        lines.extend([
+            f"━━━ {c.company_name} ━━━",
+            f"📍 Город: {c.city} ({'миллионник' if c.is_million_city else 'регион'})",
+            f"🏆 Место в сети: {c.rank} из {c.total_companies}",
+            "",
+            f"💰 Выручка: {c.revenue:,.0f} ₽",
+            f"   {revenue_status} vs город: {c.revenue_vs_city_pct:+.1f}% (среднее {c.city_avg_revenue:,.0f} ₽)",
+            "",
+            f"📊 Средний чек: {c.avg_check:,.0f} ₽",
+            f"   {check_status} vs город: {c.check_vs_city_pct:+.1f}% (среднее {c.city_avg_check:,.0f} ₽)",
+            "",
+            f"🔄 Повторные визиты: {c.repeat_visitors_pct:.1f}%",
+            f"   {repeat_status} vs город: {c.repeat_vs_city_diff:+.1f}% (среднее {c.city_avg_repeat_pct:.1f}%)",
+            "",
+            f"👥 Клиенты: {c.new_clients_count} новых, {c.return_clients_count} вернулись",
+            f"📋 Записей: {c.completed_count}",
+            f"💇 Услуги: {c.services_revenue:,.0f} ₽ | 🛍️ Товары: {c.products_revenue:,.0f} ₽",
+            "",
+        ])
+    
+    return "\n".join(lines)
+
+
+def get_partner_issues(analytics: PartnerAnalytics) -> list[str]:
+    """
+    Определить проблемные зоны партнёра.
+    
+    Returns:
+        Список проблем для анализа AI
+    """
+    issues = []
+    
+    for c in analytics.companies:
+        prefix = f"{c.company_name}: "
+        
+        # Выручка ниже среднего
+        if c.revenue_vs_city_pct < -20:
+            issues.append(f"{prefix}Выручка на {abs(c.revenue_vs_city_pct):.0f}% ниже среднего по городу")
+        
+        # Низкий средний чек
+        if c.check_vs_city_pct < -15:
+            issues.append(f"{prefix}Средний чек на {abs(c.check_vs_city_pct):.0f}% ниже среднего")
+        
+        # Мало повторных визитов
+        if c.repeat_visitors_pct < 50:
+            issues.append(f"{prefix}Низкий % повторных визитов ({c.repeat_visitors_pct:.0f}%)")
+        
+        # Низкий возврат базы
+        if c.client_base_return_pct < 10:
+            issues.append(f"{prefix}Низкий возврат клиентской базы ({c.client_base_return_pct:.1f}%)")
+        
+        # Низкий ранг
+        if c.rank > c.total_companies * 0.7:
+            issues.append(f"{prefix}Салон в нижней трети рейтинга ({c.rank} из {c.total_companies})")
+        
+        # Мало продаж товаров
+        if c.revenue > 0 and c.products_revenue / c.revenue < 0.05:
+            issues.append(f"{prefix}Низкая доля товаров в выручке ({c.products_revenue / c.revenue * 100:.1f}%)")
+    
+    return issues
+
+
+def get_partner_strengths(analytics: PartnerAnalytics) -> list[str]:
+    """
+    Определить сильные стороны партнёра.
+    
+    Returns:
+        Список сильных сторон
+    """
+    strengths = []
+    
+    for c in analytics.companies:
+        prefix = f"{c.company_name}: "
+        
+        # Высокая выручка
+        if c.revenue_vs_city_pct > 20:
+            strengths.append(f"{prefix}Выручка на {c.revenue_vs_city_pct:.0f}% выше среднего по городу")
+        
+        # Высокий чек
+        if c.check_vs_city_pct > 15:
+            strengths.append(f"{prefix}Средний чек на {c.check_vs_city_pct:.0f}% выше среднего")
+        
+        # Хороший возврат
+        if c.repeat_visitors_pct >= 65:
+            strengths.append(f"{prefix}Отличный % повторных визитов ({c.repeat_visitors_pct:.0f}%)")
+        
+        # Топ рейтинга
+        if c.rank <= 10:
+            strengths.append(f"{prefix}В топ-10 сети!")
+        elif c.rank <= c.total_companies * 0.2:
+            strengths.append(f"{prefix}В топ-20% сети ({c.rank} место)")
+    
+    return strengths
+
