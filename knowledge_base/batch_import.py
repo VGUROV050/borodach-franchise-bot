@@ -137,8 +137,8 @@ async def process_lesson(
         if not download_video(url, video_path):
             return False
         
-        # Extract audio
-        extracted_audio = await processor.extract_audio(video_path)
+        # Extract audio (sync function)
+        extracted_audio = processor.extract_audio(video_path)
         if not extracted_audio:
             logger.error(f"Failed to extract audio: {title}")
             cleanup_files(video_path)
