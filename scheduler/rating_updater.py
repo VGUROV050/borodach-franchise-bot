@@ -17,22 +17,93 @@ logger = logging.getLogger(__name__)
 _scheduler: AsyncIOScheduler = None
 
 
+async def save_month_to_history(year: int, month: int) -> int:
+    """
+    Получить данные за указанный месяц из YClients и сохранить в историю.
+    Возвращает количество сохранённых записей.
+    """
+    from database.models import NetworkRatingHistory
+    from yclients.client import get_all_companies_metrics
+    from admin.analytics import extract_city_from_name
+    from sqlalchemy import select
+    
+    logger.info(f"Fetching data for {year}-{month:02d} from YClients...")
+    
+    # Проверяем, нет ли уже данных
+    async with AsyncSessionLocal() as db:
+        existing = await db.execute(
+            select(NetworkRatingHistory).where(
+                NetworkRatingHistory.year == year,
+                NetworkRatingHistory.month == month,
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            logger.info(f"History for {year}-{month:02d} already exists, skipping")
+            return 0
+    
+    # Получаем метрики за прошлый месяц НАПРЯМУЮ из YClients
+    metrics = await get_all_companies_metrics(year=year, month=month)
+    
+    if not metrics:
+        logger.warning(f"No data for {year}-{month:02d}")
+        return 0
+    
+    # Фильтруем активные и сортируем
+    active = [m for m in metrics if m["revenue"] > 0]
+    sorted_metrics = sorted(active, key=lambda x: x["revenue"], reverse=True)
+    total_companies = len(sorted_metrics)
+    
+    # Сохраняем в историю
+    count = 0
+    async with AsyncSessionLocal() as db:
+        for i, m in enumerate(sorted_metrics):
+            company_name = m["company_name"]
+            city = extract_city_from_name(company_name)
+            
+            history = NetworkRatingHistory(
+                yclients_company_id=m["company_id"],
+                company_name=company_name,
+                city=city,
+                revenue=m["revenue"],
+                services_revenue=m.get("services_revenue", 0.0),
+                products_revenue=m.get("products_revenue", 0.0),
+                avg_check=m.get("avg_check", 0.0),
+                completed_count=m.get("completed_count", 0),
+                repeat_visitors_pct=m.get("repeat_visitors_pct", 0.0),
+                new_clients_count=m.get("new_clients_count", 0),
+                return_clients_count=m.get("return_clients_count", 0),
+                total_clients_count=m.get("total_clients_count", 0),
+                client_base_return_pct=m.get("client_base_return_pct", 0.0),
+                rank=i + 1,
+                total_companies=total_companies,
+                year=year,
+                month=month,
+            )
+            db.add(history)
+            count += 1
+        
+        await db.commit()
+    
+    logger.info(f"Saved {count} records to history for {year}-{month:02d}")
+    return count
+
+
 async def update_network_rating_job():
     """
     Задача обновления рейтинга сети.
-    Запрашивает выручку всех салонов и сохраняет рейтинг в БД.
+    Запрашивает все метрики салонов и сохраняет в БД.
+    
+    1-го числа месяца: сначала сохраняет историю за ПРОШЛЫЙ месяц,
+    затем обновляет текущий рейтинг.
     """
     logger.info("Starting network rating update job...")
     start_time = datetime.now()
     
     try:
-        # Проверяем, первый ли это день месяца - если да, сохраняем историю
         today = datetime.now(ZoneInfo("Europe/Moscow"))
+        
+        # 1-го числа месяца: сохраняем историю за ПРОШЛЫЙ месяц
         if today.day == 1:
-            # Первый день месяца - сохраняем рейтинг прошлого месяца в историю
-            from database import save_rating_history
-            
-            # Определяем прошлый месяц
             if today.month == 1:
                 prev_year = today.year - 1
                 prev_month = 12
@@ -40,15 +111,13 @@ async def update_network_rating_job():
                 prev_year = today.year
                 prev_month = today.month - 1
             
-            async with AsyncSessionLocal() as db:
-                saved = await save_rating_history(db, prev_year, prev_month)
-                if saved > 0:
-                    logger.info(f"Saved rating history for {prev_year}-{prev_month}")
+            # Получаем данные за прошлый месяц из YClients и сохраняем
+            saved = await save_month_to_history(prev_year, prev_month)
+            logger.info(f"History save complete: {saved} records for {prev_year}-{prev_month:02d}")
         
-        # Получаем previous_rank из истории прошлого месяца
+        # Получаем previous_rank из истории
         from database import get_previous_month_ranks
         
-        # Определяем прошлый месяц для previous_rank
         if today.month == 1:
             prev_year = today.year - 1
             prev_month = 12
@@ -59,24 +128,22 @@ async def update_network_rating_job():
         async with AsyncSessionLocal() as db:
             previous_ranks = await get_previous_month_ranks(db, prev_year, prev_month)
         
-        # Получаем рейтинг всех салонов
+        # Получаем ТЕКУЩИЙ рейтинг (за текущий месяц)
         ranking = await calculate_network_ranking()
         
         if not ranking:
             logger.error("Failed to calculate network ranking - no data received")
             return
         
-        # Получаем информацию о городах для сравнения
         from admin.analytics import extract_city_from_name, is_millionnik
         
-        # Сохраняем в БД с previous_rank и всеми метриками
+        # Сохраняем текущий рейтинг с ВСЕМИ метриками
         async with AsyncSessionLocal() as db:
             for company in ranking:
                 company_id = company["company_id"]
                 company_name = company["company_name"]
                 prev_rank = previous_ranks.get(company_id, 0)
                 
-                # Парсим город из названия
                 city = extract_city_from_name(company_name)
                 is_million_city = is_millionnik(city) if city else False
                 
