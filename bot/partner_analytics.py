@@ -16,6 +16,7 @@ from database.crud import (
     get_similar_cities_average,
     get_company_history_12m,
 )
+from yclients.client import get_smart_period_comparison
 from database.models import NetworkRating, NetworkRatingHistory, YClientsCompany
 
 logger = logging.getLogger(__name__)
@@ -564,6 +565,52 @@ def format_trends_for_ai(trends: CompanyTrends) -> str:
         lines.append("🏆 Рейтинг по месяцам:")
         for period, rank in trends.rank_history[:4]:
             lines.append(f"   {period}: {rank} место")
+    
+    return "\n".join(lines)
+
+
+async def get_realtime_comparison(company_id: str) -> Optional[dict]:
+    """
+    Получить честное сравнение по одинаковым периодам (real-time из YClients).
+    
+    Если сегодня 14 декабря:
+    - Текущий: 1-13 дек
+    - Прошлый: 1-13 ноя
+    - 3 мес назад: 1-13 сен
+    """
+    try:
+        result = await get_smart_period_comparison(company_id)
+        if result.get("success"):
+            return result
+        return None
+    except Exception as e:
+        logger.error(f"Error getting realtime comparison: {e}")
+        return None
+
+
+def format_realtime_comparison_for_ai(comparison: dict, company_name: str) -> str:
+    """Форматировать реалтайм сравнение для AI."""
+    if not comparison or not comparison.get("success"):
+        return ""
+    
+    lines = [
+        f"📊 АКТУАЛЬНОЕ СРАВНЕНИЕ: {company_name}",
+        f"   Период: {comparison['period_label']} ({comparison['period_days']} дней)",
+        "",
+        f"💰 Выручка за период:",
+        f"   Текущий: {comparison['current']['revenue']:,.0f} ₽",
+        f"   Прошлый месяц (тот же период): {comparison['prev_month']['revenue']:,.0f} ₽",
+        f"   3 мес назад (тот же период): {comparison['months_ago_3']['revenue']:,.0f} ₽",
+        "",
+        f"📈 Изменение:",
+        f"   vs прошлый месяц: {comparison['change_1m_pct']:+.1f}%",
+        f"   vs 3 мес назад: {comparison['change_3m_pct']:+.1f}%",
+        "",
+        f"📋 Записей:",
+        f"   Текущий: {comparison['current']['completed_count']}",
+        f"   Прошлый месяц: {comparison['prev_month']['completed_count']}",
+        "",
+    ]
     
     return "\n".join(lines)
 

@@ -298,6 +298,119 @@ async def get_period_revenue(company_id: str, date_from: str, date_to: str) -> d
         }
 
 
+async def get_smart_period_comparison(company_id: str) -> dict:
+    """
+    Получить умное сравнение по одинаковым периодам.
+    
+    Если сегодня 14 декабря, сравниваем:
+    - Текущий: 1-13 дек (вчерашний день - конец периода)
+    - Прошлый месяц: 1-13 ноя
+    - 3 месяца назад: 1-13 сен
+    
+    Returns:
+        {
+            "success": True/False,
+            "period_days": int,  # Кол-во дней в периоде
+            "period_label": str,  # "1-13 декабря"
+            "current": {"revenue": float, "completed_count": int},
+            "prev_month": {"revenue": float, "completed_count": int},
+            "months_ago_3": {"revenue": float, "completed_count": int},
+            "change_1m_pct": float,
+            "change_3m_pct": float,
+        }
+    """
+    from datetime import datetime, timedelta
+    from dateutil.relativedelta import relativedelta
+    
+    today = datetime.now()
+    yesterday = today - timedelta(days=1)
+    
+    # Если 1-е число, берём данные за весь прошлый месяц
+    if today.day == 1:
+        # За прошлый месяц
+        end_date = yesterday
+        start_date = (end_date.replace(day=1))
+    else:
+        # С 1-го числа по вчера
+        start_date = today.replace(day=1)
+        end_date = yesterday
+    
+    period_days = (end_date - start_date).days + 1
+    period_label = f"{start_date.day}-{end_date.day} {_get_month_name(today.month)}"
+    
+    # Формируем даты для всех периодов
+    current_from = start_date.strftime("%Y-%m-%d")
+    current_to = end_date.strftime("%Y-%m-%d")
+    
+    # Прошлый месяц (тот же период)
+    prev_start = start_date - relativedelta(months=1)
+    prev_end = prev_start + timedelta(days=period_days - 1)
+    prev_from = prev_start.strftime("%Y-%m-%d")
+    prev_to = prev_end.strftime("%Y-%m-%d")
+    
+    # 3 месяца назад
+    m3_start = start_date - relativedelta(months=3)
+    m3_end = m3_start + timedelta(days=period_days - 1)
+    m3_from = m3_start.strftime("%Y-%m-%d")
+    m3_to = m3_end.strftime("%Y-%m-%d")
+    
+    logger.info(f"Smart comparison for {company_id}: current={current_from}..{current_to}, prev={prev_from}..{prev_to}, m3={m3_from}..{m3_to}")
+    
+    # Запрашиваем данные параллельно
+    import asyncio
+    
+    results = await asyncio.gather(
+        get_period_revenue(company_id, current_from, current_to),
+        get_period_revenue(company_id, prev_from, prev_to),
+        get_period_revenue(company_id, m3_from, m3_to),
+        return_exceptions=True,
+    )
+    
+    current_data, prev_data, m3_data = results
+    
+    # Проверяем ошибки
+    if isinstance(current_data, Exception) or not current_data.get("success"):
+        return {"success": False, "error": "Не удалось получить текущие данные"}
+    
+    # Формируем результат
+    current_revenue = current_data.get("revenue", 0)
+    prev_revenue = prev_data.get("revenue", 0) if isinstance(prev_data, dict) and prev_data.get("success") else 0
+    m3_revenue = m3_data.get("revenue", 0) if isinstance(m3_data, dict) and m3_data.get("success") else 0
+    
+    change_1m = round((current_revenue / prev_revenue - 1) * 100, 1) if prev_revenue > 0 else 0
+    change_3m = round((current_revenue / m3_revenue - 1) * 100, 1) if m3_revenue > 0 else 0
+    
+    return {
+        "success": True,
+        "period_days": period_days,
+        "period_label": period_label,
+        "current": {
+            "revenue": current_revenue,
+            "completed_count": current_data.get("completed_count", 0),
+        },
+        "prev_month": {
+            "revenue": prev_revenue,
+            "completed_count": prev_data.get("completed_count", 0) if isinstance(prev_data, dict) else 0,
+        },
+        "months_ago_3": {
+            "revenue": m3_revenue,
+            "completed_count": m3_data.get("completed_count", 0) if isinstance(m3_data, dict) else 0,
+        },
+        "change_1m_pct": change_1m,
+        "change_3m_pct": change_3m,
+    }
+
+
+def _get_month_name(month: int) -> str:
+    """Получить название месяца в родительном падеже."""
+    names = {
+        1: "января", 2: "февраля", 3: "марта", 4: "апреля",
+        5: "мая", 6: "июня", 7: "июля", 8: "августа",
+        9: "сентября", 10: "октября", 11: "ноября", 12: "декабря"
+    }
+    return names.get(month, str(month))
+
+
 @api_retry(max_attempts=3, min_wait=2, max_wait=15)
 async def get_chain_companies(chain_id: str = None) -> list[dict]:
     """

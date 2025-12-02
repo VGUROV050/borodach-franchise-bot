@@ -126,6 +126,8 @@ async def get_smart_answer(
             get_company_trends,
             format_trends_for_ai,
             get_trend_insights,
+            get_realtime_comparison,
+            format_realtime_comparison_for_ai,
         )
         
         analytics = await get_partner_analytics(telegram_id)
@@ -156,6 +158,12 @@ async def get_smart_answer(
             
             for company in analytics.companies:
                 try:
+                    # Получаем актуальное сравнение по одинаковым периодам (real-time)
+                    realtime = await get_realtime_comparison(company.company_id)
+                    if realtime:
+                        trends_context += "\n" + format_realtime_comparison_for_ai(realtime, company.company_name)
+                    
+                    # Также получаем исторические тренды
                     trends = await get_company_trends(company.company_id, company)
                     if trends:
                         trends_context += "\n" + format_trends_for_ai(trends)
