@@ -31,6 +31,90 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# Промпт для генерации саммари
+SUMMARY_PROMPT = """На основе транскрипта видеоурока напиши КРАТКОЕ СОДЕРЖАНИЕ (3-5 предложений):
+1. Основная тема урока
+2. Ключевые понятия (через запятую)
+3. Практическая польза для франчайзи барбершопа
+
+Пиши кратко и информативно!"""
+
+
+async def generate_lesson_summary(session, lesson, chunks: list, processor) -> bool:
+    """Generate summary for a lesson and save as special chunk."""
+    import json
+    from openai import AsyncOpenAI
+    from config.settings import OPENAI_API_KEY
+    from database.models import KnowledgeChunk
+    from sqlalchemy import select
+    
+    if not OPENAI_API_KEY:
+        logger.warning("OpenAI API key not configured, skipping summary")
+        return False
+    
+    try:
+        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        
+        # Concatenate all chunk texts
+        full_text = " ".join([c["text"] for c in chunks])[:16000]
+        
+        # Generate summary
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SUMMARY_PROMPT},
+                {"role": "user", "content": f"Урок: {lesson.title}\n\nТранскрипт:\n{full_text}"}
+            ],
+            max_tokens=300,
+            temperature=0.3,
+        )
+        
+        summary = response.choices[0].message.content.strip()
+        tokens = response.usage.total_tokens if response.usage else "?"
+        logger.info(f"  ✅ Summary generated ({tokens} tokens)")
+        
+        # Save summary to lesson
+        lesson.summary = summary
+        
+        # Create summary chunk text
+        summary_text = f"📋 КРАТКОЕ СОДЕРЖАНИЕ УРОКА: {lesson.title}\n\n{summary}"
+        
+        # Create embedding for summary
+        embedding = await processor.create_embedding(summary_text)
+        embedding_json = json.dumps(embedding) if embedding else None
+        
+        # Check if summary chunk exists
+        existing = await session.execute(
+            select(KnowledgeChunk).where(
+                KnowledgeChunk.lesson_id == lesson.id,
+                KnowledgeChunk.chunk_index == -1
+            )
+        )
+        existing_chunk = existing.scalar_one_or_none()
+        
+        if existing_chunk:
+            existing_chunk.text = summary_text
+            existing_chunk.embedding_json = embedding_json
+            logger.info("  🔄 Updated summary chunk")
+        else:
+            summary_chunk = KnowledgeChunk(
+                lesson_id=lesson.id,
+                text=summary_text,
+                start_time=0,
+                end_time=0,
+                chunk_index=-1,
+                embedding_json=embedding_json,
+            )
+            session.add(summary_chunk)
+            logger.info("  ➕ Created summary chunk")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"  ❌ Failed to generate summary: {e}")
+        return False
+
+
 async def import_module(module_title: str, videos_path: Path, create_embeddings: bool = True):
     """
     Import a module with all its videos.
@@ -299,6 +383,11 @@ async def import_single_lesson(module_title: str, videos_path: Path, lesson_file
         
         if embeddings:
             await mark_lesson_embedded(session, lesson_id=lesson.id)
+        
+        # Generate summary for better RAG search
+        if create_embeddings and result["chunks"]:
+            logger.info("Generating lesson summary...")
+            await generate_lesson_summary(session, lesson, result["chunks"], processor)
         
         await session.commit()
         
