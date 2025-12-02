@@ -744,6 +744,9 @@ class KnowledgeLesson(Base):
     is_transcribed: Mapped[bool] = mapped_column(Boolean, default=False)
     is_embedded: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # Краткое содержание урока (для улучшения RAG)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
