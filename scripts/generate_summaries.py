@@ -143,10 +143,13 @@ async def process_lesson(db, lesson: KnowledgeLesson, force: bool = False) -> bo
     summary_text = f"📋 КРАТКОЕ СОДЕРЖАНИЕ УРОКА: {lesson.title}\n\n{summary}"
     embedding = await create_summary_embedding(summary_text)
     
+    import json
+    embedding_json = json.dumps(embedding) if embedding else None
+    
     if existing_chunk:
         existing_chunk.text = summary_text
-        if embedding:
-            existing_chunk.embedding = embedding
+        if embedding_json:
+            existing_chunk.embedding_json = embedding_json
         logger.info(f"  🔄 Updated existing summary chunk")
     else:
         # Create new summary chunk with index -1 (before regular chunks)
@@ -156,7 +159,7 @@ async def process_lesson(db, lesson: KnowledgeLesson, force: bool = False) -> bo
             start_time=0,
             end_time=0,
             chunk_index=-1,  # Special index for summary
-            embedding=embedding,
+            embedding_json=embedding_json,
         )
         db.add(summary_chunk)
         logger.info(f"  ➕ Created new summary chunk")
