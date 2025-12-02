@@ -129,7 +129,7 @@ class KnowledgeRAG:
             return None
         
         # Search for relevant chunks
-        chunks = await self.search(question, limit=3)
+        chunks = await self.search(question, limit=5)
         
         if not chunks:
             return None

@@ -179,11 +179,12 @@ async def get_smart_answer(
             
             stats = await get_knowledge_stats()
             if stats["embedded_count"] > 0:
-                chunks = await knowledge_rag.search(user_message, limit=5)
+                chunks = await knowledge_rag.search(user_message, limit=8)
                 if chunks:
                     kb_context = "\n📚 ИНФОРМАЦИЯ ИЗ БАЗЫ ЗНАНИЙ:\n"
                     for chunk in chunks:
-                        kb_context += f"\n[{chunk.get('lesson_title', 'Урок')}]\n{chunk.get('text', '')[:500]}\n"
+                        # Берём больше текста для лучшего контекста
+                        kb_context += f"\n[{chunk.get('lesson_title', 'Урок')}]\n{chunk.get('text', '')[:800]}\n"
         except Exception as e:
             logger.warning(f"KB search error: {e}")
         
