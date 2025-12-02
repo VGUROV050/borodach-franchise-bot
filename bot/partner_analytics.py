@@ -405,9 +405,62 @@ async def get_company_trends(yclients_id: str, current_metrics: CompanyMetrics) 
                 return h
         return None
     
-    prev_month = get_history_for_months_ago(1)
-    months_3 = get_history_for_months_ago(3)
-    months_6 = get_history_for_months_ago(6)
+    # Если в начале месяца (первые 7 дней) — используем прошлый месяц как "текущий"
+    # чтобы не сравнивать неполный месяц с полным
+    use_previous_as_current = now.day <= 7
+    
+    if use_previous_as_current:
+        # Сдвигаем все периоды на 1 месяц назад
+        prev_month = get_history_for_months_ago(1)  # Это будет "текущий"
+        months_2 = get_history_for_months_ago(2)    # Это будет "прошлый"
+        months_4 = get_history_for_months_ago(4)    # 3 месяца назад от "текущего"
+        months_7 = get_history_for_months_ago(7)    # 6 месяцев назад от "текущего"
+        
+        # Используем данные из истории
+        current_revenue = prev_month.revenue if prev_month else 0
+        current_avg_check = prev_month.avg_check if prev_month else 0
+        current_completed = float(prev_month.completed_count) if prev_month else 0
+        current_repeat_pct = prev_month.repeat_visitors_pct if prev_month else 0
+        
+        prev_revenue = months_2.revenue if months_2 else 0
+        prev_avg_check = months_2.avg_check if months_2 else 0
+        prev_completed = float(months_2.completed_count) if months_2 else 0
+        prev_repeat_pct = months_2.repeat_visitors_pct if months_2 else 0
+        
+        m3_revenue = months_4.revenue if months_4 else 0
+        m3_avg_check = months_4.avg_check if months_4 else 0
+        m3_completed = float(months_4.completed_count) if months_4 else 0
+        m3_repeat_pct = months_4.repeat_visitors_pct if months_4 else 0
+        
+        m6_revenue = months_7.revenue if months_7 else 0
+        m6_avg_check = months_7.avg_check if months_7 else 0
+        m6_completed = float(months_7.completed_count) if months_7 else 0
+        m6_repeat_pct = months_7.repeat_visitors_pct if months_7 else 0
+    else:
+        # Обычная логика — используем текущие метрики
+        prev_month = get_history_for_months_ago(1)
+        months_3 = get_history_for_months_ago(3)
+        months_6 = get_history_for_months_ago(6)
+        
+        current_revenue = current_metrics.revenue
+        current_avg_check = current_metrics.avg_check
+        current_completed = float(current_metrics.completed_count)
+        current_repeat_pct = current_metrics.repeat_visitors_pct
+        
+        prev_revenue = prev_month.revenue if prev_month else 0
+        prev_avg_check = prev_month.avg_check if prev_month else 0
+        prev_completed = float(prev_month.completed_count) if prev_month else 0
+        prev_repeat_pct = prev_month.repeat_visitors_pct if prev_month else 0
+        
+        m3_revenue = months_3.revenue if months_3 else 0
+        m3_avg_check = months_3.avg_check if months_3 else 0
+        m3_completed = float(months_3.completed_count) if months_3 else 0
+        m3_repeat_pct = months_3.repeat_visitors_pct if months_3 else 0
+        
+        m6_revenue = months_6.revenue if months_6 else 0
+        m6_avg_check = months_6.avg_check if months_6 else 0
+        m6_completed = float(months_6.completed_count) if months_6 else 0
+        m6_repeat_pct = months_6.repeat_visitors_pct if months_6 else 0
     
     # Формируем тренды
     trends = CompanyTrends(
@@ -417,34 +470,34 @@ async def get_company_trends(yclients_id: str, current_metrics: CompanyMetrics) 
     
     # Выручка
     trends.revenue = TrendData(
-        current=current_metrics.revenue,
-        previous=prev_month.revenue if prev_month else 0,
-        months_ago_3=months_3.revenue if months_3 else 0,
-        months_ago_6=months_6.revenue if months_6 else 0,
+        current=current_revenue,
+        previous=prev_revenue,
+        months_ago_3=m3_revenue,
+        months_ago_6=m6_revenue,
     )
     
     # Средний чек
     trends.avg_check = TrendData(
-        current=current_metrics.avg_check,
-        previous=prev_month.avg_check if prev_month else 0,
-        months_ago_3=months_3.avg_check if months_3 else 0,
-        months_ago_6=months_6.avg_check if months_6 else 0,
+        current=current_avg_check,
+        previous=prev_avg_check,
+        months_ago_3=m3_avg_check,
+        months_ago_6=m6_avg_check,
     )
     
     # Записи
     trends.completed_count = TrendData(
-        current=float(current_metrics.completed_count),
-        previous=float(prev_month.completed_count) if prev_month else 0,
-        months_ago_3=float(months_3.completed_count) if months_3 else 0,
-        months_ago_6=float(months_6.completed_count) if months_6 else 0,
+        current=current_completed,
+        previous=prev_completed,
+        months_ago_3=m3_completed,
+        months_ago_6=m6_completed,
     )
     
     # Повторные визиты
     trends.repeat_visitors_pct = TrendData(
-        current=current_metrics.repeat_visitors_pct,
-        previous=prev_month.repeat_visitors_pct if prev_month else 0,
-        months_ago_3=months_3.repeat_visitors_pct if months_3 else 0,
-        months_ago_6=months_6.repeat_visitors_pct if months_6 else 0,
+        current=current_repeat_pct,
+        previous=prev_repeat_pct,
+        months_ago_3=m3_repeat_pct,
+        months_ago_6=m6_repeat_pct,
     )
     
     # Возврат базы
@@ -468,8 +521,17 @@ def format_trends_for_ai(trends: CompanyTrends) -> str:
     """
     Форматировать тренды для AI-контекста.
     """
+    from datetime import datetime
+    now = datetime.now()
+    
+    # Если в начале месяца — указываем что данные за прошлый месяц
+    if now.day <= 7:
+        period_note = "(данные за прошлый месяц, т.к. текущий только начался)"
+    else:
+        period_note = ""
+    
     lines = [
-        f"📈 ДИНАМИКА: {trends.company_name}",
+        f"📈 ДИНАМИКА: {trends.company_name} {period_note}",
         "",
     ]
     
