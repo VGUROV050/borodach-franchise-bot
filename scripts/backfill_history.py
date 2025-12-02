@@ -33,19 +33,7 @@ async def fetch_and_save_month(year: int, month: int) -> int:
     """
     logger.info(f"📅 Загружаем данные за {year}-{month:02d}...")
     
-    # Проверяем, нет ли уже данных за этот месяц
-    async with AsyncSessionLocal() as db:
-        existing = await db.execute(
-            select(NetworkRatingHistory).where(
-                NetworkRatingHistory.year == year,
-                NetworkRatingHistory.month == month,
-            ).limit(1)
-        )
-        if existing.scalar_one_or_none():
-            logger.info(f"   ⏭️  Данные за {year}-{month:02d} уже есть, пропускаем")
-            return 0
-    
-    # Получаем метрики за месяц
+    # Сначала получаем метрики (до открытия транзакции)
     metrics = await get_all_companies_metrics(year=year, month=month)
     
     if not metrics:
@@ -59,9 +47,21 @@ async def fetch_and_save_month(year: int, month: int) -> int:
     sorted_metrics = sorted(active, key=lambda x: x["revenue"], reverse=True)
     total_companies = len(sorted_metrics)
     
-    # Сохраняем в историю
+    # Проверка и вставка в ОДНОЙ транзакции (атомарно)
     count = 0
     async with AsyncSessionLocal() as db:
+        # Проверяем, нет ли уже данных за этот месяц
+        existing = await db.execute(
+            select(NetworkRatingHistory).where(
+                NetworkRatingHistory.year == year,
+                NetworkRatingHistory.month == month,
+            ).limit(1)
+        )
+        if existing.scalar_one_or_none():
+            logger.info(f"   ⏭️  Данные за {year}-{month:02d} уже есть, пропускаем")
+            return 0
+        
+        # Данных нет — вставляем (в той же транзакции)
         for i, m in enumerate(sorted_metrics):
             company_name = m["company_name"]
             city = extract_city_from_name(company_name)
