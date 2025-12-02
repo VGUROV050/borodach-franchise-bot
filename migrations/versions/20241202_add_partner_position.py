@@ -1,12 +1,15 @@
-"""Add is_owner and position fields to partners
+"""Add is_owner and position fields to partners table
 
 Revision ID: 20241202_position
 Revises: 20241201_add_client_stats
 Create Date: 2024-12-02
+
 """
 from alembic import op
 import sqlalchemy as sa
 
+
+# revision identifiers, used by Alembic.
 revision = '20241202_position'
 down_revision = '20241201_add_client_stats'
 branch_labels = None
@@ -14,6 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Add is_owner and position columns to partners table
     op.add_column('partners', sa.Column('is_owner', sa.Boolean(), server_default='true', nullable=False))
     op.add_column('partners', sa.Column('position', sa.String(length=100), nullable=True))
 
@@ -21,4 +25,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column('partners', 'position')
     op.drop_column('partners', 'is_owner')
-
