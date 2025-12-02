@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers
 revision = 'extend_rating_001'
-down_revision = None
+down_revision = '741c5006b13b'
 branch_labels = None
 depends_on = None
 
