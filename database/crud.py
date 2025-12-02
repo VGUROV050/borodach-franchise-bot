@@ -66,6 +66,8 @@ async def create_partner(
     telegram_first_name: Optional[str] = None,
     telegram_last_name: Optional[str] = None,
     branches_text: Optional[str] = None,
+    is_owner: bool = True,
+    position: Optional[str] = None,
 ) -> Partner:
     """Создать нового партнёра."""
     partner = Partner(
@@ -77,6 +79,8 @@ async def create_partner(
         phone=phone,
         branches_text=branches_text,
         status=PartnerStatus.PENDING,
+        is_owner=is_owner,
+        position=position,
     )
     
     db.add(partner)

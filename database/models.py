@@ -64,6 +64,10 @@ class Partner(Base):
     # Флаг: есть ли запрос на добавление филиала
     has_pending_branch: Mapped[bool] = mapped_column(Boolean, default=False)
     
+    # Роль в барбершопе
+    is_owner: Mapped[bool] = mapped_column(Boolean, default=True)  # Владелец или сотрудник
+    position: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # Должность (если не владелец)
+    
     # Временные метки
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

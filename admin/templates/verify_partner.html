@@ -76,6 +76,16 @@
                     <td class="text-muted">Дата заявки:</td>
                     <td>{{ partner.created_at.strftime('%d.%m.%Y %H:%M') if partner.created_at else '—' }}</td>
                 </tr>
+                <tr>
+                    <td class="text-muted">Должность:</td>
+                    <td>
+                        {% if partner.is_owner %}
+                        <span class="badge badge-success">👑 Владелец</span>
+                        {% else %}
+                        <span class="badge badge-info">👤 {{ partner.position or 'Сотрудник' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
             </table>
             
             {% if partner.branches_text %}

@@ -64,6 +64,7 @@
             <tr>
                 <th style="width: 50px;">ID</th>
                 <th>ФИО</th>
+                <th>Должность</th>
                 <th>Телефон</th>
                 <th>Telegram</th>
                 <th style="width: 130px; text-align: center;">Статус</th>
@@ -77,6 +78,13 @@
             <tr>
                 <td>{{ partner.id }}</td>
                 <td>{{ partner.full_name }}</td>
+                <td style="font-size: 0.85rem;">
+                    {% if partner.is_owner %}
+                    <span style="color: #d97706;">👑 Владелец</span>
+                    {% else %}
+                    <span style="color: #6b7280;">👤 {{ partner.position or 'Сотрудник' }}</span>
+                    {% endif %}
+                </td>
                 <td>{{ partner.phone or '—' }}</td>
                 <td>@{{ partner.telegram_username or '—' }}</td>
                 <td style="text-align: center;">

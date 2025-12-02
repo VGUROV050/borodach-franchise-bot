@@ -89,7 +89,36 @@
                     <td class="text-muted" style="padding: 0.5rem 0;">Верификация:</td>
                     <td style="padding: 0.5rem 0;">{{ partner.verified_at.strftime('%d.%m.%Y %H:%M') if partner.verified_at else '—' }}</td>
                 </tr>
+                <tr>
+                    <td class="text-muted" style="padding: 0.5rem 0;">Роль:</td>
+                    <td style="padding: 0.5rem 0;">
+                        {% if partner.is_owner %}
+                        <span class="badge badge-success">👑 Владелец</span>
+                        {% else %}
+                        <span class="badge badge-info">👤 {{ partner.position or 'Сотрудник' }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
             </table>
+            
+            <!-- Редактирование должности -->
+            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-main); border-radius: 8px;">
+                <strong class="text-muted">👔 Изменить должность:</strong>
+                <form method="post" action="/partners/{{ partner.id }}/update-position" style="margin-top: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" name="is_owner" value="1" {% if partner.is_owner %}checked{% endif %}
+                                   onchange="document.getElementById('positionField').style.display = this.checked ? 'none' : 'flex';">
+                            Владелец
+                        </label>
+                    </div>
+                    <div id="positionField" style="display: {% if partner.is_owner %}none{% else %}flex{% endif %}; gap: 0.5rem; align-items: center;">
+                        <input type="text" name="position" value="{{ partner.position or '' }}" 
+                               class="form-input" placeholder="Управляющий, Администратор..." style="flex: 1;">
+                    </div>
+                    <button type="submit" class="btn btn-sm mt-1">💾 Сохранить должность</button>
+                </form>
+            </div>
             
             {% if partner.branches_text %}
             <div style="margin-top: 1rem;">

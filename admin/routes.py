@@ -607,6 +607,41 @@ async def edit_partner(
     return RedirectResponse(url="/partners?updated=1", status_code=302)
 
 
+@router.post("/partners/{partner_id}/update-position")
+async def update_partner_position(
+    request: Request,
+    partner_id: int,
+    is_owner: str = Form(default=None),
+    position: str = Form(default=""),
+):
+    """Обновить должность партнёра."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from sqlalchemy import select
+    from database.models import Partner
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Partner).where(Partner.id == partner_id))
+        partner = result.scalar_one_or_none()
+        
+        if not partner:
+            raise HTTPException(status_code=404, detail="Партнёр не найден")
+        
+        # Определяем, владелец ли (чекбокс отправляет "1" если выбран)
+        partner.is_owner = is_owner == "1"
+        
+        if partner.is_owner:
+            partner.position = "Владелец"
+        else:
+            partner.position = position.strip() if position.strip() else "Сотрудник"
+        
+        await db.commit()
+    
+    logger.info(f"Partner {partner_id} position updated: is_owner={partner.is_owner}, position={partner.position}")
+    return RedirectResponse(url=f"/partners/{partner_id}/edit", status_code=302)
+
+
 @router.post("/partners/{partner_id}/delete")
 async def delete_partner(
     request: Request,

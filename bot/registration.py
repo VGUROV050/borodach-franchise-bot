@@ -27,6 +27,13 @@ class RegistrationStates(StatesGroup):
     waiting_for_full_name = State()
     waiting_for_barbershop = State()
     waiting_for_more_barbershops = State()
+    waiting_for_is_owner = State()  # Вы владелец?
+    waiting_for_position = State()  # Какая должность?
+
+
+# Кнопки для вопроса о владельце
+BTN_YES_OWNER = "✅ Да, я владелец"
+BTN_NO_NOT_OWNER = "👤 Нет, я сотрудник"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -238,7 +245,102 @@ async def registration_add_more(message: types.Message, state: FSMContext) -> No
 
 
 @router.message(RegistrationStates.waiting_for_more_barbershops, F.text == BTN_FINISH_REGISTRATION)
-async def registration_finish(message: types.Message, state: FSMContext) -> None:
+async def registration_ask_owner(message: types.Message, state: FSMContext) -> None:
+    """После барбершопов — спрашиваем, владелец ли пользователь."""
+    await state.set_state(RegistrationStates.waiting_for_is_owner)
+    
+    await message.answer(
+        "👤 <b>Вы владелец барбершопа?</b>\n\n"
+        "Выберите ответ ниже:",
+        reply_markup=owner_question_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 5: Вы владелец?
+# ═══════════════════════════════════════════════════════════════════
+
+def owner_question_keyboard() -> types.ReplyKeyboardMarkup:
+    """Клавиатура для вопроса о владельце."""
+    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_YES_OWNER), KeyboardButton(text=BTN_NO_NOT_OWNER)],
+        ],
+        resize_keyboard=True,
+    )
+
+
+@router.message(RegistrationStates.waiting_for_is_owner, F.text == BTN_YES_OWNER)
+async def registration_is_owner_yes(message: types.Message, state: FSMContext) -> None:
+    """Пользователь — владелец → завершаем регистрацию."""
+    await state.update_data(is_owner=True, position="Владелец")
+    await _complete_registration(message, state)
+
+
+@router.message(RegistrationStates.waiting_for_is_owner, F.text == BTN_NO_NOT_OWNER)
+async def registration_is_owner_no(message: types.Message, state: FSMContext) -> None:
+    """Пользователь не владелец → спрашиваем должность."""
+    await state.update_data(is_owner=False)
+    await state.set_state(RegistrationStates.waiting_for_position)
+    
+    await message.answer(
+        "👔 <b>Укажите вашу должность</b>\n\n"
+        "Например:\n"
+        "• Управляющий\n"
+        "• Администратор\n"
+        "• Старший барбер",
+        reply_markup=cancel_registration_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_is_owner)
+async def registration_is_owner_invalid(message: types.Message, state: FSMContext) -> None:
+    """Неверный выбор — ждём кнопку."""
+    await message.answer(
+        "⚠️ Пожалуйста, выберите один из вариантов:",
+        reply_markup=owner_question_keyboard(),
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Шаг 6: Должность (если не владелец)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(RegistrationStates.waiting_for_position, F.text == BTN_CANCEL_REGISTRATION)
+async def registration_position_cancel(message: types.Message, state: FSMContext) -> None:
+    """Отмена на этапе должности."""
+    await state.clear()
+    await message.answer(
+        "❌ Регистрация отменена.",
+        reply_markup=registration_start_keyboard(),
+    )
+
+
+@router.message(RegistrationStates.waiting_for_position, F.text)
+async def registration_position(message: types.Message, state: FSMContext) -> None:
+    """Получили должность → завершаем регистрацию."""
+    if message.text == BTN_CANCEL_REGISTRATION:
+        return
+    
+    position = message.text.strip()
+    
+    if len(position) < 2:
+        await message.answer(
+            "⚠️ Пожалуйста, укажите должность:",
+            reply_markup=cancel_registration_keyboard(),
+        )
+        return
+    
+    await state.update_data(position=position)
+    await _complete_registration(message, state)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Завершение регистрации
+# ═══════════════════════════════════════════════════════════════════
+
+async def _complete_registration(message: types.Message, state: FSMContext) -> None:
     """Завершение регистрации — сохраняем в БД."""
     data = await state.get_data()
     
@@ -246,6 +348,8 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
     full_name = data.get("full_name")
     phone = data.get("phone")
     barbershops = data.get("barbershops", [])
+    is_owner = data.get("is_owner", True)
+    position = data.get("position")
     
     # Формируем текст барбершопов для сохранения
     branches_text = "\n".join(barbershops) if barbershops else None
@@ -263,15 +367,19 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
                 full_name=full_name,
                 phone=phone,
                 branches_text=branches_text,
+                is_owner=is_owner,
+                position=position,
             )
         
         barbershops_list = "\n".join([f"  • {b}" for b in barbershops])
+        position_text = "Владелец" if is_owner else position
         
         await processing_msg.edit_text(
             "✅ <b>Заявка на регистрацию отправлена!</b>\n\n"
             f"👤 ФИО: {full_name}\n"
             f"📱 Телефон: {phone}\n"
-            f"💈 Барбершопы:\n{barbershops_list}\n\n"
+            f"💈 Барбершопы:\n{barbershops_list}\n"
+            f"👔 Должность: {position_text}\n\n"
             "⏳ Ваша заявка будет рассмотрена администратором.\n"
             "Мы уведомим вас о результате.",
         )
@@ -283,7 +391,7 @@ async def registration_finish(message: types.Message, state: FSMContext) -> None
             reply_markup=pending_verification_keyboard(),
         )
         
-        logger.info(f"New partner registration: {user.id} ({full_name}), barbershops: {barbershops}")
+        logger.info(f"New partner registration: {user.id} ({full_name}), barbershops: {barbershops}, position: {position_text}")
         
     except Exception as e:
         logger.error(f"Failed to create partner: {e}")
