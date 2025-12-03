@@ -33,12 +33,19 @@ class VideoProcessor:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
         
-    def extract_audio(self, video_path: Path) -> Optional[Path]:
+    def extract_audio(self, video_path: Path, output_name: Optional[str] = None) -> Optional[Path]:
         """
         Extract audio from video using ffmpeg.
+        
+        Args:
+            video_path: Path to video file
+            output_name: Optional custom name for audio file (without extension)
+                        If not provided, uses video filename
+        
         Returns path to audio file or None on error.
         """
-        audio_path = AUDIO_DIR / f"{video_path.stem}.mp3"
+        audio_filename = output_name if output_name else video_path.stem
+        audio_path = AUDIO_DIR / f"{audio_filename}.mp3"
         
         if audio_path.exists():
             logger.info(f"Audio already exists: {audio_path}")
@@ -325,15 +332,33 @@ class VideoProcessor:
             logger.error(f"Error creating embedding: {e}")
             return None
     
-    async def process_video(self, video_path: Path) -> Optional[dict]:
+    async def process_video(
+        self, 
+        video_path: Path, 
+        module_num: Optional[int] = None,
+        lesson_num: Optional[int] = None
+    ) -> Optional[dict]:
         """
         Full pipeline: extract audio -> transcribe -> chunk.
+        
+        Args:
+            video_path: Path to video file
+            module_num: Module number for naming (e.g., 7 for "module7_lesson3")
+            lesson_num: Lesson number for naming
+        
         Returns processed data or None on error.
         """
         logger.info(f"Processing video: {video_path.name}")
         
+        # Generate standardized filename if module/lesson provided
+        if module_num is not None and lesson_num is not None:
+            output_name = f"module{module_num}_lesson{lesson_num}"
+            logger.info(f"Using standardized name: {output_name}")
+        else:
+            output_name = None
+        
         # Step 1: Extract audio
-        audio_path = self.extract_audio(video_path)
+        audio_path = self.extract_audio(video_path, output_name=output_name)
         if not audio_path:
             return None
         

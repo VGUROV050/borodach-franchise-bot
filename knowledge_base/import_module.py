@@ -305,6 +305,7 @@ async def import_single_lesson(module_title: str, videos_path: Path, lesson_file
     metadata_path = videos_path / "metadata.json"
     lessons_meta = {}
     actual_module_title = module_title
+    module_num = None
     
     if metadata_path.exists():
         try:
@@ -312,20 +313,34 @@ async def import_single_lesson(module_title: str, videos_path: Path, lesson_file
                 metadata = json.load(f)
             if "module_title" in metadata:
                 actual_module_title = metadata["module_title"]
+            if "module_num" in metadata:
+                module_num = int(metadata["module_num"])
             if "lessons" in metadata:
                 lessons_meta = metadata["lessons"]
             logger.info(f"Loaded metadata: {actual_module_title}")
         except Exception as e:
             logger.warning(f"Failed to load metadata: {e}")
     
+    # Try to extract module number from folder name if not in metadata
+    if module_num is None:
+        folder_match = re.search(r'module(\d+)', videos_path.name, re.IGNORECASE)
+        if folder_match:
+            module_num = int(folder_match.group(1))
+            logger.info(f"Extracted module number from folder: {module_num}")
+    
     # Get lesson number and title
     lesson_num_match = re.search(r'(\d+)', lesson_file.stem)
     lesson_num = lesson_num_match.group(1) if lesson_num_match else "1"
+    lesson_num_int = int(lesson_num)
     
     if lesson_num in lessons_meta:
         lesson_title = lessons_meta[lesson_num]
     else:
         lesson_title = lesson_file.stem.replace("_", " ").title()
+    
+    # Create proper lesson title with module and lesson numbers
+    if module_num and not lesson_title.startswith("Модуль"):
+        lesson_title = f"Модуль {module_num}, Урок {lesson_num}: {lesson_title}"
     
     logger.info(f"Processing: {lesson_title}")
     
@@ -337,20 +352,30 @@ async def import_single_lesson(module_title: str, videos_path: Path, lesson_file
             session,
             title=actual_module_title,
             description=f"Модуль из {videos_path.name}",
-            order=0
+            order=module_num - 1 if module_num else 0
         )
+        
+        # Standardized video filename
+        if module_num:
+            standard_video_filename = f"module{module_num}_lesson{lesson_num}.mp4"
+        else:
+            standard_video_filename = lesson_file.name
         
         # Get or create lesson
         lesson = await get_or_create_lesson(
             session,
             module_id=module.id,
             title=lesson_title,
-            video_filename=lesson_file.name,
-            order=int(lesson_num) - 1
+            video_filename=standard_video_filename,
+            order=lesson_num_int - 1
         )
         
-        # Process video/audio
-        result = await processor.process_video(lesson_file)
+        # Process video/audio with standardized naming
+        result = await processor.process_video(
+            lesson_file,
+            module_num=module_num,
+            lesson_num=lesson_num_int
+        )
         
         if not result:
             logger.error(f"Failed to process: {lesson_file.name}")
