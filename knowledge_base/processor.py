@@ -70,9 +70,82 @@ class VideoProcessor:
             logger.error(f"Error extracting audio: {e}")
             return None
     
+    def split_audio(self, audio_path: Path, segment_duration: int = 600) -> list[Path]:
+        """
+        Split large audio file into smaller segments.
+        Whisper API has 25MB limit, so we split into ~10 min chunks.
+        
+        Args:
+            audio_path: Path to audio file
+            segment_duration: Duration of each segment in seconds (default 10 min)
+        
+        Returns:
+            List of paths to audio segments
+        """
+        # Check file size (25MB limit for Whisper)
+        file_size_mb = audio_path.stat().st_size / (1024 * 1024)
+        
+        if file_size_mb <= 24:  # Under limit, no need to split
+            logger.info(f"Audio file {file_size_mb:.1f}MB - no split needed")
+            return [audio_path]
+        
+        logger.info(f"Audio file {file_size_mb:.1f}MB - splitting into {segment_duration}s segments")
+        
+        # Get audio duration
+        try:
+            result = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(audio_path)],
+                capture_output=True, text=True
+            )
+            total_duration = float(result.stdout.strip())
+        except Exception as e:
+            logger.error(f"Error getting audio duration: {e}")
+            return [audio_path]
+        
+        # Calculate number of segments
+        num_segments = int(total_duration / segment_duration) + 1
+        logger.info(f"Splitting {total_duration:.0f}s audio into {num_segments} segments")
+        
+        segments = []
+        for i in range(num_segments):
+            start_time = i * segment_duration
+            segment_path = AUDIO_DIR / f"{audio_path.stem}_part{i:03d}.mp3"
+            
+            if segment_path.exists():
+                segments.append(segment_path)
+                continue
+            
+            try:
+                cmd = [
+                    "ffmpeg", "-i", str(audio_path),
+                    "-ss", str(start_time),
+                    "-t", str(segment_duration),
+                    "-acodec", "libmp3lame",
+                    "-ab", "64k",
+                    "-ar", "16000",
+                    "-ac", "1",
+                    "-y",
+                    str(segment_path)
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0 and segment_path.exists():
+                    segments.append(segment_path)
+                    logger.info(f"Created segment {i+1}/{num_segments}: {segment_path.name}")
+                else:
+                    logger.error(f"Failed to create segment {i}: {result.stderr}")
+                    
+            except Exception as e:
+                logger.error(f"Error creating segment {i}: {e}")
+        
+        return segments
+
     async def transcribe_audio(self, audio_path: Path) -> Optional[dict]:
         """
         Transcribe audio using OpenAI Whisper API.
+        Automatically splits large files into segments.
         Returns transcript with timestamps.
         """
         transcript_path = TRANSCRIPTS_DIR / f"{audio_path.stem}.json"
@@ -88,51 +161,87 @@ class VideoProcessor:
             return None
         
         try:
-            logger.info(f"Transcribing: {audio_path.name}")
+            # Split audio if needed
+            audio_segments = self.split_audio(audio_path)
             
-            with open(audio_path, "rb") as audio_file:
-                # Use verbose_json for timestamps
-                response = await self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language="ru",
-                    response_format="verbose_json",
-                    timestamp_granularities=["segment"]
-                )
+            all_segments = []
+            total_duration = 0
+            full_text = ""
+            time_offset = 0
+            segment_id = 0
             
-            # Convert to dict (handle both object and dict responses)
-            segments = []
-            for i, seg in enumerate(response.segments):
-                # Handle both object attributes and dict keys
-                if hasattr(seg, 'id'):
-                    segments.append({
-                        "id": seg.id,
-                        "start": seg.start,
-                        "end": seg.end,
-                        "text": seg.text.strip() if hasattr(seg.text, 'strip') else str(seg.text).strip()
-                    })
+            for seg_idx, segment_path in enumerate(audio_segments):
+                logger.info(f"Transcribing segment {seg_idx + 1}/{len(audio_segments)}: {segment_path.name}")
+                
+                with open(segment_path, "rb") as audio_file:
+                    response = await self.client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        language="ru",
+                        response_format="verbose_json",
+                        timestamp_granularities=["segment"]
+                    )
+                
+                # Get segment duration for offset calculation
+                seg_duration = getattr(response, 'duration', 0)
+                
+                # Process segments with time offset
+                for seg in response.segments:
+                    if hasattr(seg, 'id'):
+                        all_segments.append({
+                            "id": segment_id,
+                            "start": seg.start + time_offset,
+                            "end": seg.end + time_offset,
+                            "text": seg.text.strip() if hasattr(seg.text, 'strip') else str(seg.text).strip()
+                        })
+                    else:
+                        all_segments.append({
+                            "id": segment_id,
+                            "start": seg.get('start', 0) + time_offset,
+                            "end": seg.get('end', 0) + time_offset,
+                            "text": str(seg.get('text', '')).strip()
+                        })
+                    segment_id += 1
+                
+                # Append text
+                seg_text = getattr(response, 'text', '')
+                if full_text:
+                    full_text += " " + seg_text
                 else:
-                    # Dict format
-                    segments.append({
-                        "id": seg.get('id', i),
-                        "start": seg.get('start', 0),
-                        "end": seg.get('end', 0),
-                        "text": str(seg.get('text', '')).strip()
-                    })
+                    full_text = seg_text
+                
+                time_offset += seg_duration
+                total_duration += seg_duration
+                
+                logger.info(f"Segment {seg_idx + 1} transcribed: {seg_duration:.1f}s")
+                
+                # Small delay between API calls
+                if seg_idx < len(audio_segments) - 1:
+                    await asyncio.sleep(1)
+            
+            # Clean up segment files if we split the audio
+            if len(audio_segments) > 1:
+                for seg_path in audio_segments:
+                    if seg_path != audio_path and seg_path.exists():
+                        try:
+                            seg_path.unlink()
+                            logger.info(f"Cleaned up: {seg_path.name}")
+                        except Exception:
+                            pass
             
             transcript = {
                 "filename": audio_path.stem,
-                "language": getattr(response, 'language', 'ru'),
-                "duration": getattr(response, 'duration', 0),
-                "text": getattr(response, 'text', ''),
-                "segments": segments
+                "language": "ru",
+                "duration": total_duration,
+                "text": full_text,
+                "segments": all_segments
             }
             
             # Save transcript
             with open(transcript_path, "w", encoding="utf-8") as f:
                 json.dump(transcript, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"Transcribed: {audio_path.name} ({response.duration:.1f}s)")
+            logger.info(f"Transcribed: {audio_path.name} ({total_duration:.1f}s total, {len(all_segments)} segments)")
             return transcript
             
         except Exception as e:
