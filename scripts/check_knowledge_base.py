@@ -57,7 +57,7 @@ async def check_db():
                 has_summary = summary_result.scalar_one_or_none() is not None
                 
                 # Format status
-                status = '✅' if lesson.status == 'embedded' else '⏳'
+                status = '✅' if lesson.is_embedded else '⏳'
                 summary_icon = '📋' if has_summary else '  '
                 
                 # Clean title for display
