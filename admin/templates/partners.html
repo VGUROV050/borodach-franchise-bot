@@ -7,12 +7,12 @@
     /* Tags */
     .tag {
         display: inline-block;
-        padding: 4px 10px;
+        padding: 3px 8px;
         border-radius: 4px;
-        font-size: 0.7rem;
+        font-size: 0.65rem;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.2px;
         white-space: nowrap;
     }
     .tag-pending {
@@ -49,68 +49,115 @@
         background: rgba(59, 130, 246, 0.2) !important;
     }
     
-    /* Table layout */
+    /* Table layout - без fixed, пусть браузер сам подберёт ширины */
     .partners-table {
         width: 100%;
-        table-layout: fixed;
         border-collapse: collapse;
+        font-size: 0.85rem;
     }
     .partners-table th,
     .partners-table td {
-        padding: 12px 8px;
-        vertical-align: middle;
+        padding: 10px 12px;
+        vertical-align: top;
         border-bottom: 1px solid #f0f0f0;
+        text-align: left;
     }
     .partners-table th {
-        text-align: left;
         font-weight: 600;
         color: #64748b;
-        font-size: 0.8rem;
+        font-size: 0.72rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        white-space: nowrap;
+        vertical-align: middle;
     }
     .partners-table tbody tr:hover {
         background: #f8fafc;
     }
     
-    /* Column widths */
-    .col-id { width: 50px; }
-    .col-name { width: 18%; }
-    .col-position { width: 10%; }
-    .col-phone { width: 12%; }
-    .col-telegram { width: 12%; }
-    .col-status { width: 10%; text-align: center; }
-    .col-shops { width: 18%; }
-    .col-date { width: 8%; }
-    .col-actions { width: 100px; text-align: center; }
-    
-    /* Cell content */
-    .cell-truncate {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .cell-shops {
-        font-size: 0.82rem;
+    /* Ячейки */
+    .partners-table td {
         line-height: 1.4;
     }
-    .cell-shops div {
-        overflow: hidden;
-        text-overflow: ellipsis;
+    
+    /* ID - узкая */
+    .col-id { 
+        width: 40px;
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
+    
+    /* ФИО */
+    .cell-name {
+        font-weight: 500;
+        min-width: 140px;
+    }
+    
+    /* Телефон */
+    .cell-phone {
+        font-size: 0.8rem;
         white-space: nowrap;
+        color: #475569;
+    }
+    
+    /* Telegram */
+    .cell-telegram {
+        font-size: 0.8rem;
+        color: #3b82f6;
+    }
+    
+    /* Статус - центр */
+    .col-status { 
+        text-align: center !important;
+        white-space: nowrap;
+    }
+    
+    /* Барбершопы - разрешаем перенос */
+    .cell-shops {
+        font-size: 0.78rem;
+        line-height: 1.5;
+        color: #475569;
+        min-width: 160px;
+        max-width: 220px;
+    }
+    .cell-shops div {
+        margin-bottom: 2px;
     }
     .cell-shops small {
         color: #94a3b8;
+        font-size: 0.72rem;
+    }
+    
+    /* Дата */
+    .cell-date {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+    
+    /* Действия */
+    .col-actions {
+        text-align: center !important;
+        white-space: nowrap;
+    }
+    .actions-cell {
+        display: inline-flex;
+        gap: 4px;
+        justify-content: center;
+    }
+    .actions-cell .btn {
+        padding: 5px 8px;
+        font-size: 0.82rem;
     }
     
     /* Position badges */
     .position-badge {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 3px 8px;
+        gap: 3px;
+        padding: 2px 6px;
         border-radius: 4px;
-        font-size: 0.72rem;
+        font-size: 0.68rem;
         font-weight: 500;
         white-space: nowrap;
     }
@@ -121,18 +168,6 @@
     .position-employee {
         background: rgba(107, 114, 128, 0.1);
         color: #4b5563;
-    }
-    
-    /* Actions */
-    .actions-cell {
-        display: flex;
-        gap: 4px;
-        justify-content: center;
-        flex-wrap: nowrap;
-    }
-    .actions-cell .btn {
-        padding: 4px 8px;
-        font-size: 0.85rem;
     }
 </style>
 
@@ -153,21 +188,21 @@
         <thead>
             <tr>
                 <th class="col-id">ID</th>
-                <th class="col-name">ФИО</th>
-                <th class="col-position">Должность</th>
-                <th class="col-phone">Телефон</th>
-                <th class="col-telegram">Telegram</th>
+                <th>ФИО</th>
+                <th>Роль</th>
+                <th>Телефон</th>
+                <th>Telegram</th>
                 <th class="col-status">Статус</th>
-                <th class="col-shops">Барбершопы</th>
-                <th class="col-date">Дата</th>
+                <th>Барбершопы</th>
+                <th>Дата</th>
                 <th class="col-actions">Действия</th>
             </tr>
         </thead>
         <tbody>
             {% for partner in partners %}
             <tr>
-                <td class="text-muted">{{ partner.id }}</td>
-                <td class="cell-truncate" title="{{ partner.full_name }}">{{ partner.full_name }}</td>
+                <td class="col-id">{{ partner.id }}</td>
+                <td class="cell-name">{{ partner.full_name }}</td>
                 <td>
                     {% if partner.is_owner %}
                     <span class="position-badge position-owner">🔥 Владелец</span>
@@ -175,32 +210,32 @@
                     <span class="position-badge position-employee">{{ partner.position or 'Сотрудник' }}</span>
                     {% endif %}
                 </td>
-                <td class="cell-truncate">{{ partner.phone or '—' }}</td>
-                <td class="cell-truncate" title="@{{ partner.telegram_username }}">@{{ partner.telegram_username or '—' }}</td>
-                <td style="text-align: center;">
+                <td class="cell-phone">{{ partner.phone or '—' }}</td>
+                <td class="cell-telegram">@{{ partner.telegram_username or '—' }}</td>
+                <td class="col-status">
                     {% if partner.status.value == 'pending' %}
                     <span class="tag tag-pending">Ожидает</span>
                     {% elif partner.status.value == 'verified' %}
-                    <span class="tag tag-verified">Верифицирован</span>
+                    <span class="tag tag-verified">✓</span>
                     {% else %}
-                    <span class="tag tag-rejected">Отклонён</span>
+                    <span class="tag tag-rejected">✗</span>
                     {% endif %}
                 </td>
                 <td class="cell-shops">
                     {% if partner.companies %}
                         {% for pc in partner.companies %}
-                        <div title="{{ pc.company.name if pc.company else '?' }}">• {{ pc.company.name if pc.company else '?' }}{% if pc.company and pc.company.city %} <small>({{ pc.company.city }})</small>{% endif %}</div>
+                        <div>{{ pc.company.name if pc.company else '?' }}{% if pc.company and pc.company.city %}<br><small>{{ pc.company.city }}</small>{% endif %}</div>
                         {% endfor %}
                     {% elif partner.branches %}
                         {% for pb in partner.branches %}
-                        <div title="{{ pb.branch.display_name or pb.branch.city }}">• {{ pb.branch.display_name or pb.branch.city }}</div>
+                        <div>{{ pb.branch.display_name or pb.branch.city }}</div>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">—</span>
                     {% endif %}
                 </td>
-                <td class="text-muted" style="font-size: 0.85rem;">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
-                <td>
+                <td class="cell-date">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
+                <td class="col-actions">
                     <div class="actions-cell">
                         {% if partner.status.value == 'pending' %}
                         <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm" title="Верифицировать">✅</a>
@@ -212,7 +247,7 @@
                         <a href="/partners/{{ partner.id }}/edit" class="btn btn-sm btn-edit" title="Редактировать">✏️</a>
                         <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline; margin: 0;"
                               onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
-                            <button type="submit" class="btn btn-sm btn-delete" title="Удалить">🗑</button>
+                            <button type="submit" class="btn btn-sm btn-delete" title="Удалить">🗑️</button>
                         </form>
                     </div>
                 </td>
