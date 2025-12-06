@@ -21,7 +21,17 @@ from database import (
     get_partners_with_pending_branches,
     clear_partner_pending_branch,
 )
-from .auth import verify_session, create_session
+from .auth import (
+    verify_session, 
+    create_session, 
+    check_brute_force,
+    set_secure_cookie,
+    delete_session,
+    get_csrf_token,
+    _get_client_ip,
+    _record_failed_attempt,
+    _clear_failed_attempts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +140,21 @@ async def health_check():
     return JSONResponse(content=response, status_code=status_code)
 
 
+@router.get("/metrics")
+async def prometheus_metrics():
+    """
+    Prometheus metrics эндпоинт.
+    Не требует авторизации для scraping.
+    """
+    from fastapi.responses import Response
+    from utils.metrics import get_metrics, get_metrics_content_type
+    
+    return Response(
+        content=get_metrics(),
+        media_type=get_metrics_content_type()
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Авторизация
 # ═══════════════════════════════════════════════════════════════════
@@ -153,17 +178,34 @@ async def login(
     username: str = Form(...),
     password: str = Form(...),
 ):
-    """Обработка входа."""
+    """Обработка входа с защитой от brute-force."""
+    # Проверяем блокировку по IP
+    try:
+        check_brute_force(request)
+    except HTTPException as e:
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": e.detail,
+        })
+    
+    ip = _get_client_ip(request)
+    
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        token = create_session(username)
+        # Успешный вход — очищаем счётчик неудачных попыток
+        _clear_failed_attempts(ip)
+        
+        session_token, csrf_token = create_session(username)
         response = RedirectResponse(url="/", status_code=302)
-        response.set_cookie(
-            key="session_token",
-            value=token,
-            httponly=True,
-            max_age=86400,  # 24 часа
-        )
+        
+        # Используем secure cookie
+        set_secure_cookie(response, "session_token", session_token)
+        
+        logger.info(f"Admin login successful from {ip}")
         return response
+    
+    # Неудачная попытка — записываем
+    _record_failed_attempt(ip)
+    logger.warning(f"Failed admin login attempt from {ip}")
     
     return templates.TemplateResponse("login.html", {
         "request": request,
@@ -174,6 +216,11 @@ async def login(
 @router.get("/logout")
 async def logout(request: Request):
     """Выход."""
+    # Удаляем сессию из хранилища
+    token = request.cookies.get("session_token")
+    if token:
+        delete_session(token)
+    
     response = RedirectResponse(url="/login", status_code=302)
     response.delete_cookie("session_token")
     return response

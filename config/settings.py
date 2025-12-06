@@ -34,6 +34,12 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # OpenAI API (для AI-ассистента)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
+# Sentry (мониторинг ошибок)
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+
+# Environment (production/development)
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
 # ID проектов/групп в Bitrix24 для каждого отдела
 BITRIX_GROUP_ID_DEVELOPMENT = os.getenv("BITRIX_GROUP_ID_DEVELOPMENT", "")  # Отдел Развития
 BITRIX_GROUP_ID_MARKETING = os.getenv("BITRIX_GROUP_ID_MARKETING", "")      # Отдел Маркетинга

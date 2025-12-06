@@ -4,9 +4,10 @@ import time
 from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import Message, TelegramObject, CallbackQuery
 
 from config.logging import get_logger, bind_request_context, clear_request_context
+from utils.metrics import telegram_messages_total, message_processing_duration, errors_total
 
 logger = get_logger(__name__)
 
@@ -79,7 +80,7 @@ class RateLimitMiddleware(BaseMiddleware):
 class LoggingMiddleware(BaseMiddleware):
     """
     Middleware для логирования всех входящих сообщений.
-    Добавляет контекст пользователя к логам.
+    Добавляет контекст пользователя к логам и собирает метрики.
     """
     
     async def __call__(
@@ -88,16 +89,32 @@ class LoggingMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
+        start_time = time.time()
+        
         # Извлекаем информацию о пользователе
         user = None
         chat = None
+        message_type = "unknown"
         
         if isinstance(event, Message):
             user = event.from_user
             chat = event.chat
             message_text = event.text or event.caption or "[media]"
+            # Определяем тип сообщения
+            if message_text and message_text.startswith('/'):
+                message_type = "command"
+            else:
+                message_type = "text"
+        elif isinstance(event, CallbackQuery):
+            user = event.from_user
+            message_type = "callback"
+            message_text = f"callback:{event.data}"
         else:
             message_text = str(type(event).__name__)
+            message_type = "other"
+        
+        # Увеличиваем счётчик сообщений
+        telegram_messages_total.labels(message_type=message_type).inc()
         
         # Добавляем контекст к логам
         if user:
@@ -118,6 +135,8 @@ class LoggingMiddleware(BaseMiddleware):
             result = await handler(event, data)
             return result
         except Exception as e:
+            # Увеличиваем счётчик ошибок
+            errors_total.labels(type="handler_error", module="bot").inc()
             logger.error(
                 "handler_error",
                 error=str(e),
@@ -125,6 +144,10 @@ class LoggingMiddleware(BaseMiddleware):
             )
             raise
         finally:
+            # Записываем время обработки
+            duration = time.time() - start_time
+            message_processing_duration.labels(handler=message_type).observe(duration)
+            
             # Очищаем контекст после обработки
             clear_request_context()
 

@@ -88,14 +88,35 @@ class KnowledgeRAG:
             logger.error(f"[RAG] Error creating embedding: {e}")
             return None
     
-    async def search(self, query: str, limit: int = 3) -> list[dict]:
-        """Search for relevant chunks in knowledge base."""
+    async def search(
+        self, 
+        query: str, 
+        limit: int = 3,
+        expand_context: bool = True,
+        context_window: int = 1
+    ) -> list[dict]:
+        """
+        Search for relevant chunks in knowledge base.
+        
+        Args:
+            query: Search query text
+            limit: Max results to return
+            expand_context: Include neighboring chunks for richer context
+            context_window: How many chunks before/after to include
+        """
         embedding = await self.create_query_embedding(query)
         if not embedding:
             return []
         
-        results = await search_chunks(embedding, limit=limit)
-        logger.info(f"[RAG] Found {len(results)} relevant chunks for query: {query[:50]}...")
+        results = await search_chunks(
+            embedding, 
+            limit=limit,
+            expand_context=expand_context,
+            context_window=context_window
+        )
+        
+        context_info = "with context expansion" if expand_context else "without expansion"
+        logger.info(f"[RAG] Found {len(results)} chunks {context_info} for: {query[:50]}...")
         return results
     
     def format_context(self, chunks: list[dict]) -> str:

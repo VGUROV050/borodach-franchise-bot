@@ -24,5 +24,8 @@ jobs:
             pip install -r requirements.txt
             mkdir -p logs
             chmod +x scripts/*.sh
+            echo "=== Running migrations ==="
+            alembic upgrade head || { echo "Migration failed!"; exit 1; }
+            echo "=== Restarting bot ==="
             bash scripts/run.sh
 

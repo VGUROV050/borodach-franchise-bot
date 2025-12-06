@@ -195,9 +195,21 @@ async def get_module_with_lessons(module_id: int) -> Optional[dict]:
         }
 
 
-async def search_chunks(query_embedding: list[float], limit: int = 5) -> list[dict]:
+async def search_chunks(
+    query_embedding: list[float], 
+    limit: int = 5,
+    expand_context: bool = True,
+    context_window: int = 1
+) -> list[dict]:
     """
     Search for most similar chunks using cosine similarity.
+    
+    Args:
+        query_embedding: Vector embedding of the query
+        limit: Max number of primary results to return
+        expand_context: If True, include neighboring chunks for context (parent-child effect)
+        context_window: Number of chunks before/after to include (default: 1)
+    
     Note: This is a basic implementation. For production, use pgvector extension.
     """
     import numpy as np
@@ -210,6 +222,17 @@ async def search_chunks(query_embedding: list[float], limit: int = 5) -> list[di
         
         if not chunks:
             return []
+        
+        # Build index by lesson for context expansion
+        chunks_by_lesson: dict[int, list] = {}
+        for chunk in chunks:
+            if chunk.lesson_id not in chunks_by_lesson:
+                chunks_by_lesson[chunk.lesson_id] = []
+            chunks_by_lesson[chunk.lesson_id].append(chunk)
+        
+        # Sort chunks within each lesson by index
+        for lesson_id in chunks_by_lesson:
+            chunks_by_lesson[lesson_id].sort(key=lambda c: c.chunk_index)
         
         # Calculate similarities
         query_vec = np.array(query_embedding)
@@ -229,31 +252,83 @@ async def search_chunks(query_embedding: list[float], limit: int = 5) -> list[di
         
         # Get lesson info for top results
         results = []
+        seen_chunks = set()  # Avoid duplicates when expanding context
+        
         for chunk, sim in similarities[:limit]:
+            if chunk.id in seen_chunks:
+                continue
+            
             # Load lesson
             stmt = select(KnowledgeLesson).where(KnowledgeLesson.id == chunk.lesson_id)
             lesson_result = await session.execute(stmt)
             lesson = lesson_result.scalar_one_or_none()
             
-            if lesson:
-                # Load module
-                stmt = select(KnowledgeModule).where(KnowledgeModule.id == lesson.module_id)
-                module_result = await session.execute(stmt)
-                module = module_result.scalar_one_or_none()
+            if not lesson:
+                continue
+            
+            # Load module
+            stmt = select(KnowledgeModule).where(KnowledgeModule.id == lesson.module_id)
+            module_result = await session.execute(stmt)
+            module = module_result.scalar_one_or_none()
+            
+            # === CONTEXT EXPANSION (Parent-Child Effect) ===
+            # Get neighboring chunks for fuller context
+            expanded_text = chunk.text
+            expanded_start = chunk.start_time
+            expanded_end = chunk.end_time
+            
+            if expand_context and chunk.lesson_id in chunks_by_lesson:
+                lesson_chunks = chunks_by_lesson[chunk.lesson_id]
                 
-                results.append({
-                    "chunk_id": chunk.id,
-                    "text": chunk.text,
-                    "start_time": chunk.start_time,
-                    "end_time": chunk.end_time,
-                    "timestamp": chunk.timestamp_formatted,
-                    "similarity": sim,
-                    "lesson_id": lesson.id,
-                    "lesson_title": lesson.title,
-                    "video_filename": lesson.video_filename,
-                    "module_id": module.id if module else None,
-                    "module_title": module.title if module else None,
-                })
+                # Find current chunk position
+                chunk_position = None
+                for i, c in enumerate(lesson_chunks):
+                    if c.id == chunk.id:
+                        chunk_position = i
+                        break
+                
+                if chunk_position is not None:
+                    # Collect text from neighboring chunks
+                    texts = []
+                    
+                    # Previous chunks (context_window before)
+                    for i in range(max(0, chunk_position - context_window), chunk_position):
+                        neighbor = lesson_chunks[i]
+                        if neighbor.chunk_index >= 0:  # Skip summary chunks
+                            texts.append(neighbor.text)
+                            expanded_start = min(expanded_start, neighbor.start_time)
+                            seen_chunks.add(neighbor.id)
+                    
+                    # Current chunk
+                    texts.append(chunk.text)
+                    seen_chunks.add(chunk.id)
+                    
+                    # Next chunks (context_window after)
+                    for i in range(chunk_position + 1, min(len(lesson_chunks), chunk_position + context_window + 1)):
+                        neighbor = lesson_chunks[i]
+                        if neighbor.chunk_index >= 0:  # Skip summary chunks
+                            texts.append(neighbor.text)
+                            expanded_end = max(expanded_end, neighbor.end_time)
+                            seen_chunks.add(neighbor.id)
+                    
+                    # Combine texts
+                    expanded_text = " ".join(texts)
+            
+            results.append({
+                "chunk_id": chunk.id,
+                "text": expanded_text,  # Expanded text with context
+                "original_text": chunk.text,  # Original chunk text
+                "start_time": expanded_start,
+                "end_time": expanded_end,
+                "timestamp": chunk.timestamp_formatted,
+                "similarity": sim,
+                "lesson_id": lesson.id,
+                "lesson_title": lesson.title,
+                "video_filename": lesson.video_filename,
+                "module_id": module.id if module else None,
+                "module_title": module.title if module else None,
+                "context_expanded": expand_context,
+            })
         
         return results
 

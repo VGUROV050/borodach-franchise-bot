@@ -9,12 +9,31 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from config.settings import TELEGRAM_BOT_TOKEN
+from config.settings import TELEGRAM_BOT_TOKEN, SENTRY_DSN, ENVIRONMENT
 from config.logging import setup_logging, get_logger
 from bot import main_router
 from database import init_db, close_db
 from cache import init_cache, close_cache
 from scheduler import start_scheduler, stop_scheduler, update_network_rating_now
+
+# Инициализируем Sentry для мониторинга ошибок
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.asyncio import AsyncioIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=ENVIRONMENT,
+        traces_sample_rate=0.1,  # 10% транзакций для performance monitoring
+        profiles_sample_rate=0.1,
+        integrations=[
+            AsyncioIntegration(),
+            SqlalchemyIntegration(),
+        ],
+        # Не отправлять PII (личные данные)
+        send_default_pii=False,
+    )
 
 # Инициализируем структурированное логирование
 setup_logging(json_logs=False, log_level="INFO")
