@@ -4,14 +4,16 @@
 
 {% block content %}
 <style>
+    /* Tags */
     .tag {
         display: inline-block;
-        padding: 4px 12px;
+        padding: 4px 10px;
         border-radius: 4px;
         font-size: 0.7rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.3px;
+        white-space: nowrap;
     }
     .tag-pending {
         background: rgba(245, 158, 11, 0.1);
@@ -28,6 +30,8 @@
         color: #dc2626;
         border: 1px solid rgba(239, 68, 68, 0.2);
     }
+    
+    /* Buttons */
     .btn-delete {
         background: rgba(239, 68, 68, 0.1) !important;
         color: #dc2626 !important;
@@ -44,32 +48,91 @@
     .btn-edit:hover {
         background: rgba(59, 130, 246, 0.2) !important;
     }
-    table {
+    
+    /* Table layout */
+    .partners-table {
         width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
     }
-    td {
+    .partners-table th,
+    .partners-table td {
+        padding: 12px 8px;
         vertical-align: middle;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .partners-table th {
+        text-align: left;
+        font-weight: 600;
+        color: #64748b;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .partners-table tbody tr:hover {
+        background: #f8fafc;
+    }
+    
+    /* Column widths */
+    .col-id { width: 50px; }
+    .col-name { width: 18%; }
+    .col-position { width: 10%; }
+    .col-phone { width: 12%; }
+    .col-telegram { width: 12%; }
+    .col-status { width: 10%; text-align: center; }
+    .col-shops { width: 18%; }
+    .col-date { width: 8%; }
+    .col-actions { width: 100px; text-align: center; }
+    
+    /* Cell content */
+    .cell-truncate {
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
     }
-    td.wrap-cell {
-        white-space: normal;
+    .cell-shops {
+        font-size: 0.82rem;
+        line-height: 1.4;
     }
+    .cell-shops div {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .cell-shops small {
+        color: #94a3b8;
+    }
+    
+    /* Position badges */
     .position-badge {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 8px;
+        padding: 3px 8px;
         border-radius: 4px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         font-weight: 500;
+        white-space: nowrap;
     }
     .position-owner {
-        background: rgba(245, 158, 11, 0.1);
+        background: rgba(245, 158, 11, 0.15);
         color: #b45309;
     }
     .position-employee {
         background: rgba(107, 114, 128, 0.1);
         color: #4b5563;
+    }
+    
+    /* Actions */
+    .actions-cell {
+        display: flex;
+        gap: 4px;
+        justify-content: center;
+        flex-wrap: nowrap;
+    }
+    .actions-cell .btn {
+        padding: 4px 8px;
+        font-size: 0.85rem;
     }
 </style>
 
@@ -84,36 +147,36 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card" style="overflow-x: auto;">
     {% if partners %}
-    <table>
+    <table class="partners-table">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>ФИО</th>
-                <th>Должность</th>
-                <th>Телефон</th>
-                <th>Telegram</th>
-                <th style="text-align: center;">Статус</th>
-                <th>Барбершопы</th>
-                <th>Дата</th>
-                <th style="text-align: center;">Действия</th>
+                <th class="col-id">ID</th>
+                <th class="col-name">ФИО</th>
+                <th class="col-position">Должность</th>
+                <th class="col-phone">Телефон</th>
+                <th class="col-telegram">Telegram</th>
+                <th class="col-status">Статус</th>
+                <th class="col-shops">Барбершопы</th>
+                <th class="col-date">Дата</th>
+                <th class="col-actions">Действия</th>
             </tr>
         </thead>
         <tbody>
             {% for partner in partners %}
             <tr>
-                <td>{{ partner.id }}</td>
-                <td>{{ partner.full_name }}</td>
+                <td class="text-muted">{{ partner.id }}</td>
+                <td class="cell-truncate" title="{{ partner.full_name }}">{{ partner.full_name }}</td>
                 <td>
                     {% if partner.is_owner %}
-                    <span class="position-badge position-owner">👑 Владелец</span>
+                    <span class="position-badge position-owner">🔥 Владелец</span>
                     {% else %}
-                    <span class="position-badge position-employee">👤 {{ partner.position or 'Сотрудник' }}</span>
+                    <span class="position-badge position-employee">{{ partner.position or 'Сотрудник' }}</span>
                     {% endif %}
                 </td>
-                <td>{{ partner.phone or '—' }}</td>
-                <td>@{{ partner.telegram_username or '—' }}</td>
+                <td class="cell-truncate">{{ partner.phone or '—' }}</td>
+                <td class="cell-truncate" title="@{{ partner.telegram_username }}">@{{ partner.telegram_username or '—' }}</td>
                 <td style="text-align: center;">
                     {% if partner.status.value == 'pending' %}
                     <span class="tag tag-pending">Ожидает</span>
@@ -123,31 +186,31 @@
                     <span class="tag tag-rejected">Отклонён</span>
                     {% endif %}
                 </td>
-                <td class="wrap-cell" style="font-size: 0.85rem;">
+                <td class="cell-shops">
                     {% if partner.companies %}
                         {% for pc in partner.companies %}
-                        <div>• {{ pc.company.name if pc.company else '?' }}{% if pc.company and pc.company.city %} <small class="text-muted">({{ pc.company.city }})</small>{% endif %}</div>
+                        <div title="{{ pc.company.name if pc.company else '?' }}">• {{ pc.company.name if pc.company else '?' }}{% if pc.company and pc.company.city %} <small>({{ pc.company.city }})</small>{% endif %}</div>
                         {% endfor %}
                     {% elif partner.branches %}
                         {% for pb in partner.branches %}
-                        <div>• {{ pb.branch.display_name or pb.branch.city }}</div>
+                        <div title="{{ pb.branch.display_name or pb.branch.city }}">• {{ pb.branch.display_name or pb.branch.city }}</div>
                         {% endfor %}
                     {% else %}
                         <span class="text-muted">—</span>
                     {% endif %}
                 </td>
-                <td class="text-muted">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
+                <td class="text-muted" style="font-size: 0.85rem;">{{ partner.created_at.strftime('%d.%m.%Y') if partner.created_at else '—' }}</td>
                 <td>
-                    <div style="display: flex; gap: 6px; justify-content: center;">
+                    <div class="actions-cell">
                         {% if partner.status.value == 'pending' %}
                         <a href="/partners/{{ partner.id }}/verify" class="btn btn-success btn-sm" title="Верифицировать">✅</a>
-                        <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline;">
+                        <form method="post" action="/partners/{{ partner.id }}/reject" style="display: inline; margin: 0;">
                             <input type="hidden" name="reason" value="">
                             <button type="submit" class="btn btn-danger btn-sm" title="Отклонить">❌</button>
                         </form>
                         {% endif %}
                         <a href="/partners/{{ partner.id }}/edit" class="btn btn-sm btn-edit" title="Редактировать">✏️</a>
-                        <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline;"
+                        <form method="post" action="/partners/{{ partner.id }}/delete" style="display: inline; margin: 0;"
                               onsubmit="return confirm('Удалить партнёра {{ partner.full_name }}? Это действие нельзя отменить!');">
                             <button type="submit" class="btn btn-sm btn-delete" title="Удалить">🗑</button>
                         </form>
@@ -158,7 +221,7 @@
         </tbody>
     </table>
     {% else %}
-    <p class="text-muted">Партнёры не найдены</p>
+    <p class="text-muted" style="padding: 20px;">Партнёры не найдены</p>
     {% endif %}
 </div>
 {% endblock %}
