@@ -420,12 +420,16 @@ class AIAssistantStates(StatesGroup):
 
 @router.message(F.text == BTN_STATISTICS)
 async def statistics_handler(message: types.Message, state: FSMContext) -> None:
-    """Показать статистику по барбершопам из YClients (текущий месяц по умолчанию)."""
+    """Показать меню выбора периода статистики."""
     if not await _check_verified(message):
         return
     
-    # Показываем статистику за текущий месяц и меню выбора периода
-    await _show_statistics(message, state, period_type="current_month")
+    await state.set_state(StatisticsStates.selecting_period)
+    await message.answer(
+        "📊 <b>Статистика</b>\n\n"
+        "Выберите период или посмотрите рейтинг сети:",
+        reply_markup=statistics_period_keyboard(),
+    )
 
 
 async def _show_statistics(
