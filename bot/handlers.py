@@ -719,8 +719,8 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         
         partner_companies = await get_partner_companies(db, partner.id)
         partner_yclients_ids = {c.yclients_id for c in partner_companies}
-        # Словарь названий салонов партнёра
-        partner_names = {c.yclients_id: c.display_name or c.name for c in partner_companies}
+        # Словарь названий салонов партнёра (из Branch, не YClientsCompany)
+        partner_names = {c.yclients_id: c.name for c in partner_companies}
         
         # Получаем все YClientsCompany для регионов
         result = await db.execute(select(YClientsCompany))
