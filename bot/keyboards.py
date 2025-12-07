@@ -16,7 +16,7 @@ BTN_STATS_PREV_MONTH = "📆 Прошлый месяц"
 BTN_STATS_TODAY = "📊 Сегодня"
 BTN_STATS_YESTERDAY = "📊 Вчера"
 BTN_USEFUL = "📚 Полезное"
-BTN_CONTACT_OFFICE_MAIN = "📞 Связаться с офисом"
+BTN_CONTACT_OFFICE_MAIN = "📞 Связаться"
 BTN_BACK = "⬅️ Назад"
 BTN_MAIN_MENU = "🏠 Главное меню"
 
@@ -86,8 +86,8 @@ def main_menu_keyboard() -> ReplyKeyboardMarkup:
     keyboard = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_TASKS), KeyboardButton(text=BTN_USEFUL)],
-            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_ACCOUNT)],
-            [KeyboardButton(text=BTN_AI_ASSISTANT), KeyboardButton(text=BTN_CONTACT_OFFICE_MAIN)],
+            [KeyboardButton(text=BTN_STATISTICS), KeyboardButton(text=BTN_AI_ASSISTANT)],
+            [KeyboardButton(text=BTN_ACCOUNT), KeyboardButton(text=BTN_CONTACT_OFFICE_MAIN)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Выберите действие",
