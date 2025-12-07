@@ -835,7 +835,9 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
     if not partner_positions:
         lines.append("\n\n⚠️ <i>Ваши салоны пока не в рейтинге</i>")
     
-    await loading_msg.edit_text(
+    # Удаляем сообщение загрузки и отправляем результат
+    await loading_msg.delete()
+    await message.answer(
         "\n".join(lines),
         reply_markup=rating_period_keyboard(),
     )
