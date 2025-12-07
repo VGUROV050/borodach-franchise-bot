@@ -564,18 +564,13 @@
                         </a>
                     </li>
                     <li>
-                        <a href="/useful-info" class="{% if '/useful-info' in request.url.path %}active{% endif %}">
-                            <span class="nav-icon">📚</span> Полезное
+                        <a href="/bot-settings" class="{% if '/bot-settings' in request.url.path or '/useful-info' in request.url.path %}active{% endif %}">
+                            <span class="nav-icon">⚙️</span> Настройки
                         </a>
                     </li>
                     <li>
                         <a href="/diagnostics" class="{% if '/diagnostics' in request.url.path %}active{% endif %}">
                             <span class="nav-icon">🩺</span> Диагностика
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/bot-settings" class="{% if '/bot-settings' in request.url.path %}active{% endif %}">
-                            <span class="nav-icon">⚙️</span> Настройки
                         </a>
                     </li>
                 </ul>

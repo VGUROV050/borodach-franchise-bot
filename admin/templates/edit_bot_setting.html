@@ -4,59 +4,82 @@
 
 {% block content %}
 <div class="page-header">
-    <a href="/bot-settings" class="btn btn-secondary">← Назад</a>
-    <h1 class="page-title" style="margin-left: 1rem;">Редактирование настройки</h1>
+    <h1 class="page-title">✏️ Редактирование настройки</h1>
+    <a href="/bot-settings" class="btn">← Назад к списку</a>
 </div>
 
 <div class="card">
-    <div class="setting-info">
-        <div class="setting-key">{{ setting.key }}</div>
-        {% if setting.description %}
-        <div class="setting-description">{{ setting.description }}</div>
-        {% endif %}
-    </div>
-    
     <form method="post" action="/bot-settings/{{ setting.key }}/edit">
-        <div class="form-group">
-            <label class="form-label">Текст сообщения</label>
-            <textarea 
-                name="value" 
-                class="form-input" 
-                rows="12" 
-                placeholder="Введите текст..."
-                required
-            >{{ setting.value }}</textarea>
-            <div class="form-hint">
-                Поддерживаются HTML-теги: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, 
-                &lt;a href="..."&gt;ссылка&lt;/a&gt;, &lt;code&gt;код&lt;/code&gt;
+        <div style="padding: 1.5rem; display: grid; gap: 1.5rem;">
+            
+            <!-- Информация о настройке -->
+            <div class="setting-info">
+                <div class="setting-key">{{ setting.key }}</div>
+                {% if setting.description %}
+                <div class="setting-description">{{ setting.description }}</div>
+                {% endif %}
             </div>
-        </div>
-        
-        <div class="preview-section">
-            <div class="preview-title">Превью в Telegram:</div>
-            <div class="telegram-preview">
-                <div class="telegram-bubble" id="preview-bubble">
-                    {{ setting.value | safe }}
+            
+            <!-- Сообщение с тулбаром -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Текст сообщения</label>
+                
+                <!-- Toolbar -->
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" onclick="wrapText('b')" class="format-btn" title="Жирный">
+                        <b>B</b>
+                    </button>
+                    <button type="button" onclick="wrapText('i')" class="format-btn" title="Курсив">
+                        <i>I</i>
+                    </button>
+                    <button type="button" onclick="wrapText('u')" class="format-btn" title="Подчёркнутый">
+                        <u>U</u>
+                    </button>
+                    <button type="button" onclick="wrapText('s')" class="format-btn" title="Зачёркнутый">
+                        <s>S</s>
+                    </button>
+                    <button type="button" onclick="wrapText('code')" class="format-btn" title="Код">
+                        &lt;/&gt;
+                    </button>
+                    <button type="button" onclick="insertLink()" class="format-btn" title="Ссылка">
+                        🔗
+                    </button>
+                    <button type="button" onclick="insertNewline()" class="format-btn" title="Новая строка">
+                        ↵
+                    </button>
+                </div>
+                
+                <textarea id="message_text" name="value" required
+                          rows="10" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; font-family: monospace; resize: vertical;">{{ setting.value }}</textarea>
+                
+                <small style="color: var(--text-muted);">Поддерживается HTML: &lt;b&gt;, &lt;i&gt;, &lt;u&gt;, &lt;s&gt;, &lt;code&gt;, &lt;a href=""&gt;</small>
+            </div>
+            
+            <!-- Предпросмотр -->
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Предпросмотр в Telegram</label>
+                <div id="preview" style="background: #e5ddd5; padding: 1rem; border-radius: 12px; min-height: 60px;">
+                    <div style="background: #dcf8c6; padding: 0.75rem 1rem; border-radius: 8px; max-width: 400px; word-wrap: break-word; box-shadow: 0 1px 1px rgba(0,0,0,0.1);">
+                        <div id="preview-content" style="white-space: pre-wrap; line-height: 1.5;"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">💾 Сохранить</button>
-            <a href="/bot-settings" class="btn btn-secondary">Отмена</a>
+            
+            <!-- Кнопки -->
+            <div style="display: flex; gap: 1rem; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <a href="/bot-settings" class="btn" style="background: var(--card-bg); border: 1px solid var(--border);">
+                    Отмена
+                </a>
+                <button type="submit" class="btn btn-success">
+                    💾 Сохранить
+                </button>
+            </div>
         </div>
     </form>
 </div>
 
 <style>
-.page-header {
-    display: flex;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
 .setting-info {
-    margin-bottom: 1.5rem;
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--border);
 }
@@ -77,76 +100,68 @@
     font-size: 0.875rem;
 }
 
-.form-group {
-    margin-bottom: 1.5rem;
+.format-btn {
+    padding: 0.5rem 0.75rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    min-width: 36px;
+    transition: all 0.2s;
 }
 
-.form-input {
-    width: 100%;
-    padding: 0.75rem 1rem;
-    border: 1.5px solid var(--border);
-    border-radius: 10px;
-    font-size: 0.9rem;
-    font-family: monospace;
-    line-height: 1.5;
-    resize: vertical;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.form-hint {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    margin-top: 0.5rem;
-}
-
-.preview-section {
-    background: #e5ddd5;
-    border-radius: 12px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.preview-title {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: #666;
-    margin-bottom: 0.75rem;
-    letter-spacing: 0.5px;
-}
-
-.telegram-preview {
-    max-width: 320px;
-}
-
-.telegram-bubble {
-    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
-    padding: 0.75rem 1rem;
-    border-radius: 12px;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.75rem;
+.format-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
 }
 </style>
 
 <script>
-// Live preview
-const textarea = document.querySelector('textarea[name="value"]');
-const preview = document.getElementById('preview-bubble');
+const textarea = document.getElementById('message_text');
+const preview = document.getElementById('preview-content');
 
-textarea.addEventListener('input', function() {
-    preview.innerHTML = this.value;
-});
+function updatePreview() {
+    let text = textarea.value;
+    preview.innerHTML = text || '<span style="color: #999;">Введите текст...</span>';
+}
+
+textarea.addEventListener('input', updatePreview);
+updatePreview();
+
+function wrapText(tag) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end);
+    const replacement = `<${tag}>${selectedText}</${tag}>`;
+    
+    textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    textarea.focus();
+    textarea.setSelectionRange(start + tag.length + 2, start + tag.length + 2 + selectedText.length);
+    updatePreview();
+}
+
+function insertLink() {
+    const url = prompt('Введите URL (например: https://t.me/username):');
+    if (!url) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = textarea.value.substring(start, end) || 'текст ссылки';
+    const replacement = `<a href="${url}">${selectedText}</a>`;
+    
+    textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+    textarea.focus();
+    updatePreview();
+}
+
+function insertNewline() {
+    const start = textarea.selectionStart;
+    textarea.value = textarea.value.substring(0, start) + '\n' + textarea.value.substring(start);
+    textarea.focus();
+    textarea.setSelectionRange(start + 1, start + 1);
+    updatePreview();
+}
 </script>
 {% endblock %}
-

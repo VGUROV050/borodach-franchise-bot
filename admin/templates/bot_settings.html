@@ -8,25 +8,41 @@
 </div>
 
 <p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-    Здесь можно настроить тексты кнопок и сообщений в боте.
+    Настройки кнопок и сообщений в боте.
 </p>
+
+<!-- Табы навигации -->
+<div class="tabs-nav">
+    <a href="/bot-settings" class="tab active">📞 Кнопка "Связаться"</a>
+    <a href="/useful-info/buttons" class="tab">📚 Кнопки "Полезное"</a>
+</div>
 
 <div class="settings-grid">
     {% for setting in settings %}
     <div class="card setting-card">
         <div class="setting-header">
-            <div class="setting-key">{{ setting.key }}</div>
-            <a href="/bot-settings/{{ setting.key }}/edit" class="btn btn-sm btn-primary">✏️ Редактировать</a>
+            <div>
+                <div class="setting-title">
+                    {% if setting.key == 'contact_office_text' %}
+                    📞 Текст кнопки "Связаться"
+                    {% else %}
+                    {{ setting.key }}
+                    {% endif %}
+                </div>
+                {% if setting.description %}
+                <div class="setting-description">{{ setting.description }}</div>
+                {% endif %}
+            </div>
+            <a href="/bot-settings/{{ setting.key }}/edit" class="btn btn-primary">✏️ Редактировать</a>
         </div>
         
-        {% if setting.description %}
-        <div class="setting-description">{{ setting.description }}</div>
-        {% endif %}
-        
-        <div class="setting-preview">
-            <div class="preview-title">Текущее значение:</div>
-            <div class="telegram-bubble">
-                {{ setting.value | safe }}
+        <!-- Предпросмотр как в Telegram -->
+        <div class="telegram-preview">
+            <div class="preview-title">Предпросмотр в Telegram:</div>
+            <div class="telegram-chat">
+                <div class="telegram-bubble">
+                    {{ setting.value | safe }}
+                </div>
             </div>
         </div>
         
@@ -42,6 +58,33 @@
 </div>
 
 <style>
+.tabs-nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+
+.tab {
+    padding: 0.75rem 1.25rem;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    color: var(--accent);
+}
+
+.tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
 .settings-grid {
     display: grid;
     gap: 1.5rem;
@@ -54,26 +97,23 @@
 .setting-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    gap: 1rem;
 }
 
-.setting-key {
-    font-family: monospace;
-    font-size: 0.9rem;
-    color: var(--accent);
-    background: var(--accent-light);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+.setting-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
 }
 
 .setting-description {
     color: var(--text-muted);
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
+    font-size: 0.85rem;
 }
 
-.setting-preview {
+.telegram-preview {
     background: #e5ddd5;
     border-radius: 12px;
     padding: 1rem;
@@ -84,18 +124,23 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     color: #666;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
     letter-spacing: 0.5px;
 }
 
+.telegram-chat {
+    max-width: 400px;
+}
+
 .telegram-bubble {
-    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
+    background: #dcf8c6;
     padding: 0.75rem 1rem;
-    border-radius: 12px;
+    border-radius: 8px;
     font-size: 0.9rem;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.1);
 }
 
 .setting-meta {
@@ -104,4 +149,3 @@
 }
 </style>
 {% endblock %}
-

@@ -4,12 +4,22 @@
 
 {% block content %}
 <div class="page-header">
-    <h1 class="page-title">📚 Полезное — Кнопки отделов</h1>
+    <h1 class="page-title">⚙️ Настройки бота</h1>
     <a href="/useful-info/buttons/create" class="btn btn-success">+ Добавить кнопку</a>
 </div>
 
-<p style="color: var(--text-muted); margin-bottom: 1.5rem;">
-    Настройте кнопки меню для раздела "Полезное" в боте. Кнопка "◀️ Назад" добавляется автоматически.
+<p style="color: var(--text-muted); margin-bottom: 1rem;">
+    Настройки кнопок и сообщений в боте.
+</p>
+
+<!-- Табы навигации -->
+<div class="tabs-nav">
+    <a href="/bot-settings" class="tab">📞 Кнопка "Связаться"</a>
+    <a href="/useful-info/buttons" class="tab active">📚 Кнопки "Полезное"</a>
+</div>
+
+<p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem;">
+    Кнопки меню для раздела "Полезное". Кнопка "◀️ Назад" добавляется автоматически.
 </p>
 
 <div class="departments-grid">
@@ -88,6 +98,33 @@
 </div>
 
 <style>
+.tabs-nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+
+.tab {
+    padding: 0.75rem 1.25rem;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.tab:hover {
+    color: var(--accent);
+}
+
+.tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
 .departments-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
