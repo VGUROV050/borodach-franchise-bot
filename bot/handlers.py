@@ -762,9 +762,18 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         )
         return
     
-    # Сортируем по рангу
-    sorted_ratings = sorted(all_ratings, key=lambda x: x.rank if x.rank else 999)
+    # Фильтруем: только с выручкой > 0 и не закрытые (как в админке)
+    filtered_ratings = [
+        r for r in all_ratings 
+        if r.revenue > 0 and "закрыт" not in (r.company_name or "").lower()
+    ]
+    
+    # Сортируем по выручке (убывание) для правильного ранжирования
+    sorted_ratings = sorted(filtered_ratings, key=lambda x: x.revenue or 0, reverse=True)
     total_companies = len(sorted_ratings)
+    
+    # Создаём словарь новых рангов после фильтрации
+    new_ranks = {r.yclients_company_id: idx + 1 for idx, r in enumerate(sorted_ratings)}
     
     # Находим позиции салонов партнёра
     partner_positions = []
@@ -784,10 +793,10 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
     
     # Добавляем позиции партнёра ± 2
     for pr in partner_positions:
-        rank = pr.rank or 0
+        rank = new_ranks.get(pr.yclients_company_id, 0)
         if rank > 3:  # Если партнёр не в топ-3
-            for r in range(max(1, rank - 2), min(total_companies + 1, rank + 3)):
-                positions_to_show.add(r)
+            for pos in range(max(1, rank - 2), min(total_companies + 1, rank + 3)):
+                positions_to_show.add(pos)
     
     # Формируем список для отображения
     shown_ranks = sorted(positions_to_show)
@@ -800,8 +809,8 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
             break
     
     prev_rank_shown = 0
-    for r in sorted_ratings:
-        rank = r.rank or 0
+    for idx, r in enumerate(sorted_ratings):
+        rank = idx + 1  # Новый ранг (1-based)
         if rank not in shown_ranks:
             continue
         
@@ -813,7 +822,7 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         yclients_id = r.yclients_company_id
         is_partner = yclients_id in partner_yclients_ids
         
-        # Получаем изменение позиции
+        # Получаем изменение позиции (сравниваем с прошлым месяцем)
         prev_rank = prev_ranks.get(yclients_id)
         change_str = _format_rank_change(rank, prev_rank)
         
