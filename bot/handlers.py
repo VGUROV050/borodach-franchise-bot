@@ -647,12 +647,12 @@ async def rating_back_to_stats(message: types.Message, state: FSMContext) -> Non
     )
 
 
-def _format_location(city: str | None) -> str:
-    """Форматировать локацию: для Москвы/СПб - город, для остальных - область."""
-    if not city:
+def _format_location(city: str | None, region: str | None) -> str:
+    """Форматировать локацию: для Москвы/СПб - город, для остальных - область/регион."""
+    if not city and not region:
         return "—"
     
-    city_lower = city.lower()
+    city_lower = (city or "").lower()
     
     # Москва и Санкт-Петербург показываем как город
     if "москва" in city_lower or "moscow" in city_lower:
@@ -660,13 +660,16 @@ def _format_location(city: str | None) -> str:
     if "санкт-петербург" in city_lower or "петербург" in city_lower or "спб" in city_lower:
         return "Санкт-Петербург"
     
-    # Для остальных пытаемся определить область/регион
-    # Если город содержит "область" или "край" - оставляем как есть
+    # Для остальных показываем регион/область
+    if region:
+        return region
+    
+    # Если региона нет, но есть город с областью
     if "область" in city_lower or "край" in city_lower or "респ" in city_lower:
         return city
     
     # Иначе просто возвращаем город
-    return city
+    return city or "—"
 
 
 def _format_rank_change(current_rank: int, previous_rank: int | None) -> str:
@@ -687,17 +690,25 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
     """Показать рейтинг сети."""
     from datetime import datetime
     from zoneinfo import ZoneInfo
+    from sqlalchemy import select
     from database import (
         get_partner_companies, 
         get_all_network_ratings, 
         get_rating_history,
         get_previous_month_ranks,
     )
+    from database.models import YClientsCompany
     
     loading_msg = await message.answer("⏳ Загружаю рейтинг...")
     
     tz = ZoneInfo("Europe/Moscow")
     now = datetime.now(tz)
+    
+    month_names = {
+        1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+        5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+        9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+    }
     
     async with AsyncSessionLocal() as db:
         # Получаем салоны партнёра
@@ -708,11 +719,17 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         
         partner_companies = await get_partner_companies(db, partner.id)
         partner_yclients_ids = {c.yclients_id for c in partner_companies}
+        # Словарь названий салонов партнёра
+        partner_names = {c.yclients_id: c.display_name or c.name for c in partner_companies}
+        
+        # Получаем все YClientsCompany для регионов
+        result = await db.execute(select(YClientsCompany))
+        all_yclients = {c.yclients_id: c for c in result.scalars().all()}
         
         if is_current_month:
             # Текущий месяц
             all_ratings = await get_all_network_ratings(db)
-            period_title = f"🏆 <b>Рейтинг сети — {now.strftime('%B %Y')}</b>\n"
+            period_title = f"🏆 <b>Рейтинг сети — {month_names[now.month]} {now.year}</b>\n"
             
             # Получаем предыдущие ранги для сравнения
             if now.month == 1:
@@ -728,12 +745,6 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
                 target_year, target_month = now.year, now.month - 1
             
             all_ratings = await get_rating_history(db, target_year, target_month)
-            
-            month_names = {
-                1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
-                5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
-                9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
-            }
             period_title = f"🏆 <b>Рейтинг сети — {month_names[target_month]} {target_year}</b>\n"
             
             # Получаем ранги за позапрошлый месяц для сравнения
@@ -806,8 +817,12 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         prev_rank = prev_ranks.get(yclients_id)
         change_str = _format_rank_change(rank, prev_rank)
         
+        # Получаем регион из YClientsCompany
+        yclients_company = all_yclients.get(yclients_id)
+        region = yclients_company.region if yclients_company else None
+        
         # Форматируем локацию
-        location = _format_location(r.city)
+        location = _format_location(r.city, region)
         
         # Форматируем выручку
         revenue = r.revenue or 0
@@ -823,9 +838,10 @@ async def _show_rating(message: types.Message, state: FSMContext, is_current_mon
         else:
             medal = f"{rank}."
         
-        # Выделяем салон партнёра
+        # Выделяем салон партнёра — показываем название
         if is_partner:
-            lines.append(f"\n<b>👉 {medal} {location}</b>")
+            partner_name = partner_names.get(yclients_id, location)
+            lines.append(f"\n<b>👉 {medal} {partner_name}</b>")
             lines.append(f"    💰 {revenue_str} ₽  {change_str}")
         else:
             lines.append(f"\n{medal} {location}")
