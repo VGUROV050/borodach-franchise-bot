@@ -15,6 +15,11 @@ BTN_STATS_CURRENT_MONTH = "📅 Текущий месяц"
 BTN_STATS_PREV_MONTH = "📆 Прошлый месяц"
 BTN_STATS_TODAY = "📊 Сегодня"
 BTN_STATS_YESTERDAY = "📊 Вчера"
+BTN_STATS_RATING = "🏆 Рейтинг"
+
+# Рейтинг — периоды
+BTN_RATING_CURRENT = "📅 Текущий месяц"
+BTN_RATING_PREV = "📆 Прошлый месяц"
 BTN_USEFUL = "📚 Полезное"
 BTN_CONTACT_OFFICE_MAIN = "📞 Связаться"
 BTN_BACK = "⬅️ Назад"
@@ -200,6 +205,20 @@ def statistics_period_keyboard() -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=BTN_STATS_TODAY), KeyboardButton(text=BTN_STATS_YESTERDAY)],
             [KeyboardButton(text=BTN_STATS_CURRENT_MONTH), KeyboardButton(text=BTN_STATS_PREV_MONTH)],
+            [KeyboardButton(text=BTN_STATS_RATING)],
+            [KeyboardButton(text=BTN_BACK)],
+        ],
+        resize_keyboard=True,
+        input_field_placeholder="Выберите период",
+    )
+    return keyboard
+
+
+def rating_period_keyboard() -> ReplyKeyboardMarkup:
+    """Меню выбора периода для рейтинга."""
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=BTN_RATING_CURRENT), KeyboardButton(text=BTN_RATING_PREV)],
             [KeyboardButton(text=BTN_BACK)],
         ],
         resize_keyboard=True,

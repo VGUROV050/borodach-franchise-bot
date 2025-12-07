@@ -60,6 +60,7 @@ from .keyboards import (
     useful_departments_keyboard,
     useful_actions_keyboard,
     statistics_period_keyboard,
+    rating_period_keyboard,
     ai_assistant_keyboard,
     BTN_TASKS,
     BTN_ACCOUNT,
@@ -69,6 +70,9 @@ from .keyboards import (
     BTN_STATS_PREV_MONTH,
     BTN_STATS_TODAY,
     BTN_STATS_YESTERDAY,
+    BTN_STATS_RATING,
+    BTN_RATING_CURRENT,
+    BTN_RATING_PREV,
     BTN_USEFUL,
     BTN_CONTACT_OFFICE_MAIN,
     BTN_USEFUL_DEVELOPMENT,
@@ -404,6 +408,11 @@ class StatisticsStates(StatesGroup):
     selecting_period = State()
 
 
+class RatingStates(StatesGroup):
+    """Состояния для раздела Рейтинг."""
+    selecting_period = State()
+
+
 class AIAssistantStates(StatesGroup):
     """Состояния для AI-ассистента (обучение)."""
     waiting_for_question = State()
@@ -599,6 +608,237 @@ async def stats_back_to_menu(message: types.Message, state: FSMContext) -> None:
     """Назад в главное меню."""
     await state.clear()
     await message.answer("🏠 Главное меню", reply_markup=main_menu_keyboard())
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Рейтинг сети
+# ═══════════════════════════════════════════════════════════════════
+
+@router.message(StatisticsStates.selecting_period, F.text == BTN_STATS_RATING)
+async def rating_menu_handler(message: types.Message, state: FSMContext) -> None:
+    """Переход в раздел рейтинга."""
+    await state.set_state(RatingStates.selecting_period)
+    await message.answer(
+        "🏆 <b>Рейтинг сети</b>\n\n"
+        "Выберите период:",
+        reply_markup=rating_period_keyboard(),
+    )
+
+
+@router.message(RatingStates.selecting_period, F.text == BTN_RATING_CURRENT)
+async def rating_current_month(message: types.Message, state: FSMContext) -> None:
+    """Рейтинг за текущий месяц."""
+    await _show_rating(message, state, is_current_month=True)
+
+
+@router.message(RatingStates.selecting_period, F.text == BTN_RATING_PREV)
+async def rating_prev_month(message: types.Message, state: FSMContext) -> None:
+    """Рейтинг за прошлый месяц."""
+    await _show_rating(message, state, is_current_month=False)
+
+
+@router.message(RatingStates.selecting_period, F.text == BTN_BACK)
+async def rating_back_to_stats(message: types.Message, state: FSMContext) -> None:
+    """Назад к статистике."""
+    await state.set_state(StatisticsStates.selecting_period)
+    await message.answer(
+        "📊 <b>Статистика</b>\n\nВыберите период:",
+        reply_markup=statistics_period_keyboard(),
+    )
+
+
+def _format_location(city: str | None) -> str:
+    """Форматировать локацию: для Москвы/СПб - город, для остальных - область."""
+    if not city:
+        return "—"
+    
+    city_lower = city.lower()
+    
+    # Москва и Санкт-Петербург показываем как город
+    if "москва" in city_lower or "moscow" in city_lower:
+        return "Москва"
+    if "санкт-петербург" in city_lower or "петербург" in city_lower or "спб" in city_lower:
+        return "Санкт-Петербург"
+    
+    # Для остальных пытаемся определить область/регион
+    # Если город содержит "область" или "край" - оставляем как есть
+    if "область" in city_lower or "край" in city_lower or "респ" in city_lower:
+        return city
+    
+    # Иначе просто возвращаем город
+    return city
+
+
+def _format_rank_change(current_rank: int, previous_rank: int | None) -> str:
+    """Форматировать изменение позиции."""
+    if previous_rank is None or previous_rank == 0:
+        return "🆕"
+    
+    change = previous_rank - current_rank
+    if change > 0:
+        return f"↑{change}"
+    elif change < 0:
+        return f"↓{abs(change)}"
+    else:
+        return "—"
+
+
+async def _show_rating(message: types.Message, state: FSMContext, is_current_month: bool) -> None:
+    """Показать рейтинг сети."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    from database import (
+        get_partner_companies, 
+        get_all_network_ratings, 
+        get_rating_history,
+        get_previous_month_ranks,
+    )
+    
+    loading_msg = await message.answer("⏳ Загружаю рейтинг...")
+    
+    tz = ZoneInfo("Europe/Moscow")
+    now = datetime.now(tz)
+    
+    async with AsyncSessionLocal() as db:
+        # Получаем салоны партнёра
+        partner = await get_partner_by_telegram_id(db, message.from_user.id)
+        if not partner:
+            await loading_msg.edit_text("❌ Партнёр не найден")
+            return
+        
+        partner_companies = await get_partner_companies(db, partner.id)
+        partner_yclients_ids = {c.yclients_id for c in partner_companies}
+        
+        if is_current_month:
+            # Текущий месяц
+            all_ratings = await get_all_network_ratings(db)
+            period_title = f"🏆 <b>Рейтинг сети — {now.strftime('%B %Y')}</b>\n"
+            
+            # Получаем предыдущие ранги для сравнения
+            if now.month == 1:
+                prev_year, prev_month = now.year - 1, 12
+            else:
+                prev_year, prev_month = now.year, now.month - 1
+            prev_ranks = await get_previous_month_ranks(db, prev_year, prev_month)
+        else:
+            # Прошлый месяц
+            if now.month == 1:
+                target_year, target_month = now.year - 1, 12
+            else:
+                target_year, target_month = now.year, now.month - 1
+            
+            all_ratings = await get_rating_history(db, target_year, target_month)
+            
+            month_names = {
+                1: "Январь", 2: "Февраль", 3: "Март", 4: "Апрель",
+                5: "Май", 6: "Июнь", 7: "Июль", 8: "Август",
+                9: "Сентябрь", 10: "Октябрь", 11: "Ноябрь", 12: "Декабрь"
+            }
+            period_title = f"🏆 <b>Рейтинг сети — {month_names[target_month]} {target_year}</b>\n"
+            
+            # Получаем ранги за позапрошлый месяц для сравнения
+            if target_month == 1:
+                prev_year, prev_month = target_year - 1, 12
+            else:
+                prev_year, prev_month = target_year, target_month - 1
+            prev_ranks = await get_previous_month_ranks(db, prev_year, prev_month)
+    
+    if not all_ratings:
+        await loading_msg.edit_text(
+            f"{period_title}\n"
+            "❌ Данные рейтинга недоступны.\n"
+            "Попробуйте позже.",
+        )
+        return
+    
+    # Сортируем по рангу
+    sorted_ratings = sorted(all_ratings, key=lambda x: x.rank if x.rank else 999)
+    total_companies = len(sorted_ratings)
+    
+    # Находим позиции салонов партнёра
+    partner_positions = []
+    for r in sorted_ratings:
+        yclients_id = r.yclients_company_id
+        if yclients_id in partner_yclients_ids:
+            partner_positions.append(r)
+    
+    # Формируем текст рейтинга
+    lines = [period_title, f"📊 Всего салонов: {total_companies}\n"]
+    
+    # Определяем какие позиции показывать
+    positions_to_show = set()
+    
+    # Всегда показываем топ-3
+    positions_to_show.update([1, 2, 3])
+    
+    # Добавляем позиции партнёра ± 2
+    for pr in partner_positions:
+        rank = pr.rank or 0
+        if rank > 3:  # Если партнёр не в топ-3
+            for r in range(max(1, rank - 2), min(total_companies + 1, rank + 3)):
+                positions_to_show.add(r)
+    
+    # Формируем список для отображения
+    shown_ranks = sorted(positions_to_show)
+    
+    # Проверяем нужен ли разделитель между топ-3 и позициями партнёра
+    need_separator = False
+    for pr in partner_positions:
+        if pr.rank and pr.rank > 5:  # Если есть разрыв
+            need_separator = True
+            break
+    
+    prev_rank_shown = 0
+    for r in sorted_ratings:
+        rank = r.rank or 0
+        if rank not in shown_ranks:
+            continue
+        
+        # Добавляем разделитель если есть разрыв
+        if prev_rank_shown > 0 and rank - prev_rank_shown > 1:
+            lines.append("   ···")
+        prev_rank_shown = rank
+        
+        yclients_id = r.yclients_company_id
+        is_partner = yclients_id in partner_yclients_ids
+        
+        # Получаем изменение позиции
+        prev_rank = prev_ranks.get(yclients_id)
+        change_str = _format_rank_change(rank, prev_rank)
+        
+        # Форматируем локацию
+        location = _format_location(r.city)
+        
+        # Форматируем выручку
+        revenue = r.revenue or 0
+        revenue_str = f"{revenue:,.0f}".replace(",", " ")
+        
+        # Медаль для топ-3
+        if rank == 1:
+            medal = "🥇"
+        elif rank == 2:
+            medal = "🥈"
+        elif rank == 3:
+            medal = "🥉"
+        else:
+            medal = f"{rank}."
+        
+        # Выделяем салон партнёра
+        if is_partner:
+            lines.append(f"\n<b>👉 {medal} {location}</b>")
+            lines.append(f"    💰 {revenue_str} ₽  {change_str}")
+        else:
+            lines.append(f"\n{medal} {location}")
+            lines.append(f"    💰 {revenue_str} ₽  {change_str}")
+    
+    # Добавляем информацию о салонах партнёра если не в списке
+    if not partner_positions:
+        lines.append("\n\n⚠️ <i>Ваши салоны пока не в рейтинге</i>")
+    
+    await loading_msg.edit_text(
+        "\n".join(lines),
+        reply_markup=rating_period_keyboard(),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
