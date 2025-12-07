@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Настройки бота — Borodach Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">⚙️ Настройки бота</h1>
+</div>
+
+<p style="color: var(--text-muted); margin-bottom: 1.5rem;">
+    Здесь можно настроить тексты кнопок и сообщений в боте.
+</p>
+
+<div class="settings-grid">
+    {% for setting in settings %}
+    <div class="card setting-card">
+        <div class="setting-header">
+            <div class="setting-key">{{ setting.key }}</div>
+            <a href="/bot-settings/{{ setting.key }}/edit" class="btn btn-sm btn-primary">✏️ Редактировать</a>
+        </div>
+        
+        {% if setting.description %}
+        <div class="setting-description">{{ setting.description }}</div>
+        {% endif %}
+        
+        <div class="setting-preview">
+            <div class="preview-title">Текущее значение:</div>
+            <div class="telegram-bubble">
+                {{ setting.value | safe }}
+            </div>
+        </div>
+        
+        <div class="setting-meta">
+            Обновлено: {{ setting.updated_at.strftime('%d.%m.%Y %H:%M') if setting.updated_at else '—' }}
+        </div>
+    </div>
+    {% else %}
+    <div class="card">
+        <p class="text-muted">Настройки не найдены</p>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+.settings-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.setting-card {
+    padding: 1.5rem;
+}
+
+.setting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.setting-key {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+.setting-description {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+
+.setting-preview {
+    background: #e5ddd5;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.preview-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.5px;
+}
+
+.telegram-bubble {
+    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.setting-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+</style>
+{% endblock %}
+

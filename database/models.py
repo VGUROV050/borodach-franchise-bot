@@ -812,3 +812,34 @@ class KnowledgeChunk(Base):
     def __repr__(self) -> str:
         return f"<KnowledgeChunk lesson={self.lesson_id} @{self.timestamp_formatted}>"
 
+
+# ============================================================
+# BOT SETTINGS - Настройки бота
+# ============================================================
+
+class BotSetting(Base):
+    """Настройки бота (ключ-значение)."""
+    
+    __tablename__ = "bot_settings"
+    
+    id: Mapped[int] = mapped_column(primary_key=True)
+    
+    # Уникальный ключ настройки
+    key: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    
+    # Значение настройки
+    value: Mapped[str] = mapped_column(Text)
+    
+    # Описание (для админки)
+    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    
+    # Временные метки
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    
+    def __repr__(self) -> str:
+        return f"<BotSetting {self.key}={self.value[:50]}>"
+

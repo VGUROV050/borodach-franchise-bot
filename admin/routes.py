@@ -2007,3 +2007,75 @@ async def run_diagnostics(request: Request):
         "checks": checks,
         "timestamp": datetime.now().strftime("%d.%m.%Y %H:%M:%S"),
     })
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Настройки бота (Bot Settings)
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/bot-settings", response_class=HTMLResponse)
+async def bot_settings_page(request: Request):
+    """Страница настроек бота."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_all_bot_settings, init_default_bot_settings
+    
+    async with AsyncSessionLocal() as db:
+        await init_default_bot_settings(db)
+        settings = await get_all_bot_settings(db)
+    
+    return templates.TemplateResponse(
+        "bot_settings.html",
+        {
+            "request": request,
+            "settings": settings,
+        },
+    )
+
+
+@router.get("/bot-settings/{key}/edit", response_class=HTMLResponse)
+async def edit_bot_setting_page(request: Request, key: str):
+    """Страница редактирования настройки."""
+    if not verify_session(request):
+        return RedirectResponse(url="/login", status_code=302)
+    
+    from database import get_bot_setting, init_default_bot_settings, BotSetting
+    from sqlalchemy import select
+    
+    async with AsyncSessionLocal() as db:
+        await init_default_bot_settings(db)
+        result = await db.execute(
+            select(BotSetting).where(BotSetting.key == key)
+        )
+        setting = result.scalar_one_or_none()
+    
+    if not setting:
+        raise HTTPException(status_code=404, detail="Настройка не найдена")
+    
+    return templates.TemplateResponse(
+        "edit_bot_setting.html",
+        {
+            "request": request,
+            "setting": setting,
+        },
+    )
+
+
+@router.post("/bot-settings/{key}/edit")
+async def save_bot_setting(
+    request: Request,
+    key: str,
+    value: str = Form(...),
+):
+    """Сохранить настройку."""
+    if not verify_session(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    from database import set_bot_setting
+    
+    async with AsyncSessionLocal() as db:
+        await set_bot_setting(db, key, value)
+    
+    logger.info(f"Updated bot setting: {key}")
+    return RedirectResponse(url="/bot-settings", status_code=302)

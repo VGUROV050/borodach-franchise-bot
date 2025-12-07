@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Редактирование настройки — Borodach Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="/bot-settings" class="btn btn-secondary">← Назад</a>
+    <h1 class="page-title" style="margin-left: 1rem;">Редактирование настройки</h1>
+</div>
+
+<div class="card">
+    <div class="setting-info">
+        <div class="setting-key">{{ setting.key }}</div>
+        {% if setting.description %}
+        <div class="setting-description">{{ setting.description }}</div>
+        {% endif %}
+    </div>
+    
+    <form method="post" action="/bot-settings/{{ setting.key }}/edit">
+        <div class="form-group">
+            <label class="form-label">Текст сообщения</label>
+            <textarea 
+                name="value" 
+                class="form-input" 
+                rows="12" 
+                placeholder="Введите текст..."
+                required
+            >{{ setting.value }}</textarea>
+            <div class="form-hint">
+                Поддерживаются HTML-теги: &lt;b&gt;жирный&lt;/b&gt;, &lt;i&gt;курсив&lt;/i&gt;, 
+                &lt;a href="..."&gt;ссылка&lt;/a&gt;, &lt;code&gt;код&lt;/code&gt;
+            </div>
+        </div>
+        
+        <div class="preview-section">
+            <div class="preview-title">Превью в Telegram:</div>
+            <div class="telegram-preview">
+                <div class="telegram-bubble" id="preview-bubble">
+                    {{ setting.value | safe }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+            <a href="/bot-settings" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.page-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.setting-info {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.setting-key {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+}
+
+.setting-description {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-family: monospace;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.form-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.preview-section {
+    background: #e5ddd5;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.preview-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.5px;
+}
+
+.telegram-preview {
+    max-width: 320px;
+}
+
+.telegram-bubble {
+    background: linear-gradient(135deg, #e3f0ff 0%, #d4e8ff 100%);
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+}
+</style>
+
+<script>
+// Live preview
+const textarea = document.querySelector('textarea[name="value"]');
+const preview = document.getElementById('preview-bubble');
+
+textarea.addEventListener('input', function() {
+    preview.innerHTML = this.value;
+});
+</script>
+{% endblock %}
+

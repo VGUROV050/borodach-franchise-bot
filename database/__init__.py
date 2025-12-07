@@ -24,6 +24,7 @@ from .models import (
     DepartmentType,
     DepartmentInfoType,
     DepartmentButton,
+    BotSetting,
 )
 from .crud import (
     get_partner_by_telegram_id,
@@ -83,6 +84,11 @@ from .crud import (
     update_department_button,
     delete_department_button,
     init_default_department_buttons,
+    # Bot Settings
+    get_bot_setting,
+    set_bot_setting,
+    get_all_bot_settings,
+    init_default_bot_settings,
 )
 
 __all__ = [
@@ -171,5 +177,11 @@ __all__ = [
     "update_department_button",
     "delete_department_button",
     "init_default_department_buttons",
+    # Bot Settings
+    "BotSetting",
+    "get_bot_setting",
+    "set_bot_setting",
+    "get_all_bot_settings",
+    "init_default_bot_settings",
 ]
 

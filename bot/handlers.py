@@ -70,6 +70,7 @@ from .keyboards import (
     BTN_STATS_TODAY,
     BTN_STATS_YESTERDAY,
     BTN_USEFUL,
+    BTN_CONTACT_OFFICE_MAIN,
     BTN_USEFUL_DEVELOPMENT,
     BTN_USEFUL_MARKETING,
     BTN_USEFUL_DESIGN,
@@ -196,6 +197,36 @@ async def tasks_menu_handler(message: types.Message, state: FSMContext) -> None:
     await message.answer(
         "📋 <b>Задачи</b>\n\nВыберите действие:",
         reply_markup=tasks_menu_keyboard(),
+    )
+
+
+@router.message(F.text == BTN_CONTACT_OFFICE_MAIN)
+async def contact_office_handler(message: types.Message, state: FSMContext) -> None:
+    """Показать информацию для связи с офисом."""
+    if not await _check_verified(message):
+        return
+    
+    await state.clear()
+    
+    # Получаем текст из настроек бота
+    from database import get_bot_setting, init_default_bot_settings
+    
+    async with AsyncSessionLocal() as db:
+        # Инициализируем настройки по умолчанию если их нет
+        await init_default_bot_settings(db)
+        text = await get_bot_setting(db, "contact_office_text")
+    
+    if not text:
+        text = (
+            "📞 <b>Связаться с офисом</b>\n\n"
+            "Информация временно недоступна.\n"
+            "Обратитесь к администратору."
+        )
+    
+    await message.answer(
+        text,
+        reply_markup=main_menu_keyboard(),
+        disable_web_page_preview=True,
     )
 
 

@@ -1530,3 +1530,94 @@ async def init_default_department_buttons(db: AsyncSession) -> int:
     logger.info(f"Initialized {created} default department buttons")
     return created
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Bot Settings CRUD
+# ═══════════════════════════════════════════════════════════════════
+
+from .models import BotSetting
+
+
+async def get_bot_setting(
+    db: AsyncSession,
+    key: str,
+    default: str = "",
+) -> str:
+    """Получить значение настройки бота по ключу."""
+    result = await db.execute(
+        select(BotSetting).where(BotSetting.key == key)
+    )
+    setting = result.scalar_one_or_none()
+    
+    return setting.value if setting else default
+
+
+async def set_bot_setting(
+    db: AsyncSession,
+    key: str,
+    value: str,
+    description: str = None,
+) -> BotSetting:
+    """Установить значение настройки бота."""
+    result = await db.execute(
+        select(BotSetting).where(BotSetting.key == key)
+    )
+    setting = result.scalar_one_or_none()
+    
+    if setting:
+        setting.value = value
+        if description:
+            setting.description = description
+    else:
+        setting = BotSetting(
+            key=key,
+            value=value,
+            description=description,
+        )
+        db.add(setting)
+    
+    await db.commit()
+    await db.refresh(setting)
+    
+    logger.info(f"Updated bot setting: {key}")
+    return setting
+
+
+async def get_all_bot_settings(db: AsyncSession) -> list[BotSetting]:
+    """Получить все настройки бота."""
+    result = await db.execute(
+        select(BotSetting).order_by(BotSetting.key)
+    )
+    return list(result.scalars().all())
+
+
+async def init_default_bot_settings(db: AsyncSession) -> int:
+    """Инициализировать настройки по умолчанию."""
+    defaults = {
+        "contact_office_text": (
+            "📞 <b>Связаться с офисом</b>\n\n"
+            "Для связи с управляющей компанией BORODACH:\n\n"
+            "📧 Email: franchise@borodach.com\n"
+            "📱 Телефон: +7 (XXX) XXX-XX-XX\n"
+            "💬 Telegram: @borodach_support\n\n"
+            "<i>Режим работы: Пн-Пт 10:00-19:00 (МСК)</i>",
+            "Текст кнопки 'Связаться с офисом' в главном меню"
+        ),
+    }
+    
+    created = 0
+    for key, (value, description) in defaults.items():
+        existing = await db.execute(
+            select(BotSetting).where(BotSetting.key == key)
+        )
+        if not existing.scalar_one_or_none():
+            setting = BotSetting(key=key, value=value, description=description)
+            db.add(setting)
+            created += 1
+    
+    if created > 0:
+        await db.commit()
+        logger.info(f"Initialized {created} default bot settings")
+    
+    return created
+
