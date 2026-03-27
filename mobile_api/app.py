@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import init_db, close_db
 
-from .routes import account, stats, rating, health
+from .routes import account, stats, rating, health, useful, tasks, ai, polls
 
 logger = logging.getLogger(__name__)
 
@@ -44,3 +44,7 @@ app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(account.router, prefix="/api/v1", tags=["account"])
 app.include_router(stats.router, prefix="/api/v1", tags=["statistics"])
 app.include_router(rating.router, prefix="/api/v1", tags=["rating"])
+app.include_router(useful.router, prefix="/api/v1", tags=["useful"])
+app.include_router(tasks.router, prefix="/api/v1", tags=["tasks"])
+app.include_router(ai.router, prefix="/api/v1", tags=["ai"])
+app.include_router(polls.router, prefix="/api/v1", tags=["polls"])

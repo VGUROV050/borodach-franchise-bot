@@ -67,3 +67,54 @@ export interface Rating {
 
 export type StatsPeriod = "today" | "yesterday" | "current_month" | "prev_month";
 export type RatingPeriod = "current" | "previous";
+
+export interface Department {
+  key: string;
+  name: string;
+}
+
+export interface DepartmentButton {
+  id: number;
+  button_text: string;
+  message_text: string;
+}
+
+export interface Task {
+  id: number;
+  title: string;
+  barbershop: string | null;
+  department_name: string;
+  stage: string;
+  stage_emoji: string;
+  created_at: string;
+  group_id: string;
+}
+
+export interface TaskCreateRequest {
+  department_key: string;
+  barbershop: string;
+  title: string;
+  description: string;
+}
+
+export interface AIResponse {
+  answer: string;
+}
+
+export interface ContactInfo {
+  text: string;
+}
+
+export interface PollOption {
+  id: number;
+  text: string;
+  position: number;
+}
+
+export interface Poll {
+  id: number;
+  question: string;
+  options: PollOption[];
+  status: string;
+  created_at: string;
+}

@@ -3,8 +3,18 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from mobile_api.deps import get_current_partner_id
-from mobile_api.schemas import PartnerProfileOut, CompanyOut
-from services.partner_service import get_partner_profile
+from mobile_api.schemas import (
+    PartnerProfileOut,
+    CompanyOut,
+    ContactOfficeOut,
+    BarbershopRequestIn,
+    BarbershopRequestOut,
+)
+from services.partner_service import (
+    get_partner_profile,
+    get_contact_office_text,
+    request_add_barbershop,
+)
 
 router = APIRouter()
 
@@ -55,3 +65,20 @@ async def get_companies(partner_id: int = Depends(get_current_partner_id)):
         )
         for c in profile.companies
     ]
+
+
+@router.get("/contact-office", response_model=ContactOfficeOut)
+async def contact_office():
+    text = await get_contact_office_text()
+    return ContactOfficeOut(text=text)
+
+
+@router.post("/barbershop-request", response_model=BarbershopRequestOut)
+async def barbershop_request(
+    body: BarbershopRequestIn,
+    partner_id: int = Depends(get_current_partner_id),
+):
+    success = await request_add_barbershop(partner_id, body.branch_text)
+    if not success:
+        raise HTTPException(status_code=404, detail="Partner not found")
+    return BarbershopRequestOut(success=True)

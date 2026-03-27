@@ -84,3 +84,104 @@ class RatingOut(BaseModel):
 class HealthOut(BaseModel):
     status: str
     version: str
+
+
+# ── Useful Info (Полезное) ────────────────────────────────────────
+
+class DepartmentOut(BaseModel):
+    key: str
+    name: str
+
+
+class DepartmentButtonOut(BaseModel):
+    id: int
+    button_text: str
+    message_text: str
+
+
+# ── Tasks (Задачи) ──────────────────────────────────────────────
+
+class TaskDepartmentOut(BaseModel):
+    key: str
+    name: str
+    group_id: str
+    responsible_id: str
+
+
+class TaskOut(BaseModel):
+    id: int
+    title: str
+    barbershop: Optional[str] = None
+    created_at: str
+    stage: str
+    stage_emoji: str
+    group_id: str
+    department_name: str
+
+
+class TaskCreateIn(BaseModel):
+    department_key: str
+    barbershop: str
+    title: str
+    description: str
+
+
+class TaskCreateOut(BaseModel):
+    task_id: int
+
+
+class TaskCancelOut(BaseModel):
+    success: bool
+
+
+# ── AI Assistant ─────────────────────────────────────────────────
+
+class AiAskIn(BaseModel):
+    question: str
+    detailed: bool = False
+
+
+class AiAskOut(BaseModel):
+    answer: str
+
+
+# ── Contact Office ───────────────────────────────────────────────
+
+class ContactOfficeOut(BaseModel):
+    text: str
+
+
+# ── Polls (Опросы) ──────────────────────────────────────────────
+
+class PollOptionOut(BaseModel):
+    id: int
+    text: str
+    position: int
+
+
+class PollOut(BaseModel):
+    id: int
+    question: str
+    is_anonymous: bool = True
+    allows_multiple: bool = False
+    status: str
+    options: list[PollOptionOut] = []
+    created_at: Optional[datetime] = None
+
+
+class PollVoteIn(BaseModel):
+    option_ids: list[int]
+
+
+class PollVoteOut(BaseModel):
+    success: bool
+
+
+# ── Barbershop Request ──────────────────────────────────────────
+
+class BarbershopRequestIn(BaseModel):
+    branch_text: str
+
+
+class BarbershopRequestOut(BaseModel):
+    success: bool

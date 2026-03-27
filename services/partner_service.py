@@ -13,6 +13,8 @@ from database import (
     AsyncSessionLocal,
     get_partner_by_id,
     get_partner_companies,
+    get_bot_setting,
+    update_partner_for_branch_request,
     PartnerStatus,
 )
 
@@ -84,3 +86,15 @@ async def get_partner_profile(partner_id: int) -> Optional[PartnerProfile]:
             created_at=partner.created_at,
             verified_at=partner.verified_at,
         )
+
+
+async def get_contact_office_text() -> str:
+    async with AsyncSessionLocal() as db:
+        text = await get_bot_setting(db, "contact_office_text")
+    return text or "Информация временно недоступна. Обратитесь к администратору."
+
+
+async def request_add_barbershop(partner_id: int, branch_text: str) -> bool:
+    async with AsyncSessionLocal() as db:
+        result = await update_partner_for_branch_request(db, partner_id, branch_text)
+        return result is not None

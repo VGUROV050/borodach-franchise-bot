@@ -1,5 +1,3 @@
-// Profile screen — read-only partner info
-
 import React from "react";
 import { ScrollView, View, Text, StyleSheet, RefreshControl } from "react-native";
 import { Card } from "@/components/ui/Card";
@@ -8,8 +6,9 @@ import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { colors, spacing, fonts, radius } from "@/lib/theme";
+import { colors, spacing, fonts } from "@/lib/theme";
 import { formatDate } from "@/lib/formatters";
+import { Stack } from "expo-router";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   verified: { label: "Верифицирован", color: colors.success },
@@ -30,60 +29,63 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={refresh}
-          tintColor={colors.gold}
-        />
-      }
-    >
-      {/* Avatar & Name */}
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {p.full_name.charAt(0).toUpperCase()}
-          </Text>
+    <>
+      <Stack.Screen options={{ headerTitle: "Профиль" }} />
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            tintColor={colors.gold}
+          />
+        }
+      >
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {p.full_name.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={styles.name}>{p.full_name}</Text>
+          <Badge label={statusInfo.label} bgColor={statusInfo.color} />
         </View>
-        <Text style={styles.name}>{p.full_name}</Text>
-        <Badge
-          label={statusInfo.label}
-          bgColor={statusInfo.color}
-        />
-      </View>
 
-      {/* Info card */}
-      <Card>
-        <InfoRow label="Телефон" value={p.phone_masked} />
-        <InfoRow label="Роль" value={p.is_owner ? "Владелец" : (p.position ?? "Сотрудник")} />
-        <InfoRow label="Регистрация" value={formatDate(p.created_at)} />
-        {p.verified_at && (
-          <InfoRow label="Верификация" value={formatDate(p.verified_at)} last />
-        )}
-      </Card>
-
-      {/* Companies */}
-      <Text style={styles.sectionTitle}>Салоны</Text>
-      {p.companies.length === 0 ? (
         <Card>
-          <Text style={styles.emptyText}>Нет привязанных салонов</Text>
+          <InfoRow label="Телефон" value={p.phone_masked} />
+          <InfoRow
+            label="Роль"
+            value={p.is_owner ? "Владелец" : (p.position ?? "Сотрудник")}
+          />
+          <InfoRow label="Регистрация" value={formatDate(p.created_at)} />
+          {p.verified_at && (
+            <InfoRow
+              label="Верификация"
+              value={formatDate(p.verified_at)}
+              last
+            />
+          )}
         </Card>
-      ) : (
-        p.companies.map((c) => (
-          <Card key={c.id}>
-            <Text style={styles.companyName}>💈 {c.name}</Text>
-            {c.city && <Text style={styles.companyDetail}>{c.city}</Text>}
-            {c.region && <Text style={styles.companyDetail}>{c.region}</Text>}
-          </Card>
-        ))
-      )}
 
-      {/* App version */}
-      <Text style={styles.version}>v0.1.0 — TestFlight MVP</Text>
-    </ScrollView>
+        <Text style={styles.sectionTitle}>Салоны</Text>
+        {p.companies.length === 0 ? (
+          <Card>
+            <Text style={styles.emptyText}>Нет привязанных салонов</Text>
+          </Card>
+        ) : (
+          p.companies.map((c) => (
+            <Card key={c.id}>
+              <Text style={styles.companyName}>💈 {c.name}</Text>
+              {c.city && <Text style={styles.companyDetail}>{c.city}</Text>}
+              {c.region && <Text style={styles.companyDetail}>{c.region}</Text>}
+            </Card>
+          ))
+        )}
+
+        <Text style={styles.version}>v0.1.0 — TestFlight MVP</Text>
+      </ScrollView>
+    </>
   );
 }
 

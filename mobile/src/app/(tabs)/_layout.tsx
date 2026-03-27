@@ -53,6 +53,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="tasks"
+        options={{
+          title: "Задачи",
+          headerTitle: "Задачи",
+          tabBarIcon: ({ focused }) => tabIcon("📋", focused),
+        }}
+      />
+      <Tabs.Screen
         name="rating"
         options={{
           title: "Рейтинг",
@@ -61,11 +69,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="more"
         options={{
-          title: "Профиль",
-          headerTitle: "Профиль",
-          tabBarIcon: ({ focused }) => tabIcon("👤", focused),
+          title: "Ещё",
+          headerTitle: "Ещё",
+          tabBarIcon: ({ focused }) => tabIcon("⋯", focused),
         }}
       />
     </Tabs>
