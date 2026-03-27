@@ -1,22 +1,24 @@
 #!/bin/bash
-# Скрипт остановки бота
+# Скрипт остановки бота и мобильного API
 
 cd /home/borodachdev/apps/borodach-franchise-bot
 
-if [ -f bot.pid ]; then
-    PID=$(cat bot.pid)
-    if ps -p $PID > /dev/null 2>&1; then
-        echo "Stopping bot (PID: $PID)..."
-        kill $PID
-        rm -f bot.pid
-        echo "Bot stopped."
+for SERVICE in bot mobile_api; do
+    PIDFILE="${SERVICE}.pid"
+    if [ -f "$PIDFILE" ]; then
+        PID=$(cat "$PIDFILE")
+        if ps -p $PID > /dev/null 2>&1; then
+            echo "Stopping $SERVICE (PID: $PID)..."
+            kill $PID
+            echo "$SERVICE stopped."
+        else
+            echo "$SERVICE process not running."
+        fi
+        rm -f "$PIDFILE"
     else
-        echo "Bot process not running."
-        rm -f bot.pid
+        echo "No PID file for $SERVICE."
     fi
-else
-    echo "No PID file found."
-fi
+done
 
 
 

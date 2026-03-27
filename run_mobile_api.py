@@ -12,5 +12,6 @@ if __name__ == "__main__":
         "mobile_api:app",
         host="0.0.0.0",
         port=8001,
-        reload=True,
+        reload=False,
+        log_level="info",
     )

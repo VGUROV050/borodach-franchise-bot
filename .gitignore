@@ -6,6 +6,7 @@ __pycache__/
 
 logs/*.log
 bot.pid
+mobile_api.pid
 
 # Knowledge Base media files (large)
 knowledge_base/videos/**/*.mp4
