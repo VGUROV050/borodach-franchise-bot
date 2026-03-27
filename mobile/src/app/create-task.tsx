@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   },
   optionSelected: {
     borderColor: colors.accent,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
   },
   optionText: {
     ...fonts.medium,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.border,
     padding: spacing.md,
     color: colors.text,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   confirmRowBorder: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: colors.border,
   },
   confirmLabel: {

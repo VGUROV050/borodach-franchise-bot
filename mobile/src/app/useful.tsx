@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   },
   deptCardExpanded: {
     borderColor: colors.accent,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   buttonsList: {
     backgroundColor: colors.bg,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderTopWidth: 0,
     borderColor: colors.border,
     borderBottomLeftRadius: radius.md,

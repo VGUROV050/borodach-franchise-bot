@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
     marginTop: spacing.md,
     paddingTop: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: 0.5,
     borderTopColor: colors.border,
   },
   rankValueRow: {

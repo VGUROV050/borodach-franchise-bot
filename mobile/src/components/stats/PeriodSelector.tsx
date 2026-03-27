@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.lg,
     backgroundColor: colors.card,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.border,
   },
   chipActive: {

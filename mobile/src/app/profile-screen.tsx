@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   infoRowBorder: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 0.5,
     borderBottomColor: colors.border,
   },
   infoLabel: {

@@ -4,6 +4,7 @@
 
 Native iOS/Android app for franchise partners built with **React Native (Expo)**.
 Full-featured app with statistics, tasks, AI assistant, polls, and more.
+Light theme (Wio-inspired) with green accent, floating menu, stories, and notification banners.
 Distributed via **TestFlight** (iOS). Current build: **#3**.
 
 > The Telegram bot and admin panel remain unchanged.
@@ -17,7 +18,7 @@ Distributed via **TestFlight** (iOS). Current build: **#3**.
 │  React Native (Expo)     │       │  Existing Server        │
 │  mobile/                 │       │                         │
 │  ┌────────────────────┐  │  REST │  ┌──────────────────┐   │
-│  │  5 tabs + screens  │──┼──────▶│  │ mobile_api :8001 │   │
+│  │ Stack + FloatingMenu│──┼──────▶│  │ mobile_api :8001 │   │
 │  └────────────────────┘  │       │  └────────┬─────────┘   │
 └──────────────────────────┘       │           │             │
                                    │  ┌────────▼─────────┐   │
@@ -96,7 +97,7 @@ python run_mobile_api.py
 ### Tech stack
 
 - **Expo SDK 55** (React Native 0.83)
-- **Expo Router** — file-based routing
+- **Expo Router** — file-based routing (Stack navigator, no tabs)
 - **TypeScript** — strict mode
 
 ### Project structure
@@ -105,14 +106,11 @@ python run_mobile_api.py
 mobile/
   src/
     app/
-      _layout.tsx              Root layout (Stack)
-      (tabs)/
-        _layout.tsx            Tab navigator (5 tabs)
-        index.tsx              Dashboard screen
-        stats.tsx              Statistics screen
-        tasks.tsx              Tasks screen (Bitrix)
-        rating.tsx             Rating screen
-        more.tsx               More menu screen
+      _layout.tsx              Root layout (Stack, no back buttons)
+      index.tsx                Dashboard (stories, notifications, barbershop carousel)
+      stats.tsx                Statistics screen
+      tasks.tsx                Tasks screen (Bitrix)
+      rating.tsx               Rating screen
       create-task.tsx          Multi-step task creation wizard
       useful.tsx               Useful info by department
       ai-chat.tsx              AI assistant chat
@@ -120,6 +118,9 @@ mobile/
       polls.tsx                Active polls with voting
       profile-screen.tsx       Partner profile
     components/
+      FloatingMenu.tsx         Full-screen menu overlay (replaces tabs)
+      StoriesRow.tsx           Horizontal scrollable story circles
+      NotificationBanners.tsx  Dismissible notification cards
       ui/                      Reusable atoms (Card, Badge, Skeleton, etc.)
       stats/                   StatsCard, PeriodSelector
       rating/                  RatingRow, RatingTable
@@ -128,7 +129,7 @@ mobile/
       config.ts                API_URL, PARTNER_ID
       types.ts                 TypeScript types (mirrors backend schemas)
       formatters.ts            Currency, date, number formatting
-      theme.ts                 Dark theme colors, spacing, typography
+      theme.ts                 Light theme: #F2F2F7 bg, #5CAE5D accent, Helvetica
     hooks/
       useApi.ts                Generic data-fetching hook
   app.json                     Expo config (bundleIdentifier, buildNumber)
@@ -136,29 +137,49 @@ mobile/
   tsconfig.json
 ```
 
+### Navigation
+
+No tab bar. All navigation goes through the **FloatingMenu** — a green circular
+button at the bottom of every screen. Pressing it opens a full-screen white overlay
+with a 3×3 grid of menu items. Back buttons are disabled on all screens.
+
+### Dashboard (index.tsx)
+
+1. **Greeting** — "Здравствуйте, {name} 👋"
+2. **Stories row** — horizontal scroll of circular thumbnails (mock data, admin management planned)
+3. **Notification banners** — colored cards (info/warning/success) with dismiss button (mock data, admin management planned)
+4. **Barbershop carousel** — swipeable cards, one per barbershop:
+   - Barbershop name + city
+   - Revenue (big green number)
+   - Period label
+   - Metrics row: records, avg check, rank position with change arrow
+   - **Toggle button** "месяц"/"сегодня" in top-right corner — flips between today and monthly stats with animation
+   - Dot indicators for multiple barbershops
+
 ### Screens
 
-| Screen | Location | Description |
-|--------|----------|-------------|
-| Dashboard | Tab 🏠 | Partner greeting, current month revenue, salon list |
-| Statistics | Tab 📊 | Period selector, per-salon revenue/records/rank cards |
-| Tasks | Tab 📋 | Active/all toggle, grouped task list, create/cancel tasks |
-| Rating | Tab 🏆 | Network leaderboard, partner salons highlighted |
-| More | Tab ⋯ | Menu: Полезное, AI, Связь, Опросы, Профиль |
-| Create Task | Modal | 5-step wizard: department → salon → title → description → confirm |
-| Useful | Stack | Expandable department cards with content |
-| AI Chat | Stack | Chat bubbles, "Подробнее" button |
-| Contact | Stack | Office contact info from settings |
-| Polls | Stack | Radio buttons, vote submission |
-| Profile | Stack | Name, phone, role, dates, salon list |
+| Screen | Route | Description |
+|--------|-------|-------------|
+| Dashboard | `/` | Stories, notifications, barbershop cards carousel |
+| Statistics | `/stats` | Period selector, per-salon revenue/records/rank cards |
+| Tasks | `/tasks` | Active/all toggle, grouped task list, create/cancel |
+| Rating | `/rating` | Network leaderboard, partner salons highlighted |
+| Create Task | `/create-task` | 5-step wizard (modal) |
+| Useful | `/useful` | Expandable department cards with content |
+| AI Chat | `/ai-chat` | Chat bubbles, "Подробнее" button |
+| Contact | `/contact` | Office contact info from settings |
+| Polls | `/polls` | Radio buttons, vote submission |
+| Profile | `/profile-screen` | Name, phone, role, dates, salon list |
 
 ### Theme
 
-Dark theme with barbershop aesthetic:
-- Background: `#0F0F1A`
-- Cards: `#1A1A2E`
-- Accent (gold): `#C9A84C`
-- Text: `#EAEAEA`
+Light theme (Wio-inspired):
+- Background: `#F2F2F7`
+- Cards: `#FFFFFF`
+- Accent (green): `#5CAE5D`
+- Text: `#1A1A1A`
+- All borders: `0.5` width (thin lines)
+- Font: system default (Helvetica-like)
 
 ### Config
 
@@ -241,7 +262,7 @@ eas submit --platform ios --latest
 ## Roadmap
 
 1. ✅ Backend API (services + mobile_api)
-2. ✅ React Native app (5 tabs, 6 stack screens, dark theme)
+2. ✅ React Native app (Stack navigator, floating menu, light theme)
 3. ✅ TestFlight build & distribution (build #3)
 4. ✅ Statistics, Rating, Profile
 5. ✅ Tasks (Bitrix: create, view, cancel)
@@ -251,6 +272,12 @@ eas submit --platform ios --latest
 9. ✅ Polls (voting)
 10. ✅ Add barbershop request
 11. ✅ iOS Simulator dev workflow
-12. ⬜ JWT authentication (login screen, refresh tokens)
-13. ⬜ Push notifications (Expo Push + FCM)
-14. ⬜ Chat between partners (отложено — отдельная задача)
+12. ✅ UI redesign — light Wio-style theme, floating menu, thin borders
+13. ✅ Dashboard: barbershop carousel with today/month toggle
+14. ✅ Dashboard: stories row (mock data — admin upload planned)
+15. ✅ Dashboard: notification banners (mock data — admin management planned)
+16. ⬜ Stories: admin panel for uploading stories content
+17. ⬜ Notifications: admin panel for managing notification banners
+18. ⬜ JWT authentication (login screen, refresh tokens)
+19. ⬜ Push notifications (Expo Push + FCM)
+20. ⬜ Chat between partners (отложено — отдельная задача)

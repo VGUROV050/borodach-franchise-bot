@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.sm,
     borderRadius: radius.sm,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.border,
   },
   optionSelected: {
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: colors.textMuted,
     alignItems: "center",
     justifyContent: "center",

@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   aiBubble: {
     backgroundColor: colors.card,
     alignSelf: "flex-start",
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.border,
   },
   aiLabel: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     padding: spacing.md,
     gap: spacing.sm,
-    borderTopWidth: 1,
+    borderTopWidth: 0.5,
     borderTopColor: colors.border,
     backgroundColor: colors.card,
   },
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     maxHeight: 100,
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: colors.border,
   },
   sendBtn: {

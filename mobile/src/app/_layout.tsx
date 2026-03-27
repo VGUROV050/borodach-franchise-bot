@@ -8,6 +8,9 @@ const headerOptions = {
   headerTintColor: colors.text,
   headerTitleStyle: { fontWeight: "700" as const, fontSize: 18 },
   headerShadowVisible: false,
+  headerBackVisible: false,
+  headerLeft: () => null,
+  gestureEnabled: false,
 };
 
 export default function RootLayout() {

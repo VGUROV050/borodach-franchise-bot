@@ -34,6 +34,6 @@ const styles = StyleSheet.create({
   },
   accent: {
     borderColor: colors.accent,
-    borderWidth: 1.5,
+    borderWidth: 0.5,
   },
 });
