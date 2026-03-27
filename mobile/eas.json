@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 3.0.0"
+    "version": ">= 3.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -8,19 +9,16 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
+      "distribution": "store",
       "ios": {
-        "simulator": false
+        "image": "latest",
+        "resourceClass": "m-medium"
       }
     },
-    "production": {}
-  },
-  "submit": {
     "production": {
+      "distribution": "store",
       "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
+        "image": "latest"
       }
     }
   }

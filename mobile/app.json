@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.borodach.partner"
+      "bundleIdentifier": "com.borodach.partner",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.borodach.partner",
@@ -25,9 +28,19 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      ["expo-router", { "root": "src/app" }]
+    ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "root": "src/app"
+      },
+      "eas": {
+        "projectId": "ae220f6e-d335-4845-a41c-95917e2b543d"
+      }
     }
   }
 }
