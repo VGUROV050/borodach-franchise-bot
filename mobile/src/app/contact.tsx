@@ -24,7 +24,7 @@ export default function ContactScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={colors.gold}
+            tintColor={colors.accent}
           />
         }
       >
@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
     alignItems: "center",
   },
   icon: {

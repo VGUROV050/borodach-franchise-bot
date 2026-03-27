@@ -53,7 +53,7 @@ export default function PollsScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={colors.gold}
+            tintColor={colors.accent}
           />
         }
       >
@@ -129,7 +129,7 @@ export default function PollsScreen() {
                     onPress={() => handleVote(poll)}
                   >
                     {isVoting ? (
-                      <ActivityIndicator color={colors.bg} size="small" />
+                      <ActivityIndicator color={colors.white} size="small" />
                     ) : (
                       <Text style={styles.voteBtnText}>Голосовать</Text>
                     )}
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   emptyText: {
     ...fonts.regular,
@@ -180,8 +180,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   optionSelected: {
-    borderColor: colors.gold,
-    backgroundColor: `${colors.gold}15`,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentBg,
   },
   optionDisabled: {
     opacity: 0.7,
@@ -196,13 +196,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   radioSelected: {
-    borderColor: colors.gold,
+    borderColor: colors.accent,
   },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
   },
   optionText: {
     ...fonts.regular,
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   voteBtn: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: "center",
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   voteBtnText: {
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "800",
     fontSize: 15,
   },

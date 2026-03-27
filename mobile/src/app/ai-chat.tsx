@@ -130,7 +130,7 @@ export default function AIChatScreen() {
 
         {loading && (
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={colors.gold} />
+            <ActivityIndicator size="small" color={colors.accent} />
             <Text style={styles.loadingText}>AI думает...</Text>
           </View>
         )}
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   messagesList: {
     padding: spacing.md,
     gap: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingBottom: 100,
   },
   messageBubble: {
     borderRadius: radius.md,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     maxWidth: "85%",
   },
   userBubble: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     alignSelf: "flex-end",
   },
   aiBubble: {
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   },
   aiLabel: {
     ...fonts.caption,
-    color: colors.gold,
+    color: colors.accent,
     fontWeight: "700",
     marginBottom: spacing.xs,
   },
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   userText: {
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "600",
   },
   detailBtn: {
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   detailBtnText: {
     ...fonts.caption,
-    color: colors.gold,
+    color: colors.accent,
     fontWeight: "700",
   },
   loadingRow: {
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "flex-end",
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   sendBtnText: {
     fontSize: 20,
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "800",
   },
 });

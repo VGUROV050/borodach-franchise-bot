@@ -215,7 +215,7 @@ export default function CreateTaskScreen() {
                 onPress={handleSubmit}
               >
                 {submitting ? (
-                  <ActivityIndicator color={colors.bg} />
+                  <ActivityIndicator color={colors.white} />
                 ) : (
                   <Text style={styles.submitBtnText}>Создать задачу</Text>
                 )}
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   dotActive: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
   },
   stepTitle: {
     ...fonts.large,
@@ -282,13 +282,13 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   optionCard: {
     gap: spacing.xs,
   },
   optionSelected: {
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderWidth: 1.5,
   },
   optionText: {
@@ -314,13 +314,13 @@ const styles = StyleSheet.create({
     minHeight: 120,
   },
   nextBtn: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: "center",
   },
   nextBtnText: {
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "800",
     fontSize: 16,
   },
@@ -346,13 +346,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   submitBtn: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: "center",
   },
   submitBtnText: {
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "800",
     fontSize: 16,
   },

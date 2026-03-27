@@ -1,5 +1,3 @@
-// Network rating screen — leaderboard with partner highlighting
-
 import React, { useState } from "react";
 import {
   ScrollView,
@@ -32,11 +30,10 @@ export default function RatingScreen() {
         <RefreshControl
           refreshing={loading && !!data}
           onRefresh={refresh}
-          tintColor={colors.gold}
+          tintColor={colors.accent}
         />
       }
     >
-      {/* Period toggle */}
       <View style={styles.toggle}>
         <TouchableOpacity
           style={[styles.toggleBtn, period === "current" && styles.toggleActive]}
@@ -81,7 +78,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
     gap: spacing.md,
   },
   toggle: {
@@ -97,7 +94,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   toggleActive: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
   },
   toggleText: {
     color: colors.textSecondary,
@@ -105,7 +102,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   toggleTextActive: {
-    color: colors.bg,
+    color: colors.white,
   },
   periodLabel: {
     ...fonts.large,

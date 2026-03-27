@@ -87,7 +87,7 @@ export default function TasksScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={colors.gold}
+            tintColor={colors.accent}
           />
         }
       >
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm - 2,
   },
   toggleBtnActive: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
   },
   toggleText: {
     ...fonts.regular,
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   toggleTextActive: {
-    color: colors.bg,
+    color: colors.white,
   },
   content: {
     padding: spacing.md,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   taskId: {
     ...fonts.caption,
-    color: colors.gold,
+    color: colors.accent,
     fontWeight: "700",
   },
   taskDate: {
@@ -263,18 +263,18 @@ const styles = StyleSheet.create({
     bottom: 24,
     right: spacing.md,
     left: spacing.md,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: 14,
     alignItems: "center",
-    shadowColor: colors.gold,
+    shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   fabText: {
-    color: colors.bg,
+    color: colors.white,
     fontWeight: "800",
     fontSize: 16,
   },

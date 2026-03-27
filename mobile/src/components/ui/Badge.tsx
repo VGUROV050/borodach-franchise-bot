@@ -11,7 +11,7 @@ interface BadgeProps {
 export function Badge({
   label,
   color = colors.white,
-  bgColor = colors.gold,
+  bgColor = colors.accent,
 }: BadgeProps) {
   return (
     <View style={[styles.badge, { backgroundColor: bgColor }]}>

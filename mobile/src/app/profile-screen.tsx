@@ -38,7 +38,7 @@ export default function ProfileScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={colors.gold}
+            tintColor={colors.accent}
           />
         }
       >
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   header: {
     alignItems: "center",
@@ -125,14 +125,14 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
   avatarText: {
     fontSize: 32,
     fontWeight: "800",
-    color: colors.bg,
+    color: colors.white,
   },
   name: {
     ...fonts.title,

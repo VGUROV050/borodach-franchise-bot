@@ -1,5 +1,3 @@
-// Dashboard — partner overview with revenue summary
-
 import React from "react";
 import { ScrollView, View, Text, StyleSheet, RefreshControl } from "react-native";
 import { Card } from "@/components/ui/Card";
@@ -31,17 +29,15 @@ export default function DashboardScreen() {
             profile.refresh();
             stats.refresh();
           }}
-          tintColor={colors.gold}
+          tintColor={colors.accent}
         />
       }
     >
-      {/* Greeting */}
       <View style={styles.greeting}>
         <Text style={styles.hello}>Здравствуйте,</Text>
         <Text style={styles.name}>{p.full_name} 👋</Text>
       </View>
 
-      {/* Revenue summary */}
       {s && (
         <Card variant="accent" style={styles.revenueCard}>
           <Text style={styles.revenueLabel}>Выручка за текущий месяц</Text>
@@ -60,7 +56,6 @@ export default function DashboardScreen() {
         </Card>
       )}
 
-      {/* Barbershop list */}
       <Text style={styles.sectionTitle}>Ваши салоны</Text>
       {p.companies.length === 0 ? (
         <Card>
@@ -88,7 +83,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   greeting: {
     marginBottom: spacing.sm,
@@ -111,7 +106,7 @@ const styles = StyleSheet.create({
   revenueValue: {
     fontSize: 32,
     fontWeight: "800",
-    color: colors.gold,
+    color: colors.accent,
   },
   revenuePeriod: {
     ...fonts.caption,

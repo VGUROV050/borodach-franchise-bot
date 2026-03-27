@@ -73,7 +73,7 @@ export default function UsefulScreen() {
               <View style={styles.buttonsList}>
                 {loadingDept === dept.key ? (
                   <ActivityIndicator
-                    color={colors.gold}
+                    color={colors.accent}
                     style={styles.loader}
                   />
                 ) : buttons[dept.key]?.length === 0 ? (
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     gap: spacing.sm,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
   },
   deptCard: {
     flexDirection: "row",
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   deptCardExpanded: {
-    borderColor: colors.gold,
+    borderColor: colors.accent,
     borderWidth: 1.5,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   buttonsList: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.bg,
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: colors.border,

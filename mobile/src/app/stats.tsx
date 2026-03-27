@@ -1,5 +1,3 @@
-// Statistics screen — per-barbershop revenue with period selector
-
 import React, { useState } from "react";
 import { ScrollView, View, Text, StyleSheet, RefreshControl } from "react-native";
 import { Card } from "@/components/ui/Card";
@@ -28,7 +26,7 @@ export default function StatsScreen() {
         <RefreshControl
           refreshing={loading && !!data}
           onRefresh={refresh}
-          tintColor={colors.gold}
+          tintColor={colors.accent}
         />
       }
     >
@@ -72,7 +70,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingBottom: 100,
     gap: spacing.md,
   },
   header: {
@@ -93,7 +91,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 28,
     fontWeight: "800",
-    color: colors.gold,
+    color: colors.accent,
   },
   totalRecords: {
     ...fonts.caption,
