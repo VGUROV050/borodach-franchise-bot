@@ -5,6 +5,6 @@
 
 export const API_URL = __DEV__
   ? "http://localhost:8001"
-  : "https://api.borodach-franchise.ru";
+  : "http://api-franchise-app.borodach.com";
 
-export const PARTNER_ID = 1;
+export const PARTNER_ID = 12;
