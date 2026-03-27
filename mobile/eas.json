@@ -6,7 +6,11 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "store",
+      "ios": {
+        "image": "latest",
+        "resourceClass": "m-medium"
+      }
     },
     "preview": {
       "distribution": "store",
