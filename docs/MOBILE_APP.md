@@ -5,7 +5,8 @@
 Native iOS/Android app for franchise partners built with **React Native (Expo)**.
 Full-featured app with statistics, tasks, AI assistant, polls, and more.
 Light theme (Wio-inspired) with green accent, floating menu, stories, and notification banners.
-Distributed via **TestFlight** (iOS). Current build: **#3**.
+SVG logo in header, pill-style period chips, bottom-sheet task creation.
+Distributed via **TestFlight** (iOS). Current build: **#4**.
 
 > The Telegram bot and admin panel remain unchanged.
 
@@ -99,6 +100,8 @@ python run_mobile_api.py
 - **Expo SDK 55** (React Native 0.83)
 - **Expo Router** — file-based routing (Stack navigator, no tabs)
 - **TypeScript** — strict mode
+- **react-native-svg** — SVG logo rendering
+- **lucide-react-native** — vector icons
 
 ### Project structure
 
@@ -107,19 +110,21 @@ mobile/
   src/
     app/
       _layout.tsx              Root layout (Stack, no back buttons)
-      index.tsx                Dashboard (stories, notifications, barbershop carousel)
+      index.tsx                Dashboard (logo, stories, notifications, barbershop carousel)
       stats.tsx                Statistics screen
-      tasks.tsx                Tasks screen (Bitrix)
+      tasks.tsx                Tasks screen (Bitrix) with useFocusEffect refresh
       rating.tsx               Rating screen
-      create-task.tsx          Multi-step task creation wizard
-      useful.tsx               Useful info by department
+      create-task.tsx          Multi-step task creation (bottom sheet)
+      useful.tsx               Useful info — nested accordions
       ai-chat.tsx              AI assistant chat
       contact.tsx              Contact office info
       polls.tsx                Active polls with voting
       profile-screen.tsx       Partner profile
+      notifications.tsx        Notifications list screen
     components/
       FloatingMenu.tsx         Full-screen menu overlay (replaces tabs)
-      StoriesRow.tsx           Horizontal scrollable story circles
+      StoriesRow.tsx           Horizontal story circles (auto-fit 5, scroll for more)
+      BorodachLogo.tsx         SVG logo component (react-native-svg)
       NotificationBanners.tsx  Dismissible notification cards
       ui/                      Reusable atoms (Card, Badge, Skeleton, etc.)
       stats/                   StatsCard, PeriodSelector
@@ -129,7 +134,9 @@ mobile/
       config.ts                API_URL, PARTNER_ID
       types.ts                 TypeScript types (mirrors backend schemas)
       formatters.ts            Currency, date, number formatting
-      theme.ts                 Light theme: #F2F2F7 bg, #5CAE5D accent, Helvetica
+      theme.ts                 Light theme: #F2F2F7 bg, #5CAE5D accent
+    assets/
+      borodach-logo.svg        Source SVG logo
     hooks/
       useApi.ts                Generic data-fetching hook
   app.json                     Expo config (bundleIdentifier, buildNumber)
@@ -140,46 +147,51 @@ mobile/
 ### Navigation
 
 No tab bar. All navigation goes through the **FloatingMenu** — a green circular
-button at the bottom of every screen. Pressing it opens a full-screen white overlay
-with a 3×3 grid of menu items. Back buttons are disabled on all screens.
+button at the bottom of every screen. Pressing it opens a full-screen overlay
+with a 3×3 grid of menu items (lucide icons, active state highlighted).
+Back buttons are disabled on all screens. Safe area insets handled via `useSafeAreaInsets`.
 
 ### Dashboard (index.tsx)
 
-1. **Greeting** — "Здравствуйте, {name} 👋"
-2. **Stories row** — horizontal scroll of circular thumbnails (mock data, admin management planned)
-3. **Notification banners** — colored cards (info/warning/success) with dismiss button (mock data, admin management planned)
-4. **Barbershop carousel** — swipeable cards, one per barbershop:
-   - Barbershop name + city
-   - Revenue (big green number)
-   - Period label
+1. **Header** — green avatar circle (initials, links to profile), SVG BORODACH logo (centered, height matches avatar), bell icon with red dot (links to notifications)
+2. **Stories row** — horizontal circular thumbnails with lucide icons. 5 items auto-fit to screen width, scrollable when more than 5. (Mock data, admin management planned)
+3. **Warning banners** — full-width yellow cards with dismiss button
+4. **Info banners** — horizontal scroll, left-aligned, next card peeks from the right edge. Snap-to-interval scrolling with dot indicators
+5. **Barbershop carousel** — swipeable cards, one per barbershop:
+   - Barbershop name above card (with text wrapping)
+   - Green circle with scissors icon in top-left of card
+   - Pill-shaped "Сегодня"/"Месяц" toggle chips in top-right (borderRadius: 20)
+   - Revenue (big green number) — default period is "today"
    - Metrics row: records, avg check, rank position with change arrow
-   - **Toggle button** "месяц"/"сегодня" in top-right corner — flips between today and monthly stats with animation
+   - Fade animation on period switch
    - Dot indicators for multiple barbershops
 
 ### Screens
 
 | Screen | Route | Description |
 |--------|-------|-------------|
-| Dashboard | `/` | Stories, notifications, barbershop cards carousel |
-| Statistics | `/stats` | Period selector, per-salon revenue/records/rank cards |
-| Tasks | `/tasks` | Active/all toggle, grouped task list, create/cancel |
-| Rating | `/rating` | Network leaderboard, partner salons highlighted |
-| Create Task | `/create-task` | 5-step wizard (modal) |
-| Useful | `/useful` | Expandable department cards with content |
-| AI Chat | `/ai-chat` | Chat bubbles, "Подробнее" button |
+| Dashboard | `/` | Logo, stories, notifications, barbershop cards carousel |
+| Statistics | `/stats` | Pill chips for periods, per-salon revenue/records/rank cards |
+| Tasks | `/tasks` | Active/all pill chips, grouped task list, create/cancel, auto-refresh on focus |
+| Rating | `/rating` | Pill chips (Текущий/Предыдущий), period label left + salon count right |
+| Create Task | `/create-task` | Bottom sheet (transparentModal), 5-step wizard, back arrow per step, cancel button |
+| Useful | `/useful` | Nested accordions — department expands to show items, items expand to show content |
+| AI Chat | `/ai-chat` | Chat bubbles, "Подробнее" button, input above menu button |
 | Contact | `/contact` | Office contact info from settings |
 | Polls | `/polls` | Radio buttons, vote submission |
 | Profile | `/profile-screen` | Name, phone, role, dates, salon list |
+| Notifications | `/notifications` | Grouped by date, read/unread status, detail modal |
 
-### Theme
+### Design system
 
-Light theme (Wio-inspired):
-- Background: `#F2F2F7`
-- Cards: `#FFFFFF`
-- Accent (green): `#5CAE5D`
-- Text: `#1A1A1A`
-- All borders: `0.5` width (thin lines)
-- Font: system default (Helvetica-like)
+- **Title font**: 22px, fontWeight 600, on all screens
+- **Pill chips**: borderRadius 20, 1px border, light green bg when active
+- **Cards**: white bg, subtle shadow, no heavy borders
+- **Accent**: `#5CAE5D` (green)
+- **Background**: `#F2F2F7`
+- **Text**: `#1A1A1A`
+- **Borders**: 1px or hairlineWidth
+- **Icons**: lucide-react-native, 20-32px
 
 ### Config
 
@@ -199,7 +211,7 @@ export const PARTNER_ID = 12;
 ```bash
 # Prerequisites: Xcode + iOS Simulator runtime installed
 cd mobile
-npx expo start
+npx expo start --ios --clear
 # Press 'i' to open iOS simulator
 ```
 
@@ -255,7 +267,8 @@ eas submit --platform ios --latest
 - Bundle ID: `com.borodach.partner`
 - App Store Connect: https://appstoreconnect.apple.com/apps/6761262674/testflight/ios
 - EAS Project: `ae220f6e-d335-4845-a41c-95917e2b543d`
-- Current buildNumber: **3**
+- Current buildNumber: **4**
+- userInterfaceStyle: **light**
 
 ---
 
@@ -263,21 +276,27 @@ eas submit --platform ios --latest
 
 1. ✅ Backend API (services + mobile_api)
 2. ✅ React Native app (Stack navigator, floating menu, light theme)
-3. ✅ TestFlight build & distribution (build #3)
+3. ✅ TestFlight build & distribution (build #4)
 4. ✅ Statistics, Rating, Profile
 5. ✅ Tasks (Bitrix: create, view, cancel)
-6. ✅ Useful info (departments + content)
+6. ✅ Useful info (departments + nested accordion content)
 7. ✅ AI assistant (chat with RAG + OpenAI)
 8. ✅ Contact office
 9. ✅ Polls (voting)
 10. ✅ Add barbershop request
 11. ✅ iOS Simulator dev workflow
 12. ✅ UI redesign — light Wio-style theme, floating menu, thin borders
-13. ✅ Dashboard: barbershop carousel with today/month toggle
-14. ✅ Dashboard: stories row (mock data — admin upload planned)
-15. ✅ Dashboard: notification banners (mock data — admin management planned)
-16. ⬜ Stories: admin panel for uploading stories content
-17. ⬜ Notifications: admin panel for managing notification banners
-18. ⬜ JWT authentication (login screen, refresh tokens)
-19. ⬜ Push notifications (Expo Push + FCM)
-20. ⬜ Chat between partners (отложено — отдельная задача)
+13. ✅ Dashboard: barbershop carousel with today/month pill toggle + fade animation
+14. ✅ Dashboard: stories row (auto-fit 5, mock data — admin upload planned)
+15. ✅ Dashboard: notification banners (left-aligned info scroll, mock data — admin planned)
+16. ✅ Dashboard: SVG logo in header
+17. ✅ UI polish: pill chips on all screens, unified 22px titles, bottom-sheet task creation
+18. ✅ Create task: bottom sheet with cancel button, back arrow between steps
+19. ✅ Tasks: auto-refresh on screen focus after task creation
+20. ✅ Rating: pill chips, period label left + salon count right
+21. ✅ Useful: nested accordions (department → item → content)
+22. ⬜ Stories: admin panel for uploading stories content
+23. ⬜ Notifications: admin panel for managing notification banners
+24. ⬜ JWT authentication (login screen, refresh tokens)
+25. ⬜ Push notifications (Expo Push + FCM)
+26. ⬜ Chat between partners (отложено — отдельная задача)
