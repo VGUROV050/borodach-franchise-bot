@@ -7,8 +7,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { Stack } from "expo-router";
-import { Card } from "@/components/ui/Card";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { BookOpen, ChevronDown, ChevronUp } from "lucide-react-native";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useApi } from "@/hooks/useApi";
@@ -16,9 +16,13 @@ import { api } from "@/lib/api";
 import { colors, spacing, fonts, radius } from "@/lib/theme";
 import type { DepartmentButton } from "@/lib/types";
 
+const HEADER_ICON = 32;
+const ACCENT = "#5CAE5D";
+
 export default function UsefulScreen() {
   const { data, loading, error, refresh } = useApi(() => api.getDepartments());
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedBtn, setExpandedBtn] = useState<number | null>(null);
   const [buttons, setButtons] = useState<Record<string, DepartmentButton[]>>(
     {},
   );
@@ -47,57 +51,105 @@ export default function UsefulScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: "Полезное" }} />
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <BookOpen size={HEADER_ICON} color={ACCENT} strokeWidth={2} />
+        <Text style={styles.headerTitle}>Полезное</Text>
+      </View>
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        {data?.map((dept) => (
-          <View key={dept.key}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => toggleDepartment(dept.key)}
-            >
-              <Card
-                style={[
-                  styles.deptCard,
-                  expanded === dept.key && styles.deptCardExpanded,
-                ]}
+        {data?.map((dept) => {
+          const isOpen = expanded === dept.key;
+          return (
+            <View key={dept.key} style={styles.deptGroup}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => toggleDepartment(dept.key)}
+                style={[styles.deptCard, isOpen && styles.deptCardActive]}
               >
-                <Text style={styles.deptName}>{dept.name}</Text>
-                <Text style={styles.chevron}>
-                  {expanded === dept.key ? "▾" : "›"}
+                <Text style={[styles.deptName, isOpen && styles.deptNameActive]}>
+                  {dept.name}
                 </Text>
-              </Card>
-            </TouchableOpacity>
-
-            {expanded === dept.key && (
-              <View style={styles.buttonsList}>
-                {loadingDept === dept.key ? (
-                  <ActivityIndicator
-                    color={colors.accent}
-                    style={styles.loader}
-                  />
-                ) : buttons[dept.key]?.length === 0 ? (
-                  <Text style={styles.emptyText}>Нет информации</Text>
+                {isOpen ? (
+                  <ChevronUp size={20} color={colors.accent} />
                 ) : (
-                  buttons[dept.key]?.map((btn) => (
-                    <Card key={btn.id} style={styles.btnCard}>
-                      <Text style={styles.btnTitle}>{btn.button_text}</Text>
-                      <Text style={styles.btnMessage}>
-                        {btn.message_text}
-                      </Text>
-                    </Card>
-                  ))
+                  <ChevronDown size={20} color={colors.textMuted} />
                 )}
-              </View>
-            )}
-          </View>
-        ))}
+              </TouchableOpacity>
+
+              {isOpen && (
+                <View style={styles.buttonsList}>
+                  {loadingDept === dept.key ? (
+                    <ActivityIndicator
+                      color={colors.accent}
+                      style={styles.loader}
+                    />
+                  ) : buttons[dept.key]?.length === 0 ? (
+                    <Text style={styles.emptyText}>Нет информации</Text>
+                  ) : (
+                    buttons[dept.key]?.map((btn) => (
+                      <View key={btn.id}>
+                        <TouchableOpacity
+                          style={[
+                            styles.btnCard,
+                            expandedBtn === btn.id && styles.btnCardActive,
+                          ]}
+                          activeOpacity={0.7}
+                          onPress={() =>
+                            setExpandedBtn(expandedBtn === btn.id ? null : btn.id)
+                          }
+                        >
+                          <Text
+                            style={[
+                              styles.btnTitle,
+                              expandedBtn === btn.id && styles.btnTitleActive,
+                            ]}
+                          >
+                            {btn.button_text}
+                          </Text>
+                          {expandedBtn === btn.id ? (
+                            <ChevronUp size={18} color={colors.accent} />
+                          ) : (
+                            <ChevronDown size={18} color={colors.textMuted} />
+                          )}
+                        </TouchableOpacity>
+                        {expandedBtn === btn.id && (
+                          <View style={styles.btnContent}>
+                            <Text style={styles.btnMessage}>
+                              {btn.message_text}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ))
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })}
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: colors.text,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -107,34 +159,40 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: 100,
   },
+  deptGroup: {
+    gap: spacing.sm,
+  },
   deptCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: "transparent",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  deptCardExpanded: {
+  deptCardActive: {
     borderColor: colors.accent,
-    borderWidth: 0.5,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    backgroundColor: colors.accentLight,
   },
   deptName: {
     ...fonts.medium,
     fontWeight: "600",
+    flex: 1,
+    color: colors.text,
   },
-  chevron: {
-    fontSize: 18,
-    color: colors.textMuted,
+  deptNameActive: {
+    color: colors.accent,
   },
   buttonsList: {
-    backgroundColor: colors.bg,
-    borderWidth: 0.5,
-    borderTopWidth: 0,
-    borderColor: colors.border,
-    borderBottomLeftRadius: radius.md,
-    borderBottomRightRadius: radius.md,
-    padding: spacing.sm,
     gap: spacing.sm,
+    paddingLeft: spacing.sm,
   },
   loader: {
     padding: spacing.md,
@@ -146,13 +204,39 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   btnCard: {
-    backgroundColor: colors.cardAlt,
-    gap: spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  btnCardActive: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   btnTitle: {
     ...fonts.regular,
-    fontWeight: "700",
-    color: colors.accentLight,
+    fontWeight: "600",
+    color: colors.text,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  btnTitleActive: {
+    color: colors.accent,
+  },
+  btnContent: {
+    backgroundColor: colors.card,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    borderBottomLeftRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+    padding: spacing.md,
   },
   btnMessage: {
     ...fonts.regular,

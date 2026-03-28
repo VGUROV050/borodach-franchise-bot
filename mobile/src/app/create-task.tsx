@@ -8,8 +8,13 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
+import { ArrowLeft } from "lucide-react-native";
 import { Card } from "@/components/ui/Card";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
@@ -38,6 +43,7 @@ const STEP_TITLES: Record<Step, string> = {
 
 export default function CreateTaskScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState<Step>("department");
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [selectedShop, setSelectedShop] = useState<Company | null>(null);
@@ -98,23 +104,52 @@ export default function CreateTaskScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerTitle: "Новая задача" }} />
-      <View style={styles.screen}>
-        <View style={styles.progress}>
-          {STEPS.map((s, i) => (
-            <View
-              key={s}
-              style={[styles.dot, i <= stepIndex && styles.dotActive]}
-            />
-          ))}
-        </View>
-        <Text style={styles.stepTitle}>{STEP_TITLES[step]}</Text>
-
-        <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.overlay}>
+        <Pressable style={styles.backdrop} onPress={() => router.back()} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.sheetWrap}
         >
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.md }]}>
+            <View style={styles.dragHandle} />
+            <View style={styles.topBar}>
+              {stepIndex > 0 ? (
+                <TouchableOpacity
+                  style={styles.backArrow}
+                  onPress={goBack}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                >
+                  <ArrowLeft size={20} color={colors.text} strokeWidth={2} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.backArrow} />
+              )}
+              <Text style={styles.topBarTitle}>Новая задача</Text>
+              <TouchableOpacity
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Text style={styles.cancelText}>Отмена</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.progress}>
+              {STEPS.map((s, i) => (
+                <View
+                  key={s}
+                  style={[styles.dot, i <= stepIndex && styles.dotActive]}
+                />
+              ))}
+            </View>
+            <Text style={styles.stepTitle}>{STEP_TITLES[step]}</Text>
+
+            <ScrollView
+              style={styles.scrollArea}
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+            >
           {step === "department" &&
             departments.data?.map((dept) => (
               <TouchableOpacity
@@ -222,13 +257,9 @@ export default function CreateTaskScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </ScrollView>
-
-        {step !== "department" && (
-          <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-            <Text style={styles.backBtnText}>← Назад</Text>
-          </TouchableOpacity>
-        )}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </View>
     </>
   );
@@ -252,9 +283,51 @@ function ConfirmRow({
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  overlay: {
     flex: 1,
-    backgroundColor: colors.bg,
+    justifyContent: "flex-end",
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  sheetWrap: {
+    maxHeight: "80%",
+  },
+  sheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  dragHandle: {
+    alignSelf: "center",
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  backArrow: {
+    width: 32,
+  },
+  cancelText: {
+    fontSize: 15,
+    color: colors.danger,
+    fontWeight: "500",
+  },
+  topBarTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "600",
+    color: colors.text,
   },
   progress: {
     flexDirection: "row",
@@ -272,17 +345,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   stepTitle: {
-    ...fonts.large,
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textSecondary,
     textAlign: "center",
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   scrollArea: {
-    flex: 1,
+    flexGrow: 0,
   },
   content: {
     padding: spacing.md,
     gap: spacing.sm,
-    paddingBottom: 100,
   },
   optionCard: {
     gap: spacing.xs,
@@ -355,14 +429,5 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "800",
     fontSize: 16,
-  },
-  backBtn: {
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  backBtnText: {
-    ...fonts.regular,
-    color: colors.textSecondary,
-    fontWeight: "600",
   },
 });

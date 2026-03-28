@@ -8,15 +8,21 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
-import { Stack } from "expo-router";
-import { Card } from "@/components/ui/Card";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ClipboardList, Check } from "lucide-react-native";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { colors, spacing, fonts, radius } from "@/lib/theme";
+import { formatDate } from "@/lib/formatters";
 import type { Poll } from "@/lib/types";
+
+const HEADER_ICON = 32;
+const ACCENT = "#5CAE5D";
+const OPTION_BG = "#F8F8FA";
 
 export default function PollsScreen() {
   const { data, loading, error, refresh } = useApi(() => api.getPolls());
@@ -44,8 +50,11 @@ export default function PollsScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: "Опросы" }} />
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <ClipboardList size={HEADER_ICON} color={ACCENT} strokeWidth={2} />
+        <Text style={styles.headerTitle}>Опросы</Text>
+      </View>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
@@ -58,9 +67,9 @@ export default function PollsScreen() {
         }
       >
         {polls.length === 0 ? (
-          <Card>
+          <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>Нет активных опросов</Text>
-          </Card>
+          </View>
         ) : (
           polls.map((poll) => {
             const isVoted = voted.has(poll.id);
@@ -71,8 +80,18 @@ export default function PollsScreen() {
             );
 
             return (
-              <Card key={poll.id} style={styles.pollCard}>
+              <View key={poll.id} style={styles.pollCard}>
                 <Text style={styles.question}>{poll.question}</Text>
+                <Text style={styles.dateMuted}>
+                  {formatDate(poll.created_at)}
+                </Text>
+
+                {isVoted ? (
+                  <View style={styles.votedBadge}>
+                    <Check size={18} color={ACCENT} strokeWidth={2.5} />
+                    <Text style={styles.votedText}>Вы проголосовали</Text>
+                  </View>
+                ) : null}
 
                 <View style={styles.options}>
                   {sortedOptions.map((opt) => {
@@ -100,7 +119,9 @@ export default function PollsScreen() {
                             isSelected && styles.radioSelected,
                           ]}
                         >
-                          {isSelected && <View style={styles.radioDot} />}
+                          {isSelected ? (
+                            <View style={styles.radioDot} />
+                          ) : null}
                         </View>
                         <Text
                           style={[
@@ -115,17 +136,13 @@ export default function PollsScreen() {
                   })}
                 </View>
 
-                {isVoted ? (
-                  <View style={styles.votedBadge}>
-                    <Text style={styles.votedText}>✓ Голос учтён</Text>
-                  </View>
-                ) : (
+                {!isVoted && selectedOption ? (
                   <TouchableOpacity
                     style={[
                       styles.voteBtn,
-                      (!selectedOption || isVoting) && styles.voteBtnDisabled,
+                      isVoting && styles.voteBtnDisabled,
                     ]}
-                    disabled={!selectedOption || isVoting}
+                    disabled={isVoting}
                     onPress={() => handleVote(poll)}
                   >
                     {isVoting ? (
@@ -134,17 +151,34 @@ export default function PollsScreen() {
                       <Text style={styles.voteBtnText}>Голосовать</Text>
                     )}
                   </TouchableOpacity>
-                )}
-              </Card>
+                ) : null}
+              </View>
             );
           })
         )}
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: colors.text,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -154,21 +188,56 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: 100,
   },
+  emptyCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
   emptyText: {
     ...fonts.regular,
     color: colors.textMuted,
     textAlign: "center",
   },
   pollCard: {
-    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
   },
   question: {
-    ...fonts.medium,
-    fontWeight: "700",
+    fontSize: 17,
+    fontWeight: "600",
+    color: colors.text,
     lineHeight: 24,
+  },
+  dateMuted: {
+    ...fonts.caption,
+    color: colors.textMuted,
+    marginTop: -spacing.xs,
   },
   options: {
     gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   option: {
     flexDirection: "row",
@@ -176,65 +245,73 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.sm,
     borderRadius: radius.sm,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    borderWidth: 2,
+    borderColor: "transparent",
+    backgroundColor: OPTION_BG,
   },
   optionSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accentBg,
+    borderColor: ACCENT,
+    backgroundColor: OPTION_BG,
   },
   optionDisabled: {
     opacity: 0.7,
   },
   radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
     borderColor: colors.textMuted,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "transparent",
   },
   radioSelected: {
-    borderColor: colors.accent,
+    borderColor: ACCENT,
+    backgroundColor: ACCENT,
   },
   radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.white,
   },
   optionText: {
     ...fonts.regular,
     flex: 1,
+    color: colors.text,
   },
   optionTextSelected: {
-    color: colors.accentLight,
     fontWeight: "600",
   },
   voteBtn: {
-    backgroundColor: colors.accent,
+    backgroundColor: ACCENT,
     borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: "center",
+    marginTop: spacing.sm,
   },
   voteBtnDisabled: {
-    opacity: 0.4,
+    opacity: 0.7,
   },
   voteBtnText: {
     color: colors.white,
-    fontWeight: "800",
-    fontSize: 15,
+    fontWeight: "700",
+    fontSize: 16,
   },
   votedBadge: {
-    backgroundColor: `${colors.success}20`,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm,
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.xs,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(92,174,93,0.12)",
+    borderRadius: radius.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
   },
   votedText: {
-    color: colors.success,
-    fontWeight: "700",
+    color: ACCENT,
+    fontWeight: "600",
     fontSize: 14,
   },
 });

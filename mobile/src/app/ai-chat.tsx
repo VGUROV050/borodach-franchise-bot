@@ -10,10 +10,13 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { Stack } from "expo-router";
-import { Card } from "@/components/ui/Card";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Bot, Send } from "lucide-react-native";
 import { api } from "@/lib/api";
 import { colors, spacing, fonts, radius } from "@/lib/theme";
+
+const HEADER_ICON = 32;
+const ACCENT = "#5CAE5D";
 
 interface Message {
   id: string;
@@ -90,7 +93,7 @@ export default function AIChatScreen() {
             onPress={() => sendQuestion(item.originalQuestion!, true)}
             disabled={loading}
           >
-            <Text style={styles.detailBtnText}>Подробнее</Text>
+            <Text style={styles.detailBtnText}>Подробнее →</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -98,12 +101,15 @@ export default function AIChatScreen() {
   }
 
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: "AI-ассистент" }} />
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <Bot size={HEADER_ICON} color={ACCENT} strokeWidth={2} />
+        <Text style={styles.headerTitle}>AI-ассистент</Text>
+      </View>
       <KeyboardAvoidingView
         style={styles.screen}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {messages.length === 0 ? (
           <View style={styles.placeholder}>
@@ -148,19 +154,39 @@ export default function AIChatScreen() {
             multiline
           />
           <TouchableOpacity
-            style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
+            style={[
+              styles.sendBtn,
+              (!input.trim() || loading) && styles.sendBtnDisabled,
+            ]}
             disabled={!input.trim() || loading}
             onPress={() => sendQuestion(input)}
           >
-            <Text style={styles.sendBtnText}>→</Text>
+            <Send size={22} color={colors.white} strokeWidth={2} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: colors.text,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -187,7 +213,7 @@ const styles = StyleSheet.create({
   messagesList: {
     padding: spacing.md,
     gap: spacing.sm,
-    paddingBottom: 100,
+    paddingBottom: spacing.md,
   },
   messageBubble: {
     borderRadius: radius.md,
@@ -195,24 +221,25 @@ const styles = StyleSheet.create({
     maxWidth: "85%",
   },
   userBubble: {
-    backgroundColor: colors.accent,
+    backgroundColor: ACCENT,
     alignSelf: "flex-end",
   },
   aiBubble: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.white,
     alignSelf: "flex-start",
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
   },
   aiLabel: {
     ...fonts.caption,
-    color: colors.accent,
-    fontWeight: "700",
+    color: colors.textSecondary,
+    fontWeight: "600",
     marginBottom: spacing.xs,
   },
   messageText: {
     ...fonts.regular,
     lineHeight: 22,
+    color: colors.text,
   },
   userText: {
     color: colors.white,
@@ -224,8 +251,8 @@ const styles = StyleSheet.create({
   },
   detailBtnText: {
     ...fonts.caption,
-    color: colors.accent,
-    fontWeight: "700",
+    color: ACCENT,
+    fontWeight: "600",
   },
   loadingRow: {
     flexDirection: "row",
@@ -240,39 +267,39 @@ const styles = StyleSheet.create({
   },
   inputRow: {
     flexDirection: "row",
-    padding: spacing.md,
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 120,
     gap: spacing.sm,
-    borderTopWidth: 0.5,
-    borderTopColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.bg,
   },
   input: {
     flex: 1,
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
+    backgroundColor: colors.white,
+    borderRadius: 22,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 10,
     color: colors.text,
     fontSize: 16,
+    minHeight: 44,
     maxHeight: 100,
-    borderWidth: 0.5,
-    borderColor: colors.border,
+    borderWidth: 0,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.accent,
+    backgroundColor: ACCENT,
     alignItems: "center",
     justifyContent: "center",
-    alignSelf: "flex-end",
   },
   sendBtnDisabled: {
     opacity: 0.4,
-  },
-  sendBtnText: {
-    fontSize: 20,
-    color: colors.white,
-    fontWeight: "800",
   },
 });

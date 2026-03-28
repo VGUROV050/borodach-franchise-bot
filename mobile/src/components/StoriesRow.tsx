@@ -5,24 +5,37 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Image,
+  Dimensions,
 } from "react-native";
+import { Tag, Newspaper, GraduationCap, Package, Store } from "lucide-react-native";
 import { colors, spacing } from "@/lib/theme";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const FIT_COUNT = 5;
+const SIDE_PAD = spacing.md;
+const ITEM_WIDTH = (SCREEN_WIDTH - SIDE_PAD * 2) / FIT_COUNT;
 
 export interface StoryItem {
   id: number;
   title: string;
-  image_url: string | null;
-  emoji: string;
+  icon: string;
   is_new: boolean;
 }
 
+const ICON_MAP: Record<string, React.ComponentType<any>> = {
+  tag: Tag,
+  news: Newspaper,
+  education: GraduationCap,
+  package: Package,
+  store: Store,
+};
+
 const MOCK_STORIES: StoryItem[] = [
-  { id: 1, title: "Акции", emoji: "🎁", image_url: null, is_new: true },
-  { id: 2, title: "Новости", emoji: "📰", image_url: null, is_new: true },
-  { id: 3, title: "Обучение", emoji: "🎓", image_url: null, is_new: false },
-  { id: 4, title: "Продукция", emoji: "✂️", image_url: null, is_new: false },
-  { id: 5, title: "Франшиза", emoji: "🏢", image_url: null, is_new: false },
+  { id: 1, title: "Акции", icon: "tag", is_new: true },
+  { id: 2, title: "Новости", icon: "news", is_new: true },
+  { id: 3, title: "Обучение", icon: "education", is_new: false },
+  { id: 4, title: "Продукция", icon: "package", is_new: false },
+  { id: 5, title: "Франшиза", icon: "store", is_new: true },
 ];
 
 interface Props {
@@ -30,87 +43,102 @@ interface Props {
   onPress?: (story: StoryItem) => void;
 }
 
+function StoryCircle({
+  story,
+  onPress,
+}: {
+  story: StoryItem;
+  onPress?: (s: StoryItem) => void;
+}) {
+  const IconComponent = ICON_MAP[story.icon] || Tag;
+  return (
+    <TouchableOpacity
+      style={[styles.item, { width: ITEM_WIDTH }]}
+      activeOpacity={0.7}
+      onPress={() => onPress?.(story)}
+    >
+      <View
+        style={[styles.ring, story.is_new ? styles.ringNew : styles.ringViewed]}
+      >
+        <View style={styles.circle}>
+          <IconComponent size={24} color={colors.textSecondary} />
+        </View>
+      </View>
+      <Text style={styles.label} numberOfLines={1}>
+        {story.title}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export function StoriesRow({ stories = MOCK_STORIES, onPress }: Props) {
   if (stories.length === 0) return null;
+
+  if (stories.length <= FIT_COUNT) {
+    return (
+      <View style={styles.fitRow}>
+        {stories.map((story) => (
+          <StoryCircle key={story.id} story={story} onPress={onPress} />
+        ))}
+      </View>
+    );
+  }
 
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.container}
+      contentContainerStyle={styles.scrollContainer}
     >
       {stories.map((story) => (
-        <TouchableOpacity
-          key={story.id}
-          style={styles.item}
-          activeOpacity={0.7}
-          onPress={() => onPress?.(story)}
-        >
-          <View style={[styles.ring, story.is_new && styles.ringNew]}>
-            <View style={styles.circle}>
-              {story.image_url ? (
-                <Image
-                  source={{ uri: story.image_url }}
-                  style={styles.image}
-                />
-              ) : (
-                <Text style={styles.emoji}>{story.emoji}</Text>
-              )}
-            </View>
-          </View>
-          <Text style={styles.label} numberOfLines={1}>
-            {story.title}
-          </Text>
-        </TouchableOpacity>
+        <StoryCircle key={story.id} story={story} onPress={onPress} />
       ))}
     </ScrollView>
   );
 }
 
-const CIRCLE_SIZE = 64;
-const RING_SIZE = CIRCLE_SIZE + 6;
+const CIRCLE_SIZE = 50;
+const RING_SIZE = 58;
 
 const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: spacing.md,
-    gap: 14,
+  fitRow: {
+    flexDirection: "row",
+    paddingHorizontal: SIDE_PAD,
+    paddingBottom: spacing.sm,
+  },
+  scrollContainer: {
+    paddingHorizontal: SIDE_PAD,
+    paddingBottom: spacing.sm,
   },
   item: {
     alignItems: "center",
-    width: RING_SIZE + 4,
   },
   ring: {
     width: RING_SIZE,
     height: RING_SIZE,
     borderRadius: RING_SIZE / 2,
     borderWidth: 2,
-    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.bg,
   },
   ringNew: {
     borderColor: colors.accent,
+  },
+  ringViewed: {
+    borderColor: colors.textMuted,
   },
   circle: {
     width: CIRCLE_SIZE,
     height: CIRCLE_SIZE,
     borderRadius: CIRCLE_SIZE / 2,
-    backgroundColor: colors.cardAlt,
+    backgroundColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
-  },
-  image: {
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-    borderRadius: CIRCLE_SIZE / 2,
-  },
-  emoji: {
-    fontSize: 28,
   },
   label: {
     fontSize: 11,
-    fontWeight: "500",
+    fontWeight: "400",
     color: colors.textSecondary,
     marginTop: 6,
     textAlign: "center",

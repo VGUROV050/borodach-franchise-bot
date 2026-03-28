@@ -1,14 +1,24 @@
 import React from "react";
-import { ScrollView, View, Text, StyleSheet, RefreshControl } from "react-native";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  RefreshControl,
+  Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { User, Info } from "lucide-react-native";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
 import { ErrorMessage } from "@/components/ui/ErrorMessage";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { colors, spacing, fonts } from "@/lib/theme";
+import { colors, spacing, fonts, radius } from "@/lib/theme";
 import { formatDate } from "@/lib/formatters";
-import { Stack } from "expo-router";
+
+const HEADER_ICON = 32;
+const ACCENT = "#5CAE5D";
+const PENDING_BG = "#E8F5E9";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   verified: { label: "Верифицирован", color: colors.success },
@@ -29,8 +39,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerTitle: "Профиль" }} />
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <User size={HEADER_ICON} color={ACCENT} strokeWidth={2} />
+        <Text style={styles.headerTitle}>Профиль</Text>
+      </View>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={styles.content}
@@ -42,50 +55,57 @@ export default function ProfileScreen() {
           />
         }
       >
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {p.full_name.charAt(0).toUpperCase()}
-            </Text>
+        {p.has_pending_branch && p.pending_branch_text ? (
+          <View style={styles.pendingBanner}>
+            <Info size={20} color={ACCENT} strokeWidth={2} />
+            <Text style={styles.pendingText}>{p.pending_branch_text}</Text>
           </View>
-          <Text style={styles.name}>{p.full_name}</Text>
-          <Badge label={statusInfo.label} bgColor={statusInfo.color} />
-        </View>
+        ) : null}
 
-        <Card>
+        <View style={styles.profileCard}>
+          <InfoRow label="ФИО" value={p.full_name} />
+          <InfoRow label="Статус" value={statusInfo.label} />
           <InfoRow label="Телефон" value={p.phone_masked} />
           <InfoRow
             label="Роль"
             value={p.is_owner ? "Владелец" : (p.position ?? "Сотрудник")}
           />
-          <InfoRow label="Регистрация" value={formatDate(p.created_at)} />
-          {p.verified_at && (
+          <InfoRow
+            label="Регистрация"
+            value={formatDate(p.created_at)}
+            last={!p.verified_at}
+          />
+          {p.verified_at ? (
             <InfoRow
               label="Верификация"
               value={formatDate(p.verified_at)}
               last
             />
-          )}
-        </Card>
+          ) : null}
+        </View>
 
-        <Text style={styles.sectionTitle}>Салоны</Text>
+        <Text style={styles.salonsTitle}>Салоны</Text>
         {p.companies.length === 0 ? (
-          <Card>
+          <View style={styles.salonCard}>
             <Text style={styles.emptyText}>Нет привязанных салонов</Text>
-          </Card>
+          </View>
         ) : (
           p.companies.map((c) => (
-            <Card key={c.id}>
-              <Text style={styles.companyName}>💈 {c.name}</Text>
-              {c.city && <Text style={styles.companyDetail}>{c.city}</Text>}
-              {c.region && <Text style={styles.companyDetail}>{c.region}</Text>}
-            </Card>
+            <View key={c.id} style={styles.salonCard}>
+              <Text style={styles.companyName}>{c.name}</Text>
+              {c.city ? (
+                <Text style={styles.companyDetail}>{c.city}</Text>
+              ) : null}
+              {c.region ? (
+                <Text style={styles.companyDetail}>{c.region}</Text>
+              ) : null}
+            </View>
           ))
         )}
 
         <Text style={styles.version}>v0.1.0 — TestFlight MVP</Text>
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -107,6 +127,23 @@ function InfoRow({
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: colors.text,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -116,55 +153,89 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingBottom: 100,
   },
-  header: {
-    alignItems: "center",
+  pendingBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing.sm,
-    paddingVertical: spacing.lg,
+    backgroundColor: PENDING_BG,
+    borderWidth: 1,
+    borderColor: ACCENT,
+    borderRadius: radius.md,
+    padding: spacing.md,
   },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
+  pendingText: {
+    ...fonts.regular,
+    flex: 1,
+    color: colors.text,
+    lineHeight: 20,
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: colors.white,
-  },
-  name: {
-    ...fonts.title,
-  },
-  sectionTitle: {
-    ...fonts.large,
-    marginTop: spacing.sm,
+  profileCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      default: {},
+    }),
   },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: spacing.sm,
+    alignItems: "flex-start",
+    gap: spacing.md,
+    paddingVertical: spacing.md,
   },
   infoRowBorder: {
-    borderBottomWidth: 0.5,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
   infoLabel: {
     ...fonts.regular,
     color: colors.textSecondary,
+    flexShrink: 0,
   },
   infoValue: {
     ...fonts.regular,
-    fontWeight: "600",
+    fontWeight: "500",
+    color: colors.text,
+    flex: 1,
+    textAlign: "right",
+  },
+  salonsTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: spacing.xs,
+  },
+  salonCard: {
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+      default: {},
+    }),
   },
   companyName: {
     ...fonts.medium,
     fontWeight: "600",
+    fontSize: 16,
   },
   companyDetail: {
     ...fonts.caption,
-    marginTop: 2,
+    marginTop: 4,
   },
   emptyText: {
     ...fonts.regular,
